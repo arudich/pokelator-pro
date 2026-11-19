@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokelator Pro</title>
+    <link rel="stylesheet" href="styles.css?v=20261118-format-plus-one-popup-fix" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <button id="metaModeToggle" type="button" class="mini-button meta-mode active" aria-pressed="true" title="Meta Mode weights all scoring of stat distributions by opposing Pokémon’s relative frequency in the meta. Uses measured Smogon Champions Showdown usage; hover updates with format and snapshot date.">Meta Mode</button>
+          <div class="brand-badge">P</div>
+          <div>
+            <div class="brand-title">Pokelator Pro</div>
+            <div class="brand-subtitle">Battle calculator</div>
+          </div>
+        </div>
+
+        <div class="format-toggle" role="group" aria-label="Battle format">
+          <button type="button" class="mini-button" data-format="Singles" aria-pressed="false">Singles</button>
+          <button type="button" class="mini-button active" data-format="Doubles" aria-pressed="true">Doubles</button>
+        </div>
+        <nav class="header-actions" aria-label="navigation">
+          <button id="battleViewButton" class="primary-button active" aria-pressed="true">Battle View</button>
+          <button id="teamBuilderButton" class="secondary-button" aria-pressed="false">Team Builder</button>
+        </nav>
+      </header>
+
+      <main class="layout">
+        <aside class="panel our-team-panel">
+          <div class="panel-header">
+            <h2 id="activeTeamName">My team</h2>
+          </div>
+
+          <details id="teamLibraryPanel" class="team-library">
+            <summary>Other Teams</summary>
+            <label class="library-field">Saved team<select id="teamLibrarySelect"></select></label>
+            <label class="library-field">Name<input id="teamNameInput" type="text" maxlength="80" /></label>
+            <div class="library-actions"><button id="newTeamButton" type="button" class="mini-button">New</button>
+              <button id="duplicateTeamButton" type="button" class="mini-button">Duplicate</button>
+              <button id="deleteTeamButton" type="button" class="mini-button">Delete</button></div>
+            <div class="library-actions"><button id="exportTeamButton" type="button" class="mini-button">Export team</button>
+              <button id="exportLibraryButton" type="button" class="mini-button">Export all</button>
+              <button id="importTeamsButton" type="button" class="mini-button">Import</button>
+              <button id="copyTeamLinkButton" type="button" class="mini-button">Copy team link</button></div>
+            <input id="teamImportInput" type="file" accept="application/json,.json" hidden />
+            <input id="teamShareLink" type="text" aria-label="Team share link" readonly hidden />
+            <p id="libraryStatus" class="status-note" role="status" hidden></p>
+            <button id="undoTeamDeleteButton" type="button" class="mini-button" hidden>Undo deletion</button>
+          </details>
+
+          <form id="teamAddForm" class="search-box">
+            <label class="field-label" for="teamPokemonInput">Add Pokémon <span id="teamCount"></span></label>
+            <div class="team-add-row"><input id="teamPokemonInput" type="text" list="speciesList" placeholder="Choose a Pokémon" autocomplete="off" required />
+              <button id="addTeamButton" type="submit" class="mini-button">Add</button></div>
+            <p id="teamAddStatus" class="status-note" role="status" hidden></p>
+          </form>
+          <div id="ourTeamList" class="team-list"></div>
+          <p id="storageStatus" class="status-note" role="status">Teams save automatically on edit</p>
+        </aside>
+
+        <section id="teamBuilderPanel" class="panel builder-panel" hidden>
+          <div class="panel-header"><h2 id="builderPanelTitle">Speed tiers</h2>
+            <label class="builder-usage-filter" for="builderTopN">Top <input id="builderTopN" type="text" inputmode="numeric" value="100" aria-label="Show top Pokémon by usage" /><span id="builderUsageFormat">by Doubles usage</span></label>
+          </div>
+          <div class="inline-actions builder-analysis-tabs" aria-label="Team Builder analysis">
+            <button type="button" class="mini-button active" data-builder-panel="speed" aria-pressed="true">Speed</button>
+            <button type="button" class="mini-button" data-builder-panel="offense" aria-pressed="false">Offense</button>
+            <button type="button" class="mini-button" data-builder-panel="team-offense" aria-pressed="false">Team Offense</button>
+            <button type="button" class="mini-button" data-builder-panel="defense" aria-pressed="false">Defense</button>
+            <button type="button" class="mini-button" data-builder-panel="balance" aria-pressed="false">Balance</button>
+          </div>
+          <div id="teamOffenseMembers" class="team-offense-members" role="group" aria-label="Team members included in offense" hidden></div>
+          <div id="builderOffenseFields" class="field-controls" hidden>
+            <div id="offenseWeatherInput" class="field-icon-options" data-field-options="weather" role="group" aria-label="Weather"></div>
+            <div id="offenseTerrainInput" class="field-icon-options" data-field-options="terrain" role="group" aria-label="Terrain"></div>
+            <div class="fainted-control"><div id="offenseFaintedInput" class="field-icon-options" role="group" aria-label="Fainted Team Members"></div></div>
+            <div class="fainted-control" hidden><div id="defenseFaintedInput" class="field-icon-options" role="group" aria-label="Fainted Opponents"></div></div>
+          </div>
+          <div id="builderSelectedSummary" class="builder-selected-summary"></div>
+          <div id="builderScore" class="builder-score" hidden></div>
+          <label id="builderMoveTrialRow" class="builder-move-trial" hidden>
+            <input id="builderMoveTrial" type="checkbox" disabled />
+            <span id="builderMoveTrialText">Finding best move swap…</span><small id="builderMoveTrialGain"></small>
+          </label>
+          <div id="builderAttackTrialRow" class="builder-move-trial investment-trial" hidden>
+            <label><input id="builderAttackTrial" type="checkbox" /> Try removing</label>
+            <input id="builderAttackReduction" type="number" min="0" max="32" step="1" value="1" aria-label="Attack stat points to remove" />
+            <span>Attack investment</span>
+          </div>
+          <div id="builderSpecialAttackTrialRow" class="builder-move-trial investment-trial" hidden>
+            <label><input id="builderSpecialAttackTrial" type="checkbox" /> Try removing</label>
+            <input id="builderSpecialAttackReduction" type="number" min="0" max="32" step="1" value="1" aria-label="Special Attack stat points to remove" />
+            <span>Special Attack investment</span>
+          </div>
+          <div id="teamOffenseTrials" class="team-offense-trials" aria-label="Team move suggestions" hidden></div>
+          <div id="builderDefenseTrialRow" class="builder-move-trial investment-trial" hidden>
+            <label><input id="builderDefenseTrial" type="checkbox" disabled /><span id="builderDefenseTrialText"></span></label>
+            <input id="builderDefensePoints" type="number" min="0" max="66" step="1" aria-label="Stat points to invest in defense" />
+            <span id="builderDefenseTrialSuffix">stat points into defense</span><small id="builderDefenseTrialSpread"></small>
+          </div>
+          <details id="builderDefenseAssumptions" class="builder-assumptions" hidden>
+            <summary>Strongest available attacks, weighted by estimated sets</summary>
+            <p>Stat stages selected in Battle View apply to both sides.</p>
+            <p>Lower-left percentages show the chance of this KO tier or better across reported builds and damage rolls (1, 2 or 3 hits). For the 4+ tier, they show eventual KO under the same no-healing model. Unavailable probabilities show a dash. Accuracy and between-hit healing are excluded. In Defense, this is the opponent’s chance of KOing us, including estimated strongest-move availability.</p>
+            <p>For each reported stat spread, the opponent uses its strongest available damaging move. We then average across estimated move availability and reported spread frequencies. Weather/terrain setters have paired active/inactive entries, sharing one opponent’s scoring weight. Hover begins with the field assumption. Complete four-move sets are unavailable: move inclusion is approximated independently from each move’s usage. A 5% coverage move therefore contributes only when present, with the next-best available attack used otherwise. Unreported moves are excluded; probability with no modeled damaging attack contributes zero rather than inflating rare moves. Conditional counter/OHKO moves such as Metal Burst are excluded, without discarding other attacks. Zero-damage moves are not counted as chosen attacks. Hover shows the current field, estimated effective best-attack shares, original move usage and the probability with no effective reported attack. Tiers summarize weighted damage; individual sets can KO sooner. Internal damage scores are not displayed. Checked previews outline tier changes: green for improved survival, red for worse.</p>
+            <p>Tiers describe opponents KOing our selected Pokémon, using our exact build, ability and item, and the selected weather/terrain. Nearly Guaranteed OHKO requires every modeled move and spread to KO on its lowest roll. Disguise costs one turn; Multiscale and Shadow Shield reduce only the first attack. Accuracy, healing, subsequent stat changes and full multi-hit simulation are excluded. Missing data and unmodeled survival or turn effects appear under “4+ hits / other” with an explanation on hover.</p>
+            <p>The editable spread budget defaults to all free points; typing or arrows lets you spend fewer. The preview spends that budget across HP, Defense and Sp. Def, preserving all existing investment and the 32-per-stat cap. A bounded multi-start coordinate search looks for low opponents’ tier points (5 / 4 / 2.5 / 2.5 / 0.5 / 0); Probable OHKO requires at least a 50% modeled one-hit KO chance; Might OHKO covers chances above 0% and below 50%. Tied results prefer less incoming damage. One-point budget edits choose the best local HP/Defense/Sp. Def change, with a broader search every five edits. This fast search is approximate, not an exhaustive guarantee. When checked, icon badges show the next tier change along one shared locally optimal removal path; its suffixes are cached for arrow edits. Checking the box previews the spread without editing the saved build.</p>
+          </details>
+          <p id="builderBalanceStatus" class="status-note" role="status" hidden></p>
+          <div id="builderBalanceOptimize" hidden>
+            <p id="builderBalanceScore" class="status-note"></p>
+            <div class="inline-actions">
+              <button id="balanceOptimizeStart" title="Optimize against all Pokémon in the current Top N list." type="button" class="mini-button">Optimize all stats</button>
+              <button id="balanceOptimizeStop" type="button" class="mini-button" hidden>Stop</button>
+              <button id="balanceOptimizeLock" type="button" class="mini-button" disabled>Lock in best spread</button>
+              <label class="checkbox-row"><input id="balanceOptimizePreview" type="checkbox" disabled /> Preview best spread</label>
+            </div>
+            <p id="balanceOptimizeProgress" class="status-note" role="status"></p>
+          </div>
+          <details id="builderBalanceAssumptions" class="builder-assumptions" hidden>
+            <summary>Estimated full-HP 1v1s · usage-weighted builds and items</summary>
+            <p>Each opponent contributes its win rate (0–1) to the total score. Meta Mode (on by default) weights stat-distribution scoring by measured Smogon Champions usage; off weights opponents equally. Weights are normalized over the displayed opponents, with paired fields sharing one weight. The source is the monthly Showdown ladder, not the in-game ladder. The optimizer reallocates all 66 SP across all six stats with a cap of 32 per stat, holding nature, moves, ability and item fixed. This approximate multi-start search uses only the current Top N list. It checks physical/special bulk alternatives, screens at 16 trials per matchup, then follows local improvements at 64 trials, with a combined limit of 160 spread evaluations. Promising spreads are validated at 256 trials. Sampled opponent builds, earlier trials and repeated damage calculations are reused. Shared seeds reduce comparison noise; the displayed best score is always validated at 256 trials and never falls below the original build. This remains an in-sample estimate, not an exhaustive or independently validated optimum. Preview does not edit the saved team.</p>
+            <p>We Win is 85–100% estimated wins; We Lose is 0–15%. The middle tiers split at 50%; exact ties are Close But Unfavored. Sprite badges, tier placement and sorting all use simulated wins across all trials, including cases with unresolved sets. A dash means no modeled result. Hover retains conditional rates, modeled coverage, turn order and item details. Estimates use 256 seeded trials per opponent/field scenario.</p>
+            <p>Our saved build and moves are exact; both sides start at full HP with their selected stat stages. Opponents sample reported stat spreads, full natures, abilities and common items, including Speed items. Mega Stones are required. Missing item/nature probability uses no item/neutral nature; only reported spreads are modeled. The two most common moves are always present; two further moves are sampled by relative usage without replacement. Coverage weights are conditional, not the original inclusion percentages. These statistics are separate distributions, not observed joint builds.</p>
+            <details><summary id="builderBalanceCoreSummary">Fixed-core model cautions</summary><ul id="builderBalanceCoreAudit"></ul></details>
+            <p>This is a direct-attack duel estimate, not a complete battle AI: setup, recovery/status-move strategies, switching, recharge/charge attacks and contextual counter/OHKO moves are excluded. Best direct attacks, Speed/priority, accuracy, damage rolls, multi-hit attacks, offensive self-drops, recoil, common passive healing/berries, Focus Sash/Sturdy/Disguise and selected field effects are modeled. Attack selection uses a short KO-time heuristic. Duels stop after 20 turns; draws/unmodeled sets are reported. Critical hits, PP exhaustion and complex move/ability effects are not modeled; field conditions are held fixed. One active foe means no spread-damage penalty even when usage format is Doubles.</p>
+          </details>
+          <details id="builderOffenseAssumptions" class="builder-assumptions" hidden>
+            <summary>Reported spreads, weighted by usage</summary>
+            <p>Stat stages selected in Battle View apply here, including the defender’s stages.</p>
+            <p>Lower-left percentages show the chance of this KO tier or better across reported builds and damage rolls (1, 2 or 3 hits). For the 4+ tier, they show eventual KO under the same no-healing model. Unavailable probabilities show a dash. Accuracy and between-hit healing are excluded.</p>
+            <p>Each opponent uses all reported SP spreads from <a href="https://championsbattledata.com/" target="_blank" rel="noreferrer">Champions Battle Data</a>, weighted by their reported frequencies. Unreported builds are excluded. Weather/terrain setters have paired active/inactive entries; each pair shares one opponent’s scoring weight. Active fields use subtle colored tiles; hover begins with the exact assumption. Nature and ability assumptions and selected items follow your existing controls; these are separate usage statistics, not jointly observed sets.</p>
+            <p>Tiers use one internal average damage result from the best calculable move in this set. Nearly Guaranteed OHKO requires the lowest roll to KO every modeled spread. Repeated use includes offensive self-drops, their stage caps, Contrary/Simple and one-use White Herb. Other stat changes, accuracy and healing are excluded; multi-hit moves use one hit. Hover for the move, reference data and reported coverage.</p>
+            <p>Disguise adds one turn to the KO estimate. Multiscale halves only the first attack; follow-up attacks use normal damage. Other survival effects or moves needing unmodeled turn context appear under Uh Oh with an explanation on hover. Move trials preview a swap without editing the saved set. In single Offense, Attack-removal and move-swap previews combine; borders compare the net tier against the original saved build, and the summary shows the preview stats. While stat removal is checked, icon badges show additional Attack/Sp. Atk points needed for a tier change in six-point brackets; the other preview stats and moves stay fixed. A dash means no change within the remaining removable points. These shared background sweeps do not solve separately for each opponent. Checked previews outline tier changes: green for better coverage, red for worse; Focus Punch, charge and recharge moves are excluded from suggestions, which try the strongest available offensive-self-drop move and the strongest steady-damage move of each type using our build against an equal-defense benchmark, then maximize the displayed opponents’ tier points (5 / 4 / 2.5 / 2.5 / 0.5 / 0).</p>
+            <p id="builderOffenseContext"></p>
+            <p id="teamOffenseNote" hidden>Team coverage uses the best single attack from the highlighted members, not combined damage. Each swap’s gain is measured independently against their current saved moves; checking multiple swaps previews their combined coverage. Only highlighted members are searched and shown.</p>
+          </details>
+          <div id="builderSpeedTiers" class="builder-speed-tiers" tabindex="0" aria-label="Opponent speed tiers"></div>
+          <div id="builderOffenseTiers" class="builder-speed-tiers" tabindex="0" aria-label="Opponent KO tiers" hidden></div>
+        </section>
+
+        <section class="panel battle-panel">
+          <div class="active-card-row">
+            <div class="active-card">
+              <div class="section-label our-active-heading">Our Active<span class="base-stat-caption">Base stats</span><div id="ourActiveBaseStats"></div></div>
+              <div id="ourActiveSummary" class="active-summary"></div>
+            </div>
+
+            <div class="active-card opponent-card">
+              <div class="section-label opponent-active-heading" aria-label="Opponent Active">Op. Active<span class="base-stat-caption">Base stats</span><div id="opponentActiveBaseStats"></div></div>
+              <div id="opponentActiveSummary" class="active-summary"></div>
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <article class="card damage-card">
+              <div class="damage-toolbar">
+                <h3>Damage Ranges</h3>
+                <div class="inline-actions direction-controls" aria-label="Damage direction">
+                  <button class="mini-button active" data-damage-direction="outgoing" aria-pressed="true">Us → Them</button>
+                  <button class="mini-button" data-damage-direction="incoming" aria-pressed="false">Them → Us</button>
+                </div>
+                <div class="battle-field-icons">
+                  <div id="weatherInput" class="field-icon-options" data-field-options="weather" role="group" aria-label="Weather"></div>
+                  <div id="terrainInput" class="field-icon-options" data-field-options="terrain" role="group" aria-label="Terrain"></div>
+                  <div id="battleFaintedInput" class="field-icon-options" role="group" aria-label="Fainted Team Members"></div>
+                </div>
+              </div>
+              <div id="abilityAssumptionRow" class="ability-assumption-row" aria-label="Opponent ability assumptions" hidden></div>
+              <div class="stat-stage-controls">
+                <fieldset id="attackerStageControl" class="stat-stage-control"><legend id="attackerStageLabel">Attacker offense (Atk / SpA)</legend><div class="stat-stage-options"></div></fieldset>
+                <fieldset id="defenderStageControl" class="stat-stage-control"><legend id="defenderStageLabel">Defender defense (Def / SpD)</legend><div class="stat-stage-options"></div></fieldset>
+              </div>
+
+              <div class="nature-comparisons"><label class="checkbox-row boosting-check">
+                <input id="boostNatureToggle" type="checkbox" />
+                <span>Opponent defense-boosting nature<small id="defenseNatureUsage" class="nature-usage"></small></span>
+              </label><label class="checkbox-row boosting-check">
+                <input id="boostOffenseNatureToggle" type="checkbox" />
+                <span>Opponent offense-boosting nature<small id="offenseNatureUsage" class="nature-usage"></small></span>
+              </label><button id="natureUsageDefaultsButton" class="mini-button" type="button" hidden>Use usage defaults</button></div>
+
+              <div id="damageRangeSummary" class="damage-list" tabindex="0" aria-label="Damage comparisons"></div>
+              <p id="usageReference" class="status-note"></p>
+            </article>
+
+            <article class="card speed-card">
+              <div class="card-header">
+                <h3>Opponent Speed</h3>
+              </div>
+              <dl id="speedSummary" class="speed-summary" aria-label="Opponent Speed against our selected Pokémon"></dl>
+            </article>
+          </div>
+        </section>
+
+        <aside class="panel opponent-panel">
+          <div class="panel-header">
+            <h2>Opposition</h2>
+            <div class="inline-actions">
+              <button id="itemColorsButton" type="button" class="mini-button" aria-controls="itemColorDialog">Item colors</button>
+              <button id="clearOpponentsButton" class="mini-button">Clear Pokémon</button>
+              <button id="resetBattleButton" type="button" class="mini-button" title="Reset weather, terrain, fainted counts, all stat stages and opponent item, ability and nature overrides. Keep both rosters and our builds.">Reset Battle</button>
+            </div>
+          </div>
+
+          <div class="search-box">
+            <label class="field-label" for="pokemonSearchInput">Add Pokémon</label>
+            <input
+              id="pokemonSearchInput"
+              type="text"
+              autocomplete="off"
+              placeholder="Type a Pokémon"
+            />
+            <div id="searchResults" class="search-results" aria-live="polite"></div>
+          </div>
+
+          <p id="rosterStatus" class="status-note"></p>
+          <p class="status-note">Hover for item details. Click to activate one item; a bright border marks the active item.</p>
+          <div class="opponent-list-wrap">
+            <div id="opponentList" class="opponent-list"></div>
+            <button id="toggleOpponentsButton" class="mini-button" hidden>Show all</button>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <dialog id="itemColorDialog" class="item-color-dialog" aria-labelledby="itemColorTitle">
+      <div class="item-color-header"><h2 id="itemColorTitle">Item &amp; app colors</h2><button id="closeItemColors" type="button" class="mini-button" aria-label="Close item colors">✕</button></div>
+      <button id="pickElementColor" type="button" class="mini-button" aria-pressed="false" title="Select an element to edit its UI color. Escape cancels.">⌖ Pick element</button>
+      <div id="editableColors"></div>
+      <div class="color-editor-actions"><button id="resetItemColors" type="button" class="mini-button">Reset Colors</button><button id="defaultItemColors" type="button" class="mini-button">Site Defaults</button><button id="lockItemColors" type="button" class="mini-button">Lock In</button></div>
+    </dialog>
+    <script src="components/color-picker.js?v=20261118-saved-pokemon"></script>
+    <datalist id="speciesList"></datalist>
+    <script src="vendor/smogon-data-0.12.0.min.js"></script>
+    <script src="vendor/smogon-calc-0.12.0.min.js"></script>
+    <script src="data/champions-roster.js?v=20261118-mega-toggle"></script>
+    <script src="data/item-hints.js"></script>
+    <script src="data/ability-effects.js?v=20261118-mega-toggle"></script>
+    <script src="data/item-sprites.js?v=20261118-mega-toggle"></script>
+    <script src="team-files.js?v=20261118-mega-toggle"></script>
+    <script src="battle.js?v=20261118-fainted-skulls"></script>
+    <script src="offense.js?v=20261118-equal-two-hit-points"></script>
+    <script src="defense.js?v=20261118-offense-might-ohko"></script>
+    <script src="balance.js?v=20261118-mega-toggle"></script>
+    <script src="data/meta-usage.js?v=20261118-mega-toggle"></script>
+    <script src="app.js?v=20261118-user-palette-defaults"></script>
+  </body>
+</html>

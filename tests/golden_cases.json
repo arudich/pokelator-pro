@@ -1,0 +1,10 @@
+[
+  {"attacker":"sneasler","defender":"kingambit","move":"Dire Claw","damage":[0,0],"percent":["0%","0%"]},
+  {"attacker":"sneasler","defender":"kingambit","move":"Close Combat","damage":[352,420],"percent":["201.1%","240%"]},
+  {"attacker":"sneasler","defender":"kingambit","move":"Fake Out","damage":[10,12],"percent":["5.7%","6.8%"]},
+  {"attacker":"sneasler","defender":"kingambit","move":"Acrobatics","damage":[14,16],"percent":["8%","9.1%"]},
+  {"attacker":"kingambit","defender":"sneasler","move":"Sucker Punch","damage":[51,60],"percent":["32.6%","38.4%"]},
+  {"attacker":"kingambit","defender":"sneasler","move":"Kowtow Cleave","damage":[61,72],"percent":["39.1%","46.1%"]},
+  {"attacker":"kingambit","defender":"sneasler","move":"Iron Head","damage":[117,138],"percent":["75%","88.4%"]},
+  {"attacker":"kingambit","defender":"sneasler","move":"Swords Dance","damage":[0,0],"percent":["0%","0%"]}
+]

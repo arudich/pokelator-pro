@@ -1,0 +1,29 @@
+name: Investigate failed nightly refresh
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: 'Health or nightly-refresh run ID to investigate'
+        required: true
+        type: string
+  workflow_run:
+    workflows: ['Nightly data and engine refresh']
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: refresh-investigation
+  cancel-in-progress: false
+jobs:
+  investigate:
+    if: >-
+      github.repository == 'arudich/pokelator-pro' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository))
+    uses: ./.github/workflows/agent-review.yml
+    with:
+      source_run: ${{ github.event.inputs.source_run || format('{0}', github.event.workflow_run.id) }}
+    secrets: inherit

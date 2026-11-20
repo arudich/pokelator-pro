@@ -1,0 +1,19 @@
+{
+  "type": "object", "additionalProperties": false,
+  "required": ["status", "summary", "findings", "sources", "limitations"],
+  "properties": {
+    "status": {"type": "string", "enum": ["healthy", "attention", "uncertain"]},
+    "summary": {"type": "string"},
+    "findings": {"type": "array", "maxItems": 5, "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["severity", "finding", "evidence", "recommendation"],
+      "properties": {
+        "severity": {"type": "string", "enum": ["info", "warning", "high"]},
+        "finding": {"type": "string"}, "evidence": {"type": "string"},
+        "recommendation": {"type": "string"}
+      }
+    }},
+    "sources": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

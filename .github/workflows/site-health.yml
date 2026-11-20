@@ -25,15 +25,12 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
-      - name: Check production and email the health report
+      - name: Check production and prepare the health report
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HEALTH_SITE_URL: ${{ vars.HEALTH_SITE_URL }}
           USAGE_REPORT_TOKEN: ${{ secrets.USAGE_REPORT_TOKEN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          HEALTH_EMAIL_TO: ${{ secrets.HEALTH_EMAIL_TO }}
-          HEALTH_EMAIL_FROM: ${{ secrets.HEALTH_EMAIL_FROM }}
-        run: python scripts/site_health.py --send
+        run: python scripts/site_health.py
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
@@ -47,3 +44,10 @@ jobs:
           name: health-report
           path: health-report/
           retention-days: 90
+  investigate:
+    needs: report
+    if: always() && github.repository == 'arudich/pokelator-pro' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/agent-review.yml
+    with:
+      source_run: ${{ github.run_id }}
+    secrets: inherit

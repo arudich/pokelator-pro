@@ -2,7 +2,17 @@
 
 Production setup completed November 19, 2026: Cloudflare D1 `pokelator-usage` is bound as `USAGE_DB` in production only, with the report credential stored as secrets in Cloudflare and GitHub. Resend uses its test sender while the custom domain is being connected. The audit still targets `https://pokelator-pro.pages.dev`. The setup sections below are retained for recovery or another deployment.
 
-**Pokelator health report** runs on the **1st and 15th at 14:37 UTC** and supports manual runs in GitHub Actions. It checks production and emails a “Healthy” / “Attention needed” report. This is a deterministic automated auditor, with no paid AI model, autonomous code changes, or claim of AI visual inspection.
+**Pokelator health report** runs on the **1st and 15th at 14:37 UTC** and supports manual runs in GitHub Actions. Automated checks prepare the dashboard, then a Codex agent investigates the evidence and the delivery job emails both. A failed nightly refresh also triggers an investigation. The agent cannot modify production and does not claim that passing tests prove mechanics are current.
+
+## Agent review and API credit
+
+The official Codex Action is pinned to the current v1 commit. Its own job has read-only repository permissions, a read-only execution profile, dropped sudo privileges, live web search, and an eight-minute step timeout. It receives the OpenAI API key through the Action's proxy, not as a job-wide environment variable. The separate delivery job receives email credentials but no OpenAI key. Evidence includes failed-step logs, the current audit, source provenance, coverage summaries and recent Git history. Its trusted prompt requires current official patch/upstream research, evidence, uncertainty and specific next steps. This is a real agent investigation, not a model paraphrasing a test summary.
+
+Add the project-scoped API key as `OPENAI_API_KEY` in Actions secrets. The default model is `gpt-6.2-sol` with medium reasoning; the Actions variable `MONITOR_AGENT_MODEL` can override it. Review happens twice monthly and on failed main-branch nightly runs, not on every push or visitor. To manually investigate an existing audit, run **Investigate failed nightly refresh** with that audit’s run ID. No code is automatically changed or merged.
+
+For a modest starting budget, buy a small dollar amount of prepaid API credit and disable automatic recharge. This is not a fixed token pack: model requests and searches consume credit at their applicable rates. Prepaid exhaustion has processing delays and can produce a small negative balance; do not treat it as an instantaneous hard spending cap. Use project/organization spend controls where available, and inspect actual API usage after the first investigation. Runtime limits bound how long a review runs, not its exact dollar cost. See [OpenAI prepaid billing](https://help.openai.com/en/articles/8264644-setting-up-and-managing-prepaid-api-billing).
+
+The delivery job does not call a model. If the agent fails because of `insufficient_quota`, `credit_balance_exhausted`, or a spend limit, the email explicitly says credit/limit exhaustion and still includes the automated report. A plain 429 is labeled rate limiting, not automatically lack of credit. Authentication, permission failures, invalid output and timeouts are also reported. There is no automatic purchase/recharge or silent substitution of automated checks for an AI assessment. The key does not need billing-admin access; this detects exhaustion when an attempted review fails, rather than continuously polling a private balance endpoint.
 
 ## The report
 
@@ -51,7 +61,7 @@ The site remains static except for the counter API. D1/Functions have free-tier 
 
 This is a scheduled audit, not continuous uptime monitoring. GitHub can delay schedules or disable them after prolonged inactivity; nightly bot commits are not a guarantee against suspension. Enable GitHub Actions failure notifications as a second channel. Failures before the email step (e.g. GitHub outage or dependency installation failure) cannot send this report. An independent uptime monitor would be needed for immediate outage alerts.
 
-Health reports do not change live data; existing nightly validation governs publication. A game patch may need adapter changes despite passing checks. Investigate changed reference damage rather than automatically replacing expected values.
+Health reports and agent reviews do not change live data; existing nightly validation governs publication. A game patch may need adapter changes despite passing checks. Investigate changed reference damage rather than automatically replacing expected values.
 
 ## Local preview
 

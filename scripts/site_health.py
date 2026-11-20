@@ -186,7 +186,7 @@ def render_report(snapshot,checks,warnings,usage,baseline,run_url):
     return '\n'.join(lines)+'\n'
 
 
-def send_email(report,warnings,run_id,figure=None,run_url=None):
+def send_email(report,warnings,run_id,figure=None,run_url=None,review=None):
     required=['RESEND_API_KEY','HEALTH_EMAIL_TO','HEALTH_EMAIL_FROM']
     if not all(os.getenv(key) for key in required):raise RuntimeError('Email setup incomplete: configure RESEND_API_KEY, HEALTH_EMAIL_TO and HEALTH_EMAIL_FROM in GitHub Actions secrets.')
     payload={'from':os.environ['HEALTH_EMAIL_FROM'],'to':[os.environ['HEALTH_EMAIL_TO']],
@@ -202,6 +202,8 @@ def send_email(report,warnings,run_id,figure=None,run_url=None):
           <p style="color:#607589;font-size:12px">If images are hidden, the summary is attached as a PNG. The plain-text version contains the full report.</p></div></div>'''
         payload['attachments']=[{'filename':'pokelator-health-summary.png','content_type':'image/png',
                                  'content_id':'health-summary','content':base64.b64encode(Path(figure).read_bytes()).decode()}]
+    if review and figure:
+        payload['html']+='<div style="max-width:712px;margin:24px auto;font:15px/1.6 Arial,sans-serif;color:#192b3e"><h2>Agent assessment</h2><div style="white-space:pre-wrap">'+html.escape(review)+'</div></div>'
     result=request_json('https://api.resend.com/emails',
         {'Authorization':'Bearer '+os.environ['RESEND_API_KEY'],'Content-Type':'application/json',
          'Idempotency-Key':'pokelator-health-'+run_id},

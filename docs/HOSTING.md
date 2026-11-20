@@ -2,6 +2,8 @@
 
 Production: **https://pokelator-pro.pages.dev** (connected and verified November 19, 2026).
 
+Twice-monthly production audits, direct email, and optional aggregate usage counters are implemented in [HEALTH-REPORTS.md](HEALTH-REPORTS.md). Email secrets and a Cloudflare D1 binding need one-time configuration before delivery/counting are active. `pokelator.win` is the purchased custom domain; switch the report URL after it is connected.
+
 Recommended setup: **Cloudflare Pages Free + this GitHub repository**. The app remains static: damage calculations run in the visitor's browser. No rented server, database, paid build service, or site account system is needed.
 
 ## One-time setup

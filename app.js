@@ -667,6 +667,7 @@ function createLibraryTeam(copy = false) {
   const team = {id:teamId(), name:uniqueTeamName(copy ? `${active.name} copy` : 'New team'),
     pokemon:copy ? structuredClone(state.ourTeam) : [], updatedAt:new Date().toISOString()};
   state.teamLibrary.push(team); selectLibraryTeam(team.id);
+  window.SiteUsage?.count('team_created');
   document.getElementById('teamNameInput').focus(); document.getElementById('teamNameInput').select();
 }
 function libraryMessage(message) {
@@ -680,6 +681,7 @@ function importTeamSnapshots(teams) {
     state.teamLibrary.push(record); return record;
   });
   selectLibraryTeam(added[0].id);
+  for(const team of added) window.SiteUsage?.count('team_imported');
   document.getElementById('teamLibraryPanel').open = true;
   libraryMessage(`Imported ${added.length} ${added.length === 1 ? 'team' : 'teams'}.`);
 }
@@ -757,6 +759,7 @@ function addTeamPokemon(name,savedBuild=null) {
     return false;
   }
   state.ourTeam.push(sanitizeTeamEntry(savedBuild ? {...structuredClone(savedBuild),name:species.name} : {name:species.name,...popularTeamBuild(species)}));
+  window.SiteUsage?.count('pokemon_added');
   if(!state.teamOffenseCustomized) resetTeamOffenseSelection();
   else state.teamOffenseExcluded.add(state.ourTeam.at(-1));
   state.activeOurIndex = state.ourTeam.length - 1;
@@ -2340,6 +2343,7 @@ function bindStaticControls() {
 }
 
 function setupItemHighlightEditor() {
+  let colorUsageTimer;
   const dialog=document.getElementById('itemColorDialog');
   const rows=document.getElementById('editableColors');
   const options=[['selected','Selected Pokémon items','#70d7ff'],['other','Other Pokémon items','#3e7a91'],...APP_COLOR_OPTIONS];
@@ -2367,6 +2371,8 @@ function setupItemHighlightEditor() {
     });
     row.addEventListener('color-change',event=>{
       values(key)[key]=validHighlightColor(event.detail.value);apply();sync(false);
+      clearTimeout(colorUsageTimer);
+      colorUsageTimer=setTimeout(()=>window.SiteUsage?.count('color_change'),1000);
     });
   }
   document.getElementById('itemColorsButton').addEventListener('click',()=>{
@@ -2384,6 +2390,7 @@ function setupItemHighlightEditor() {
   document.getElementById('lockItemColors').addEventListener('click',()=>{
     Object.assign(lockedItemColors,itemHighlightColors);Object.assign(lockedAppColors,appColors);
     saveUISettings();
+    window.SiteUsage?.count('color_saved');
   });
   document.addEventListener('keydown',event=>{if(event.key==='Escape' && dialog.open) dialog.close();});
   const pickButton=document.getElementById('pickElementColor');
@@ -2632,6 +2639,10 @@ function renderDamageRanges() {
     return {name, range};
   }).sort((a, b) => (b.range.high ?? -1) - (a.range.high ?? -1)
     || (b.range.low ?? -1) - (a.range.low ?? -1)) : incomingThreats(theirs, ours);
+  if(moves.some(row=>!row.range.error) && state.view==='battle') window.SiteUsage?.count('matchup',JSON.stringify([
+    ours,theirs,state.damageDirection,state.format,state.weather,state.terrain,state.alliesFainted,state.opponentsFainted,
+    getPreferences(ours,'our'),getPreferences(theirs,'opponent')
+  ]));
   container.innerHTML = moves.map(row => {
     const moveName = row.name;
     let meta = row.range.meta || Battle.moveMeta(moveName);

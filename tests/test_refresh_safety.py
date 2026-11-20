@@ -40,6 +40,16 @@ class RefreshSafetyTests(unittest.TestCase):
         def fetch(url):return b'<html>Service unavailable</html>' if url=='https://www.smogon.com/stats/2026-11/' else self.fetch(url)
         with self.assertRaisesRegex(RuntimeError,'completeness cannot be verified'):snapshot(discover=True,fetcher=fetch)
 
+    def test_mixed_quote_links_select_the_actual_newer_published_pair(self):
+        def fetch(url):
+            if url=='https://www.smogon.com/stats/':return b"<a href='2026-11/'><a href=2026-10/>"
+            if url.endswith('/'):
+                return b"<a href='gen9championsbssregmc-1630.txt'><a href='gen9championsvgc2026regmc-1630.txt'><a href=\"other-1630.txt\">"
+            return TABLE
+        data=snapshot(discover=True,fetcher=fetch)
+        self.assertEqual(data['formats']['Singles']['month'],'2026-11')
+        self.assertEqual(data['discovery']['skippedUnpublishedFormats'],[])
+
     def test_missing_format_and_empty_category_are_rejected_with_identity(self):
         for mutation,message in [('format','Gogoat.*Singles'),('category','Furfrou.*Doubles.*spreads')]:
             with tempfile.TemporaryDirectory() as temp:
@@ -58,3 +68,25 @@ class RefreshSafetyTests(unittest.TestCase):
             meta['formats']['Doubles']['species']=dict(list(meta['formats']['Doubles']['species'].items())[:150])
             (root/'data/meta-usage.js').write_text('window.META_USAGE = '+json.dumps(meta)+';')
             with self.assertRaisesRegex(ValueError,'Doubles: meta coverage fell'):validate(root)
+
+    def test_missing_replaced_species_and_nonempty_truncation_need_review(self):
+        for mutation in ['missing','replacement','truncated']:
+            with tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);shutil.copytree(ROOT/'data',root/'data');shutil.copytree(ROOT/'vendor',root/'vendor')
+                roster=payload(root/'data/champions-roster.js')
+                if mutation=='missing':roster['pokemon']=[p for p in roster['pokemon'] if p['id']!='Gogoat']
+                elif mutation=='replacement':next(p for p in roster['pokemon'] if p['id']=='Gogoat')['id']='UnexpectedReplacement'
+                else:
+                    species=next(p for p in roster['pokemon'] if p['id']=='Furfrou')
+                    species['usage']['Doubles']['spreads']=species['usage']['Doubles']['spreads'][:1]
+                (root/'data/champions-roster.js').write_text('window.CHAMPIONS_ROSTER = '+json.dumps(roster)+';')
+                with self.assertRaisesRegex(ValueError,'Gogoat|Furfrou Doubles: spreads sharply reduced'):validate(root)
+
+    def test_concentrated_but_complete_distribution_is_not_called_truncated(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);shutil.copytree(ROOT/'data',root/'data');shutil.copytree(ROOT/'vendor',root/'vendor')
+            roster=payload(root/'data/champions-roster.js')
+            usage=next(p for p in roster['pokemon'] if p['id']=='Furfrou')['usage']['Doubles']
+            usage['spreads']=usage['spreads'][:1];usage['spreads'][0]['percent']=100
+            (root/'data/champions-roster.js').write_text('window.CHAMPIONS_ROSTER = '+json.dumps(roster)+';')
+            validate(root)

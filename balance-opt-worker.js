@@ -1,6 +1,6 @@
 'use strict';self.window=self;
 importScripts('vendor/smogon-data.min.js','vendor/smogon-calc.min.js',
-  'battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points','data/balance-moves.js?v=20261118-mega-toggle',
+  'data/move-types.js?v=20261120-champions-types','battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points','data/balance-moves.js?v=20261118-mega-toggle',
   'balance.js?v=20261118-mega-toggle','balance-optimize.js?v=20261118-mega-toggle');
 self.onmessage=async ({data:{job,baselineRows,starts=[]}})=>{
   try {

@@ -2,7 +2,7 @@
 'use strict';
 self.window=self;
 importScripts('vendor/smogon-data.min.js','vendor/smogon-calc.min.js',
-  'battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points','defense.js?v=20261118-offense-might-ohko');
+  'data/move-types.js?v=20261120-champions-types','battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points','defense.js?v=20261118-offense-might-ohko');
 let context='',profiles=[],baselineRows=[],solutions=new Map(),thresholdCache=new Map(),version=0;
 const pause=()=>new Promise(resolve=>setTimeout(resolve,0));
 const identity=row=>row.scenarioId || row.species.id;

@@ -1,6 +1,8 @@
 """Fetch public upstream evidence outside the agent's read-only network sandbox."""
 from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
+import csv
+import io
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -15,8 +17,8 @@ SOURCES={
     'dex-package':'https://registry.npmjs.org/@pkmn/dex/latest',
     'champions-moves':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/champions/moves.ts',
     'champions-abilities':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/champions/abilities.ts',
+    'base-move-reference':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/moves.ts',
     'usage-archive':'https://www.smogon.com/stats/',
-    'official-news':'https://champions.pokemon.com/en-us/news/',
     'official-in-game-news':'https://champions-news.pokemon-home.com/en/json/list.json',
 }
 
@@ -36,18 +38,40 @@ def capture(directory,name,url):
     record={'name':name,'url':url,'checkedAt':dt.datetime.now(dt.timezone.utc).isoformat()}
     text=''
     try:
-        limit=12_000_000 if name=='roster' else 2_000_000
+        limit=64_000_000 if name=='roster' else 2_000_000
         with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Pokelator maintenance evidence'}),timeout=12) as response:
             raw=response.read(limit+1);record['httpStatus']=response.status
         if len(raw)>limit:raise ValueError('Source exceeds evidence size limit')
         record['sha256']=hashlib.sha256(raw).hexdigest();text=raw.decode(errors='replace')
         if name=='roster':
             data=json.loads(text)
-            # Save a structural summary rather than another large roster dump.
             record['topLevelKeys']=list(data) if isinstance(data,dict) else []
-            text=json.dumps(data,ensure_ascii=False)
-            if isinstance(data,dict):
-                record['collectionSizes']={key:len(value) for key,value in data.items() if isinstance(value,(list,dict))}
+            pokemon=data['pokemon'];identities=set();summaries=[];csv_sources=[]
+            for species in pokemon:
+                ids=sorted({form['showdown_name'] for form in species['summary']['forms']});identities.update(ids)
+                current=[source for source in species.get('battleDataCsvs',[]) if source['season']=='Current' and not source.get('daily')]
+                summaries.append({'name':species['showdownName'],'formIds':ids,'learnsetCount':len(species.get('learnableMoveNames',[])),
+                                  'usageFormats':sorted({source['format'] for source in current})})
+                if species['showdownName'] in ['Gogoat','Furfrou','Slurpuff']:
+                    for source in current:
+                        url_path=urllib.parse.urljoin('https://championsbattledata.com/',source['path'])
+                        parsed=urllib.parse.urlsplit(url_path)
+                        if parsed.scheme=='https' and parsed.netloc=='championsbattledata.com' and parsed.path.startswith('/pokemon_champions_assets/battle_data/') and parsed.path.endswith('.csv'):
+                            csv_sources.append({'name':'csv-'+species['showdownName'].lower()+'-'+source['format'].lower(),'url':url_path})
+            record['generatedAt']=data['generatedAt'];record['sourceRecords']=len(pokemon);record['uniqueFormCount']=len(identities)
+            record['csvSources']=csv_sources
+            text=json.dumps({'generatedAt':data['generatedAt'],'formIds':sorted(identities),'records':summaries},ensure_ascii=False)
+        if name.startswith('csv-'):
+            rows=list(csv.DictReader(io.StringIO(text)))
+            if not rows or not all(key in rows[0] for key in ['category','name','percentage']):raise ValueError('Unexpected usage CSV schema')
+            record['categoryRows']={category:sum(row['category']==category for row in rows) for category in sorted({row['category'] for row in rows})}
+        if name=='base-move-reference':
+            blocks=[]
+            for move in ['lastrespects','direclaw','growth','snaptrap','rockslide','screech','metalsound','steelwing','frostbreath']:
+                start=text.find('\n\t'+move+': {');end=text.find('\n\t},',start)+len('\n\t},')
+                if start>=0 and end>start:blocks.append(text[start:end])
+            text='\n'.join(blocks)
+            record['selectedMoveReferences']=len(blocks)
         if name=='official-in-game-news':
             data=json.loads(text)
             articles=sorted(data['data'],key=lambda row:int(row.get('pubAt',0)),reverse=True)
@@ -75,6 +99,8 @@ def collect(directory):
     archive=next(text for record,text in results if record['name']=='usage-archive')
     months=sorted(set(re.findall(r'href="(\d{4}-\d{2})/"',archive)),reverse=True)[:2]
     follow=[('usage-month-'+month,'https://www.smogon.com/stats/'+month+'/') for month in months]
+    for record in records:
+        if record['name']=='roster':follow.extend((source['name'],source['url']) for source in record.get('csvSources',[]))
     for record in list(records):
         if record['name'] not in ['official-news','official-in-game-news']:continue
         links=[]

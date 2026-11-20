@@ -46,7 +46,7 @@
   function moveMeta(name) {
     const move = generation.moves.get(calc.toID(name));
     if (!move) return null;
-    return {name: move.name, category: move.category, type: move.type,
+    return {name: move.name, category: move.category, type: window.CHAMPIONS_MOVE_TYPES?.[calc.toID(name)] || move.type,
       power: move.basePower, selfBoosts:move.self?.boosts || {}, spread: ['allAdjacent', 'allAdjacentFoes'].includes(move.target),
       multihit: move.multihit, defensiveStat: move.overrideDefensiveStat || (move.category === 'Physical' ? 'def' : 'spd'),
       offensiveStat: move.overrideOffensiveStat || (move.category === 'Physical' ? 'atk' : 'spa')};
@@ -77,6 +77,8 @@
         const moveOptions = meta.multihit ? {hits:options.hits || 1} : {};
         // The pinned engine has no Last Respects scaling; supply its actual power.
         if (meta.name === 'Last Respects') moveOptions.overrides = {basePower:50*(1+a.alliesFainted)};
+        const type=window.CHAMPIONS_MOVE_TYPES?.[calc.toID(meta.name)];
+        if(type) moveOptions.overrides={...moveOptions.overrides,type};
         const move = new calc.Move(generation, meta.name, moveOptions);
         const result = calc.calculate(generation, a, d, move, field);
         const [minDamage, maxDamage] = result.range();

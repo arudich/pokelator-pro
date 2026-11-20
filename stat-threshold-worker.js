@@ -2,7 +2,7 @@
 'use strict';
 self.window=self;
 importScripts('vendor/smogon-data.min.js','vendor/smogon-calc.min.js',
-  'battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points');
+  'data/move-types.js?v=20261120-champions-types','battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points');
 self.onmessage=({data:job})=>{
   try {
     let sweeps=0;

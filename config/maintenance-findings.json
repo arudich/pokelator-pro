@@ -42,6 +42,26 @@
       "source": "https://champions-news.pokemon-home.com/en/page/877.html",
       "verification": "Official in-game news confirms scheduled December 2 maintenance, accuracy changes, Rock Slide flinch chance, learnset additions, Flash Fire and Stalwart changes. Read current feed/captures; do not apply these future rules before maintenance.",
       "reopenWhen": "After effective maintenance, compare updated upstream support and actual app mechanics. Warn if sources or adapters have not adopted live rules."
+    },
+    {
+      "id": "usage-mixed-quote-links",
+      "disposition": "fixed",
+      "verification": "refresh_meta_usage.py uses HTMLParser for month/table links, including mixed/single/unquoted attributes. tests/test_refresh_safety.py selects the newer pair from the exact mixed-quote reproduction."
+    },
+    {
+      "id": "roster-identity-and-partial-category",
+      "disposition": "fixed",
+      "verification": "Validator compares accepted identities, rejecting missing/same-count replacements. Sharp row loss also rejects partial category mass, while concentrated complete distributions are allowed. Regressions cover all four cases."
+    },
+    {
+      "id": "roster-evidence-size-cap",
+      "disposition": "fixed",
+      "verification": "Collector now hashes the full body up to 64 MB and saves a compact valid JSON identity summary. The actual source was captured successfully with 347 unique form IDs. It also captures targeted Gogoat/Furfrou/Slurpuff CSV hashes and category counts. A >12 MB regression fixture verifies this behavior."
+    },
+    {
+      "id": "champions-move-type-display",
+      "disposition": "fixed",
+      "verification": "Export preserves explicit Champions type overrides before Dex mutates its input, producing move-types.js. Browser and calculation workers load the map. Growth is Grass in display/search; Snap Trap is Steel, including engine overrides. Browser regression covers Growth in Abomasnow Grass search."
     }
   ]
 }

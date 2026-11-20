@@ -29,11 +29,17 @@ def validate(root=ROOT,baseline_root=ROOT):
         for format,usage in usage_by_format.items():
             for category in ['moves','items','abilities','natures','spreads']:
                 if not usage.get(category):raise ValueError(f'{species["id"]} {format}: empty {category}; source {usage.get("source","unknown")}')
+                old_rows=previous.get(species['id'],{}).get('usage',{}).get(format,{}).get(category,[])
+                rows=usage[category]
+                if len(old_rows)>=5 and len(rows)<len(old_rows)*0.5 and (category=='moves' or sum(row.get('percent') or 0 for row in rows)<95):
+                    raise ValueError(f'{species["id"]} {format}: {category} sharply reduced from {len(old_rows)} to {len(rows)} rows; review source {usage.get("source","unknown")}')
                 for row in usage.get(category,[]):
                     if row.get('percent') is not None and not 0<=row['percent']<=100:raise ValueError('Invalid usage percentage')
                     if category=='spreads':
                         values=[row['investment'][stat] for stat in STATS]
                         if any(not isinstance(n,int) or not 0<=n<=32 for n in values) or sum(values)>66:raise ValueError('Invalid spread')
+    missing=set(previous)-ids
+    if missing:raise ValueError('Previously supported species missing; review before publishing: '+', '.join(sorted(missing)))
     meta=payload(root/'data/meta-usage.js')
     prior_meta=payload(Path(baseline_root)/'data/meta-usage.js') if baseline_root else {'formats':{}}
     if set(meta['formats'])!={'Singles','Doubles'}:raise ValueError('Missing meta format')

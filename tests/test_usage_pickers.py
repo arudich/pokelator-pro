@@ -13,6 +13,7 @@ class UsagePickerTests(unittest.TestCase):
     def test_pokemon_results_usage_stats_and_click_add(self):
         self.load()
         self.assertFalse(self.page.locator('#searchResults').is_visible())
+
         field=self.page.locator('#teamPokemonInput')
         field.fill('char')
         expected=self.evaluate("buildTeamSearchResults('char').map(p=>p.name)")
@@ -26,6 +27,17 @@ class UsagePickerTests(unittest.TestCase):
         self.assertEqual(self.evaluate('state.ourTeam[state.activeOurIndex].name'),expected[0])
         self.assertFalse(self.evaluate("document.getElementById('searchResults').matches(':popover-open')"))
         self.assertFalse(self.page.locator('#searchResults').is_visible())
+
+    def test_champions_move_types_are_used_in_picker_and_damage_metadata(self):
+        self.load()
+        self.evaluate("state.ourTeam=[sanitizeTeamEntry({name:'Abomasnow'})];state.activeOurIndex=0;render()")
+        self.page.locator('.set-editor summary').click()
+        self.page.locator('[data-set-field=move-0]').fill('grass')
+        choice=self.page.locator('#searchResults .move-choice').filter(has_text='Growth')
+        self.assertEqual(choice.count(),1)
+        self.assertIn('Grass · Status',choice.inner_text())
+        self.assertEqual(self.evaluate("Battle.moveMeta('Growth').type"),'Grass')
+        self.assertEqual(self.evaluate("Battle.moveMeta('Snap Trap').type"),'Steel')
 
     def test_move_focus_shows_common_type_and_name_filter_and_saves(self):
         self.load()

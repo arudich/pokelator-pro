@@ -11,6 +11,9 @@ files, publish changes, contact anyone, or start additional agents.
 
 The owner cares most about silent failures in data collection and mechanics
 updates. All prior decisions, tests and source assumptions may be wrong.
+An upstream source can legitimately change after the most recent nightly run.
+Compare capture/check times with the daily refresh cadence before calling a
+newer row or hash evidence of a broken or stale collector.
 Read config/maintenance-findings.json. Verify the recorded fixes rather than
 blindly trusting them. Do not repeat a resolved finding or an intended modeling
 limitation as a new bug unless you reproduce a regression or have new contrary

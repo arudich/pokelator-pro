@@ -2,9 +2,11 @@
 import argparse
 import datetime
 import hashlib
+from html.parser import HTMLParser
 import json
 import re
 import urllib.request
+import urllib.parse
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -13,6 +15,14 @@ FORMATS={'Doubles':'gen9championsvgc2026regmc','Singles':'gen9championsbssregmc'
 
 class IncompleteFormatPair(ValueError):
     """A month was published without a complete Champions pair yet."""
+
+
+def links(markup):
+    class Anchors(HTMLParser):
+        def __init__(self):super().__init__();self.paths=[]
+        def handle_starttag(self,tag,attrs):
+            if tag=='a':self.paths.extend(urllib.parse.urlsplit(value).path for key,value in attrs if key=='href' and value)
+    parser=Anchors();parser.feed(markup);return parser.paths
 
 
 def fetch(url):
@@ -33,7 +43,8 @@ def parse_usage(text):
 
 def discover_formats(index,cutoff):
     pairs={}
-    for filename in re.findall(r'href="([^"/]+\.txt)"',index):
+    for link in links(index):
+        filename=link.rsplit('/',1)[-1]
         match=re.fullmatch(r'(gen(\d+)champions(bss|vgc)(\d{4})?(reg[a-z0-9]+))-'+str(cutoff)+r'\.txt',filename)
         if not match:continue
         key=(int(match[2]),match[5]);label='Singles' if match[3]=='bss' else 'Doubles'
@@ -44,7 +55,7 @@ def discover_formats(index,cutoff):
 
 
 def snapshot(month='latest',cutoff=1630,formats=None,discover=False,fetcher=fetch,minimum_species=100):
-    months=sorted(set(re.findall(r'href="(\d{4}-\d{2})/"',fetcher('https://www.smogon.com/stats/').decode())),reverse=True)[:3] if month=='latest' else [month]
+    months=sorted({path.rstrip('/').rsplit('/',1)[-1] for path in links(fetcher('https://www.smogon.com/stats/').decode()) if re.fullmatch(r'\d{4}-\d{2}',path.rstrip('/').rsplit('/',1)[-1])},reverse=True)[:3] if month=='latest' else [month]
     skipped=[]
     for candidate in months:
         datasets={}
@@ -52,7 +63,7 @@ def snapshot(month='latest',cutoff=1630,formats=None,discover=False,fetcher=fetc
         try:
             if discover:
                 index=fetcher(url).decode()
-                if not re.search(r'href="[^"/]+\.txt"',index):raise ValueError('Archive listing contains no usage tables; source completeness cannot be verified')
+                if not any(path.endswith('.txt') for path in links(index)):raise ValueError('Archive listing contains no usage tables; source completeness cannot be verified')
                 try:selected=discover_formats(index,cutoff)
                 except IncompleteFormatPair as error:
                     if month!='latest':raise

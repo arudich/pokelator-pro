@@ -728,12 +728,17 @@ function loadSavedTeam() {
 function createDefaultTeam() {
   return [
     sanitizeTeamEntry({ name: 'Sneasler', item: 'Focus Sash', ability: 'Pressure', nature: 'Jolly', investment: { hp: 1, atk: 32, def: 1, spa: 0, spd: 0, spe: 32 }, moveSet: ['Dire Claw', 'Close Combat', 'Fake Out', 'Acrobatics'] }),
-    sanitizeTeamEntry({ name: 'Charizard', item: 'Life Orb', nature: 'Timid', investment: { hp: 2, atk: 0, def: 0, spa: 32, spd: 0, spe: 32 }, moveSet: ['Heat Wave', 'Air Slash', 'Solar Beam', 'Protect'] }),
+    sanitizeTeamEntry({ name: 'Mega Charizard Y', nature: 'Timid', investment: { hp: 2, atk: 0, def: 0, spa: 32, spd: 0, spe: 32 }, moveSet: ['Heat Wave', 'Air Slash', 'Solar Beam', 'Protect'] }),
     sanitizeTeamEntry({ name: 'Garchomp', item: 'Life Orb', nature: 'Jolly', investment: { hp: 2, atk: 32, def: 0, spa: 0, spd: 0, spe: 32 }, moveSet: ['Earthquake', 'Dragon Claw', 'Rock Slide', 'Protect'] })
   ];
 }
 
-function createDefaultOpponents() { return [sanitizeOpponentEntry({name: 'Kingambit'})]; }
+function createDefaultOpponents() {
+  const kingambit=sanitizeOpponentEntry({name:'Kingambit'});
+  const key=`opponent:${kingambit.id}`;
+  if(!state.preferences[key]) state.preferences[key]=sanitizePreferences({itemChoice:'Life Orb'});
+  return [sanitizeOpponentEntry({name:'Mega Kangaskhan'}),kingambit];
+}
 
 function popularTeamBuild(species) {
   const usage=getUsage(species);

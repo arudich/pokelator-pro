@@ -483,6 +483,7 @@ class AppTests(unittest.TestCase):
             route.fulfill(status=200,content_type='text/javascript',body=old_adapter)
         self.context.route('**/battle.js',stale_script)
         self.load()
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         # Use the actual set editor, retaining our known Jolly / 32 Speed build.
         self.page.locator('[data-team-index="2"].team-row').click()
         self.page.locator('.set-editor summary').click()
@@ -542,6 +543,7 @@ class AppTests(unittest.TestCase):
 
     def test_opponent_ability_assumption_uses_sole_or_50_percent_ability(self):
         self.load("Singles",frozen_usage=True)
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.assertEqual(self.evaluate('getOpponentAbilityAssumption().name'),'Supreme Overlord')
         self.assertIn('83.9%',self.page.locator('#abilityAssumptionBasis').inner_text())
         self.page.locator('[data-format="Doubles"]').click()
@@ -757,6 +759,7 @@ class AppTests(unittest.TestCase):
 
     def test_neutral_natures_missing_data_and_exact_threshold(self):
         self.load("Singles")
+        self.evaluate("addOpponentFromSearch('Kingambit')")
         self.evaluate("""() => {
           getPokemonByName('Kingambit').usage.Singles.natures=[{name:'Hardy',percent:90,rank:1},{name:'Adamant',percent:10,rank:2}];
           renderDamageRanges();
@@ -779,6 +782,7 @@ class AppTests(unittest.TestCase):
           localStorage.setItem(PREFERENCES_KEY,JSON.stringify({'opponent:Kingambit':{boostDefenseNature:true,boostOffenseNature:false}}));
         }""")
         self.page.reload()
+        self.evaluate("addOpponentFromSearch('Kingambit')")
         self.assertTrue(self.page.locator('#boostNatureToggle').is_checked())
         self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
         self.page.locator('#natureUsageDefaultsButton').click()
@@ -887,7 +891,7 @@ class AppTests(unittest.TestCase):
         self.evaluate("for(let i=0;i<7;i++) addOpponentFromSearch('Gengar')")
         self.assertEqual(self.page.locator('.opponent-row').count(),6)
         self.page.locator('#toggleOpponentsButton').click()
-        self.assertEqual(self.page.locator('.opponent-row').count(),8)
+        self.assertEqual(self.page.locator('.opponent-row').count(),9)
         self.page.locator('#clearOpponentsButton').click()
         self.assertIn('No matchup',self.page.locator('#damageRangeSummary').inner_text())
 
@@ -903,6 +907,7 @@ class AppTests(unittest.TestCase):
 
     def test_incoming_strongest_then_five_common_damaging_moves(self):
         self.load("Singles",frozen_usage=True)
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.page.locator('[data-damage-direction="incoming"]').click()
         rows=self.evaluate('incomingThreats(state.opponentList[0],state.ourTeam[0])')
         self.assertEqual(len(rows),6)
@@ -985,6 +990,7 @@ class AppTests(unittest.TestCase):
 
     def test_missing_spread_data_is_explicit_and_not_synthesized(self):
         self.load("Singles")
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.evaluate("getPokemonByName('Kingambit').usage.Singles.spreads=[]")
         self.page.locator('[data-damage-direction="incoming"]').click()
         self.assertIn('Stat-spread usage unavailable',self.page.locator('.move-row').first.inner_text())
@@ -1046,6 +1052,7 @@ class AppTests(unittest.TestCase):
 
     def test_item_hints_have_usage_description_and_do_not_change_damage(self):
         self.load()
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.assertGreater(self.page.locator('.opponent-row .item-hint img[alt="Life Orb"]').count(),0)
         self.page.locator('[data-damage-direction="incoming"]').click()
         before=self.evaluate('incomingThreats(state.opponentList[0],state.ourTeam[0])')
@@ -1063,12 +1070,13 @@ class AppTests(unittest.TestCase):
 
     def test_opponent_item_activation_is_exclusive_and_affects_all_incoming_ranges(self):
         self.load()
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.assertEqual(self.page.locator('[data-damage-direction]').all_text_contents(),['Us → Them','Them → Us'])
         self.page.locator('[data-damage-direction="incoming"]').click()
         ours=self.evaluate('JSON.stringify(state.ourTeam)')
         opponent=self.evaluate('JSON.stringify(state.opponentList[0])')
         baseline=self.evaluate('incomingThreats(state.opponentList[0],state.ourTeam[0])')
-        self.assertEqual(self.page.locator('.item-hint[aria-pressed="true"]').count(),0)
+        self.assertEqual(self.page.locator('.opponent-row .item-hint[aria-pressed="true"]').count(),0)
         orb=self.page.locator('[data-opponent-item="Life Orb"]')
         glasses=self.page.locator('[data-opponent-item="Black Glasses"]')
         orb.click()
@@ -1086,7 +1094,7 @@ class AppTests(unittest.TestCase):
         glasses.click()
         self.assertEqual(orb.get_attribute('aria-pressed'),'false')
         self.assertEqual(glasses.get_attribute('aria-pressed'),'true')
-        self.assertEqual(self.page.locator('.item-hint[aria-pressed="true"]').count(),1)
+        self.assertEqual(self.page.locator('.opponent-row .item-hint[aria-pressed="true"]').count(),1)
         dark=self.evaluate('incomingThreats(state.opponentList[0],state.ourTeam[0])')
         for name,boosted_by_glasses in [('Sucker Punch',True),('Iron Head',False)]:
             before=next(r for r in baseline if r['name']==name)['ceiling']['high']
@@ -1106,6 +1114,7 @@ class AppTests(unittest.TestCase):
 
     def test_opponent_items_persist_per_species_across_formats_switches_and_reload(self):
         self.load()
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.page.locator('[data-opponent-item="Life Orb"]').click()
         self.evaluate("addOpponentFromSearch('Sylveon')")
         self.assertEqual(self.evaluate('appliedOpponentItem(state.opponentList[0])'),'')
@@ -1134,6 +1143,7 @@ class AppTests(unittest.TestCase):
 
     def test_selected_opponent_item_is_held_in_outgoing_defense_comparisons(self):
         self.load()
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.evaluate("state.ourTeam[0].moveSet=['Knock Off'];render()")
         before=self.page.locator('[data-move="Knock Off"] .defense-line strong').all_text_contents()
         self.page.locator('[data-opponent-item="Life Orb"]').click()

@@ -132,3 +132,27 @@ class ItemColorTests(unittest.TestCase):
         self.assertEqual(self.evaluate('itemHighlightColors'),{'selected':'#aabbcc','other':'#445566'})
         self.page.locator('#resetItemColors').click()
         self.assertEqual(self.evaluate('appColors.accent'),'#abcdef')
+
+    def test_new_browser_uses_cyan_deep_background(self):
+        self.load()
+        self.assertEqual(self.evaluate("appColors['bg-strong']"),'#70d7ff')
+        self.assertEqual(self.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg-strong').trim()"),'#70d7ff')
+
+    def test_legacy_yellow_default_migrates_in_saved_palette_and_reference(self):
+        self.context.add_init_script("""if(!localStorage.getItem('background-test-seeded')) {
+          localStorage.setItem('pokelator-pro-ui-v1',JSON.stringify({deepBackgroundVersion:1,toolbarColorsVersion:2,appColors:{'bg-strong':'#e5aa68',panel:'#123456'}}));
+          localStorage.setItem('pokelator-pro-color-defaults-v1',JSON.stringify({'bg-strong':'#e5aa68'}));
+          localStorage.setItem('background-test-seeded','yes');
+        }""")
+        self.load()
+        self.assertEqual(self.evaluate("appColors['bg-strong']"),'#70d7ff')
+        self.assertEqual(self.evaluate("appColors.panel"),'#123456')
+        self.page.locator('#defaultItemColors').click()
+        self.assertEqual(self.evaluate("appColors['bg-strong']"),'#70d7ff')
+        self.page.reload();self.page.wait_for_selector('.move-row')
+        self.assertEqual(self.evaluate("appColors['bg-strong']"),'#70d7ff')
+
+    def test_non_yellow_custom_background_is_preserved(self):
+        self.context.add_init_script("localStorage.setItem('pokelator-pro-ui-v1',JSON.stringify({deepBackgroundVersion:1,appColors:{'bg-strong':'#223344'}}))")
+        self.load()
+        self.assertEqual(self.evaluate("appColors['bg-strong']"),'#223344')

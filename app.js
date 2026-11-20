@@ -5,7 +5,7 @@ const BUILDER_SETTINGS_KEY = 'pokelator-pro-builder-v1';
 const UI_SETTINGS_KEY = 'pokelator-pro-ui-v1';
 const COLOR_DEFAULTS_KEY = 'pokelator-pro-color-defaults-v1';
 const APP_COLOR_OPTIONS = [
-  ['bg','Page background','#101827'],['bg-strong','Deep background','#e5aa68'],['control-bg','Control background','#0c1320'],
+  ['bg','Page background','#101827'],['bg-strong','Deep background','#70d7ff'],['control-bg','Control background','#0c1320'],
   ['panel','Panels','#172334'],['panel-alt','Secondary panels','#1b2a40'],['panel-soft','Raised surfaces','#233852'],
   ['soft-border','Borders','#2f4565'],['text','Text','#edf3ff'],['muted','Secondary text','#9fb5d0'],
   ['accent','Accent','#6cc3ff'],['accent-strong','Active buttons','#748498'],
@@ -169,6 +169,7 @@ function loadColorDefaults(settings) {
   const current={...settings.appColors,...settings.itemHighlightColors};
   let saved;
   try {saved=JSON.parse(localStorage.getItem(COLOR_DEFAULTS_KEY) || 'null');} catch { /* Capture the current saved palette. */ }
+  if(settings.correctLegacyDeepBackground && saved?.['bg-strong']==='#e5aa68') saved['bg-strong']=settings.appColors['bg-strong'];
   const defaults=Object.fromEntries(Object.entries(current).map(([key,value])=>[key,validHighlightColor(saved?.[key],value)]));
   try {localStorage.setItem(COLOR_DEFAULTS_KEY,JSON.stringify(defaults));} catch { /* Keep the reference palette in memory. */ }
   return defaults;
@@ -178,15 +179,25 @@ function loadUISettings() {
   let saved,defaults;
   try {defaults=JSON.parse(localStorage.getItem(COLOR_DEFAULTS_KEY) || 'null');} catch { /* Use built-in fallbacks. */ }
   try { saved = JSON.parse(localStorage.getItem(UI_SETTINGS_KEY) || '{}'); } catch { /* Use defaults. */ }
-  return {itemHighlightColors:{selected:validHighlightColor(saved?.itemHighlightColors?.selected,validHighlightColor(defaults?.selected)),other:saved?.colorEditorVersion===2 ? validHighlightColor(saved?.itemHighlightColors?.other,validHighlightColor(defaults?.other,'#3e7a91')) : validHighlightColor(defaults?.other,'#3e7a91')},
-    appColors:Object.fromEntries(APP_COLOR_OPTIONS.map(([key,,fallback])=>[key,validHighlightColor((key==='bg-strong' && !saved?.deepBackgroundVersion && saved?.appColors?.[key]==='#0c1320') || (key==='accent-strong' && !saved?.toolbarColorsVersion) || (key==='toolbar-accent' && saved?.toolbarColorsVersion!==2) ? fallback : saved?.appColors?.[key],validHighlightColor(defaults?.[key],fallback))])),
+  const correctLegacyDeepBackground=saved?.deepBackgroundVersion!==2;
+  const appColor=(key,fallback)=>{
+    let baseline=defaults?.[key],value=saved?.appColors?.[key];
+    if(key==='bg-strong' && correctLegacyDeepBackground) {
+      if(baseline==='#e5aa68') baseline=fallback;
+      if(value==='#e5aa68') value=fallback;
+    }
+    if((key==='accent-strong' && !saved?.toolbarColorsVersion) || (key==='toolbar-accent' && saved?.toolbarColorsVersion!==2)) value=fallback;
+    return validHighlightColor(value,validHighlightColor(baseline,fallback));
+  };
+  return {correctLegacyDeepBackground,itemHighlightColors:{selected:validHighlightColor(saved?.itemHighlightColors?.selected,validHighlightColor(defaults?.selected)),other:saved?.colorEditorVersion===2 ? validHighlightColor(saved?.itemHighlightColors?.other,validHighlightColor(defaults?.other,'#3e7a91')) : validHighlightColor(defaults?.other,'#3e7a91')},
+    appColors:Object.fromEntries(APP_COLOR_OPTIONS.map(([key,,fallback])=>[key,appColor(key,fallback)])),
     format:saved?.format === 'Singles' ? 'Singles' : 'Doubles',
     metaMode:saved?.metaMode!==false,
     view:saved?.view === 'builder' ? 'builder' : 'battle',
     builderPanel:['offense','team-offense','defense','balance'].includes(saved?.builderPanel) ? saved.builderPanel : 'speed'};
 }
 function saveUISettings() {
-  try { localStorage.setItem(UI_SETTINGS_KEY,JSON.stringify({format:state.format,metaMode:state.metaMode,view:state.view,builderPanel:state.builderPanel,itemHighlightColors:lockedItemColors,appColors:lockedAppColors,colorEditorVersion:2,deepBackgroundVersion:1,toolbarColorsVersion:2})); }
+  try { localStorage.setItem(UI_SETTINGS_KEY,JSON.stringify({format:state.format,metaMode:state.metaMode,view:state.view,builderPanel:state.builderPanel,itemHighlightColors:lockedItemColors,appColors:lockedAppColors,colorEditorVersion:2,deepBackgroundVersion:2,toolbarColorsVersion:2})); }
   catch { /* Navigation still works when storage is unavailable. */ }
 }
 function renderFormatControls() {

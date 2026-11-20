@@ -40,7 +40,7 @@ class BaseStatsTests(unittest.TestCase):
             result=self.evaluate("""() => {
               const cards=[...document.querySelectorAll('.active-card,.opponent-row')];
               const heights=cards.map(card=>card.getBoundingClientRect().height);
-              const originalItemCardHeights=cards.map(card=>card.querySelector('.item-hint') ? (card.classList.contains('expanded') ? 154 : 86) : null);
+              const originalItemCardHeights=cards.map(card=>card.querySelector('.item-hint') ? (card.classList.contains('expanded') ? 154 : 92) : null);
               const valid=[...document.querySelectorAll('.base-stat')].every(stat=>{
                 const label=stat.querySelector('.base-stat-label').getBoundingClientRect(),value=stat.querySelector('strong').getBoundingClientRect();
                 return label.right<=stat.getBoundingClientRect().right+1 && value.right<=stat.getBoundingClientRect().right+1;

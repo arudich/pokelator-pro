@@ -1,6 +1,6 @@
 # Data and mechanics sources
 
-Reviewed on November 16, 2026.
+Original review: November 16, 2026. The current accepted source dates, engine version and hashes are recorded in `data/refresh-status.json` and `vendor/engine.json`; see the automated-refresh section below.
 
 ## Champions roster and art
 
@@ -193,3 +193,12 @@ OHKO tiers use one attack, 2HKO uses up to two, and 3HKO uses up to three. The o
 ## Ability effect descriptions
 
 `data/ability-effects.js` contains short ability descriptions extracted from [Pokémon Showdown's official ability text](https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/abilities.ts), downloaded November 18, 2026. The MIT license is retained in `vendor/SHOWDOWN-LICENSE`. All 215 roster ability names have descriptions. Rebuild with `python3 scripts/build_ability_effects.py /path/to/abilities.ts`. These explain ability mechanics; displaying a description does not expand the calculator's modeled battle effects.
+
+
+## Automated refresh and release (November 19, 2026)
+
+The hosting pipeline is documented in [HOSTING.md](HOSTING.md). `scripts/refresh_site_data.py` downloads source candidates into a temporary directory, checks published npm tarball integrity, regenerates usage/ability/item/move data, validates the snapshot and only then replaces local candidate files. GitHub's nightly workflow runs the complete browser/damage regression suite before it publishes those files to main. Failure leaves the production snapshot unchanged.
+
+Engine filenames are now stable (`vendor/smogon-calc.min.js`, `vendor/smogon-data.min.js`); `vendor/engine.json` and `vendor/SHA256SUMS` pin each accepted release and its integrity. `data/refresh-status.json` records source URLs/hashes and last successful check versus actual source-generation time. Balance metadata is reproducibly extracted by `scripts/extract_balance_moves.cjs` from the latest stable published `@pkmn/dex`, using the same fields as the original projection. Node is a refresh-time dependency only.
+
+Nightly meta refresh discovers the newest complete matching Champions Singles/Doubles regulation pair in the latest three published months. The standalone script retains explicitly pinned format defaults unless `--discover-formats` is passed. The nightly job opts into discovery via `config/refresh.json` and records selected identifiers. Upstream data/engine publication delays remain possible, especially around balance patches.

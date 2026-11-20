@@ -1,7 +1,7 @@
 /* Persistent models keep one-point adjustments cheap and off the UI thread. */
 'use strict';
 self.window=self;
-importScripts('vendor/smogon-data-0.12.0.min.js','vendor/smogon-calc-0.12.0.min.js',
+importScripts('vendor/smogon-data.min.js','vendor/smogon-calc.min.js',
   'battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points','defense.js?v=20261118-offense-might-ohko');
 let context='',profiles=[],baselineRows=[],solutions=new Map(),thresholdCache=new Map(),version=0;
 const pause=()=>new Promise(resolve=>setTimeout(resolve,0));

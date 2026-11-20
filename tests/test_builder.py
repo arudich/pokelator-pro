@@ -65,7 +65,7 @@ class BuilderTests(unittest.TestCase):
         self.load();self.library()
         self.page.locator('#teamNameInput').fill('Équipe 🚀')
         self.page.locator('#teamNameInput').press('Enter')
-        before=self.evaluate('TeamFiles.pack([state.teamLibrary[0]])')
+        before=self.evaluate('TeamFiles.pack([state.teamLibrary[0]],true)')
         with self.page.expect_download() as download:
             self.page.locator('#exportTeamButton').click()
         content=Path(download.value.path()).read_bytes()

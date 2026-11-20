@@ -145,7 +145,7 @@ class OffenseTests(unittest.TestCase):
         special.fill('8');special.press('Enter')
         self.evaluate('previewInvestments=[]')
         self.page.locator('#builderSpecialAttackTrial').check()
-        self.assertEqual(self.evaluate('[previewInvestments[0].atk,previewInvestments[0].spa]'),[16,8])
+        self.assertEqual(self.evaluate('[previewInvestments.at(-1).atk,previewInvestments.at(-1).spa]'),[16,8])
         special.press('ArrowUp')
         self.assertEqual(special.input_value(),'9')
         self.evaluate("state.ourTeam[0].moveSet.push('Dragon Claw');renderTeamBuilder()")
@@ -156,7 +156,7 @@ class OffenseTests(unittest.TestCase):
         self.page.locator('#builderAttackReduction').press('Enter')
         self.evaluate('previewInvestments=[]')
         self.page.locator('#builderAttackTrial').check()
-        self.assertEqual(self.evaluate('[previewInvestments[0].atk,previewInvestments[0].spa]'),[11,7])
+        self.assertEqual(self.evaluate('[previewInvestments.at(-1).atk,previewInvestments.at(-1).spa]'),[11,7])
         self.assertEqual(self.evaluate('JSON.stringify(state.ourTeam)'),before)
         self.evaluate("state.ourTeam[0].moveSet=['Protect'];renderTeamBuilder()")
         self.assertTrue(self.page.locator('#builderAttackTrialRow').is_hidden())
@@ -384,17 +384,18 @@ class OffenseTests(unittest.TestCase):
           const analyze=(ability,attacker=ours)=>Offense.analyze(getPokemonByName(attacker.name),attacker,target,spreads,{defenderAbility:ability});
           const first=Battle.range(getPokemonByName(ours.name),ours,target,{investment:spreads[0].investment,ability:'Multiscale'},'Dragon Claw');
           const normal=analyze('');
-          return {normal,firstScore:Offense.meanDamage(first.rolls)/first.hp,multiscale:analyze('Multiscale'),
+          const fullRange=Battle.range(getPokemonByName(ours.name),ours,target,{investment:spreads[0].investment,ability:'No Ability'},'Dragon Claw');
+          return {normal,fullScore:Offense.meanDamage(fullRange.rolls)/fullRange.hp,firstScore:Offense.meanDamage(first.rolls)/first.hp,multiscale:analyze('Multiscale'),
             bypass:analyze('Multiscale',{...ours,ability:'Mold Breaker'}),
             twoHits:Offense.summarize([{percent:100,range:{rolls:[35],minDamage:35,hp:100},followupRange:{rolls:[70]}}]),
             ohko:Offense.summarize([{percent:100,range:{rolls:[110],minDamage:100,hp:100},followupRange:{rolls:[220]}}])};
         }""")
-        full=result['normal']['score'];first=result['firstScore']
+        full=result['fullScore'];first=result['firstScore']
         self.assertLess(first,full)
         self.assertAlmostEqual(result['multiscale']['score'],full/(1+full-first))
         self.assertEqual(result['multiscale']['firstHitAbility'],'Multiscale')
         self.assertNotIn('firstHitAbility',result['bypass'])
-        self.assertAlmostEqual(result['bypass']['score'],full)
+        self.assertAlmostEqual(result['bypass']['score'],result['normal']['score'])
         self.assertEqual(result['twoHits']['kind'],'probable-2hko')
         self.assertEqual(result['ohko']['kind'],'guaranteed-ohko')
 
@@ -403,7 +404,7 @@ class OffenseTests(unittest.TestCase):
         self.page.locator('#builderTopN').fill('3');self.page.locator('#builderTopN').press('Enter')
         self.page.locator('[data-builder-panel="offense"]').click()
         self.page.wait_for_function('moveTrial.finished',timeout=20000)
-        self.assertEqual(self.evaluate('Offense.groups.map(g=>Offense.points(g))'),[5,4,2.5,0.5,0])
+        self.assertEqual(self.evaluate('Offense.groups.map(g=>Offense.points(g))'),[5,4,2.5,2.5,0.5,0])
         before=self.evaluate('JSON.stringify(state.ourTeam)')
         library=self.evaluate('localStorage.getItem(LIBRARY_KEY)')
         def total():

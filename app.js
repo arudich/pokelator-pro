@@ -665,7 +665,7 @@ function libraryMessage(message) {
 function importTeamSnapshots(teams) {
   saveTeamToStorage();
   const added = teams.map(team => {
-    const record = {id:teamId(), name:uniqueTeamName(team.name), pokemon:structuredClone(team.pokemon), updatedAt:new Date().toISOString()};
+    const record = {id:teamId(), name:uniqueTeamName(team.name), pokemon:structuredClone(team.pokemon), savedPokemon:structuredClone(team.savedPokemon || []), updatedAt:new Date().toISOString()};
     state.teamLibrary.push(record); return record;
   });
   selectLibraryTeam(added[0].id);
@@ -675,7 +675,7 @@ function importTeamSnapshots(teams) {
 function exportTeams(all = false) {
   saveTeamToStorage();
   const active = state.teamLibrary.find(team => team.id === state.activeTeamId);
-  const blob = new Blob([JSON.stringify(TeamFiles.pack(all ? state.teamLibrary : [active]),null,2)],{type:'application/json'});
+  const blob = new Blob([JSON.stringify(TeamFiles.pack(all ? state.teamLibrary : [active],true),null,2)],{type:'application/json'});
   const url = URL.createObjectURL(blob), link = document.createElement('a');
   link.href = url; link.download = all ? 'pokelator-teams.json' : `${active.name.replace(/[^\p{L}\p{N}_-]/gu,'-') || 'team'}.json`;
   link.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
@@ -1709,7 +1709,9 @@ function updateDefenseTrialControl(selected) {
   const free=Defense.freePoints(selected),trial=defenseTrial;
   const input=document.getElementById('builderDefenseTrial');
   const points=getDefenseBudget(selected),budgetInput=document.getElementById('builderDefensePoints');
-  budgetInput.max=String(free);budgetInput.value=String(points);budgetInput.hidden=!free;budgetInput.disabled=!free;
+  budgetInput.max=String(free);
+  if(document.activeElement!==budgetInput || !teamDraftInputs.has(budgetInput)) budgetInput.value=String(points);
+  budgetInput.hidden=!free;budgetInput.disabled=!free;
   document.getElementById('builderDefenseTrialSuffix').hidden=!free;
   input.checked=trial.enabled;input.disabled=!points || !trial.finished || !trial.best;
   document.getElementById('builderDefenseTrialText').textContent=free
@@ -2112,6 +2114,7 @@ function bindStaticControls() {
     const selected=state.ourTeam[state.activeOurIndex];
     if (!selected) return;
     const value=Number(event.target.value);
+    teamDraftInputs.delete(event.target);
     defenseBudgets.set(selected,clamp(Number.isFinite(value) ? Math.floor(value) : 0,0,Defense.freePoints(selected)));
     renderTeamBuilder();
   };

@@ -30,4 +30,4 @@ Updated November 16, 2026. See [PROJECT-STATE.md](PROJECT-STATE.md) for the cano
 
 Do not tune formulas to historical screenshot values. Do not replace actual mechanics with approximate modifiers to make output look plausible. The old screenshot ranges are executable regression cases; their full assumptions are documented separately.
 
-Branch-based deployment remains a future idea in [DREAM-FEATURES.md](DREAM-FEATURES.md). This directory currently has no Git repository or deployed Site.
+Cloudflare Pages deployment, branch previews and nightly validated data/engine refresh are prepared; see [HOSTING.md](HOSTING.md). This is a Git repository. The production Pages project still requires the owner’s one-time Cloudflare account connection.

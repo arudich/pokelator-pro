@@ -29,7 +29,7 @@ class FieldIconTests(unittest.TestCase):
     def test_exclusive_icons_header_alignment_reset_and_shared_builder_state(self):
         self.load()
         before=self.evaluate('JSON.stringify(state.ourTeam)')
-        self.assertEqual(self.page.locator('.damage-toolbar .field-icon').count(),10)
+        self.assertEqual(self.page.locator('.damage-toolbar [data-field-option]').count(),10)
         self.assertEqual(self.page.locator('#weatherInput select, #terrainInput select').count(),0)
         self.assertTrue(self.evaluate("""() => {
           const row=document.querySelector('.damage-toolbar'),items=[row.querySelector('h3'),row.querySelector('.direction-controls'),row.querySelector('.battle-field-icons')];

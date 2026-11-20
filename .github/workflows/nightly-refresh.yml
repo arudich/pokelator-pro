@@ -1,0 +1,70 @@
+name: Nightly data and engine refresh
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nightly-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: github.repository == 'arudich/pokelator-pro' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      base: ${{ steps.base.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pip install -r requirements-dev.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: python scripts/refresh_site_data.py
+      - run: python -m unittest discover -s tests -v
+      - run: python scripts/build_site.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-refresh
+          path: |
+            data/
+            vendor/
+          retention-days: 7
+      - if: failure()
+        run: echo 'Refresh rejected. The last successful production snapshot remains live. Inspect the failed step.' >> "$GITHUB_STEP_SUMMARY"
+  publish:
+    needs: refresh
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-refresh
+          path: /tmp/verified-refresh
+      - name: Publish verified snapshot
+        env:
+          EXPECTED_BASE: ${{ needs.refresh.outputs.base }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_BASE" || { echo 'main changed during validation; refresh will retry tomorrow.'; exit 1; }
+          cp -R /tmp/verified-refresh/data/. data/
+          cp -R /tmp/verified-refresh/vendor/. vendor/
+          git add -- data vendor
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Refresh verified Champions data and engine'
+          git push origin HEAD:main

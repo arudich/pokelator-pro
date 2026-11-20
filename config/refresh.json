@@ -1,0 +1,7 @@
+{
+  "roster": "https://championsbattledata.com/data/pokemon-index.json",
+  "usageRatingCutoff": 1630,
+  "discoverCurrentRegulation": true,
+  "enginePackage": "@smogon/calc",
+  "movePackage": "@pkmn/dex"
+}

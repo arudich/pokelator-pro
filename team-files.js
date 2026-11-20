@@ -4,8 +4,8 @@
   const type = 'pokelator-pro-teams';
   const pokemon = entry => ({name: entry.name, item: entry.item, ability: entry.ability,
     nature: entry.nature, investment: entry.investment, moveSet: entry.moveSet});
-  const pack = teams => ({type, version: 1, teams: teams.map(team => ({name: team.name,
-    pokemon: team.pokemon.map(pokemon)}))});
+  const pack = (teams,includeSaved=false) => ({type, version: 1, teams: teams.map(team => ({name: team.name,
+    pokemon: team.pokemon.map(pokemon),...(includeSaved ? {savedPokemon:(team.savedPokemon || team.pokemon).map(pokemon)} : {})}))});
   function parse(text, sanitize) {
     const data = JSON.parse(text);
     if (data?.type !== type || data.version !== 1 || !Array.isArray(data.teams) || !data.teams.length) {
@@ -15,7 +15,7 @@
       if (!team || !Array.isArray(team.pokemon)) {
         throw new Error(`Team ${index + 1} must contain a Pokémon list.`);
       }
-      const entries = team.pokemon.map(raw => {
+      const parsePokemon = raw => {
         if (!raw || typeof raw.name !== 'string') throw new Error('A Pokémon name is missing.');
         const points = ['hp','atk','def','spa','spd','spe'].map(stat => raw.investment?.[stat] ?? 0);
         if (points.some(n => !Number.isInteger(n) || n < 0 || n > 32) || points.reduce((a,b) => a+b,0) > 66) {
@@ -39,8 +39,11 @@
           if (invalid) throw new Error(`Invalid nature for ${raw.name}.`);
         }
         return clean;
-      });
-      return {name: String(team.name || 'Imported team').trim().slice(0,80) || 'Imported team', pokemon: entries};
+      };
+      const entries=team.pokemon.map(parsePokemon);
+      if(team.savedPokemon!==undefined && !Array.isArray(team.savedPokemon)) throw new Error('Invalid saved Pokemon archive.');
+      const archive=team.savedPokemon ? {savedPokemon:team.savedPokemon.map(parsePokemon)} : {};
+      return {...archive,name: String(team.name || 'Imported team').trim().slice(0,80) || 'Imported team', pokemon: entries};
     });
   }
   function encode(teams) {

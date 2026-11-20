@@ -1,7 +1,7 @@
 /* Shared six-SP sweeps bound threshold work independently of icon count. */
 'use strict';
 self.window=self;
-importScripts('vendor/smogon-data-0.12.0.min.js','vendor/smogon-calc-0.12.0.min.js',
+importScripts('vendor/smogon-data.min.js','vendor/smogon-calc.min.js',
   'battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points');
 self.onmessage=({data:job})=>{
   try {

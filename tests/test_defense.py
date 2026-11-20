@@ -69,7 +69,7 @@ class DefenseTests(unittest.TestCase):
         self.assertTrue('Kowtow Cleave' in result['detail'] or 'Sucker Punch' in result['detail'])
 
     def test_kangaskhan_does_not_choose_immune_or_terrain_blocked_moves(self):
-        self.load()
+        self.load(frozen_usage=True)
         result=self.evaluate("""() => {
           const attacker=getPokemonByName('Mega Kangaskhan');
           const ours=sanitizeTeamEntry({name:'Mega Chandelure',investment:{spa:32,spe:2}});

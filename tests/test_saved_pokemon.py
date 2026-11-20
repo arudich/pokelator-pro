@@ -68,3 +68,17 @@ class SavedPokemonTests(unittest.TestCase):
         self.evaluate("addTeamPokemon('Malamar');restoreTeamHistory()")
         self.assertFalse(self.evaluate("state.ourTeam.some(p=>p.name==='Malamar')"))
         self.assertTrue(self.evaluate("buildTeamSearchResults('Malamar').some(p=>p.savedBuild)"))
+
+    def test_export_import_preserves_removed_builds_for_domain_migration(self):
+        self.fixture()
+        self.evaluate("removeTeamPokemon(0)")
+        result=self.evaluate("""() => {
+          const packet=TeamFiles.pack(state.teamLibrary,true);
+          const parsed=TeamFiles.parse(JSON.stringify(packet),sanitizeTeamEntry);
+          importTeamSnapshots(parsed);
+          return {builds:buildTeamSearchResults('Malamar').filter(row=>row.savedBuild).length,
+            saved:state.teamLibrary.at(-1).savedPokemon.find(p=>p.name==='Malamar')};
+        }""")
+        self.assertEqual(result['builds'],2)
+        self.assertEqual(result['saved']['name'],'Malamar')
+        self.assertEqual(result['saved']['item'],'Leftovers')

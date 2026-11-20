@@ -50,10 +50,13 @@ class AppTests(unittest.TestCase):
         self.context.close()
         self.assertEqual(self.errors, [], 'Browser runtime errors')
 
-    def load(self, format=None):
+    def load(self, format=None, frozen_usage=False):
         response = self.page.goto(self.url)
         self.assertEqual(response.status, 200)
         self.page.wait_for_selector('.move-row')
+        if frozen_usage:
+            fixtures=json.loads((ROOT/'tests/usage_fixtures.json').read_text())
+            self.page.evaluate("fixtures=>{for(const [name,usage] of Object.entries(fixtures)) getPokemonByName(name).usage=usage;render();}",fixtures)
         if format:
             self.page.locator(f'[data-format="{format}"]').click()
 
@@ -538,7 +541,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(original,self.evaluate('JSON.stringify(state.ourTeam)'))
 
     def test_opponent_ability_assumption_uses_sole_or_50_percent_ability(self):
-        self.load("Singles")
+        self.load("Singles",frozen_usage=True)
         self.assertEqual(self.evaluate('getOpponentAbilityAssumption().name'),'Supreme Overlord')
         self.assertIn('83.9%',self.page.locator('#abilityAssumptionBasis').inner_text())
         self.page.locator('[data-format="Doubles"]').click()
@@ -614,7 +617,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(disabled,neutral)
         self.evaluate("addOpponentFromSearch('Rotom-Wash')")
         self.assertEqual(self.page.locator('#abilityAssumptionToggle').get_attribute('aria-pressed'),'true')
-        self.page.locator('.opponent-row[data-opponent-index="1"]').click()
+        self.page.locator('.opponent-row[data-opponent-index="1"] .pokemon-name').click()
         self.assertEqual(self.page.locator('#abilityAssumptionToggle').get_attribute('aria-pressed'),'false')
         self.page.locator('[data-damage-direction="outgoing"]').click()
         self.assertEqual(self.page.locator('#abilityAssumptionToggle').get_attribute('aria-pressed'),'false')
@@ -675,7 +678,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.evaluate('state.ourTeam[0].item'),'Coba Berry')
 
     def test_nature_defaults_aggregate_usage_by_stat(self):
-        self.load("Singles")
+        self.load("Singles",frozen_usage=True)
         self.evaluate("addOpponentFromSearch('Umbreon')")
         self.assertEqual(self.evaluate("natureUsage(state.opponentList[0],'def')"),84.5)
         self.assertEqual(self.evaluate("natureUsage(state.opponentList[0],'spd')"),14.5)
@@ -727,7 +730,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(rows,expected)
 
     def test_nature_defaults_change_with_format_and_overrides_persist(self):
-        self.load("Singles")
+        self.load("Singles",frozen_usage=True)
         self.evaluate("addOpponentFromSearch('Sylveon')")
         self.page.locator('[data-damage-direction="incoming"]').click()
         self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
@@ -899,7 +902,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('.move-row').first.locator('.defense-line').count(),3)
 
     def test_incoming_strongest_then_five_common_damaging_moves(self):
-        self.load("Singles")
+        self.load("Singles",frozen_usage=True)
         self.page.locator('[data-damage-direction="incoming"]').click()
         rows=self.evaluate('incomingThreats(state.opponentList[0],state.ourTeam[0])')
         self.assertEqual(len(rows),6)
@@ -936,7 +939,7 @@ class AppTests(unittest.TestCase):
         self.assertTrue(all(not r['topDamage'] for r in result[1][1:]))
 
     def test_incoming_damage_uses_complete_reported_spreads_and_frequencies(self):
-        self.load("Singles")
+        self.load("Singles",frozen_usage=True)
         original=self.evaluate('JSON.stringify(state.ourTeam)')
         self.evaluate("addOpponentFromSearch('Sylveon')")
         self.page.locator('[data-damage-direction="incoming"]').click()
@@ -1029,7 +1032,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(selected('defender'),'2')
         self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
         self.assertEqual(self.evaluate('getOpponentPreferences().offenseNatureChoice'),'auto')
-        self.page.locator('.opponent-row[data-opponent-index="1"]').click()
+        self.page.locator('.opponent-row[data-opponent-index="1"] .pokemon-name').click()
         self.assertEqual(selected('attacker'),'-1')
         self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
         self.page.reload()

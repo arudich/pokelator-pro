@@ -1,0 +1,2390 @@
+{
+  "Kingambit": {
+    "Singles": {
+      "name": "Kingambit",
+      "rank": 27,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Singles/Kingambit.csv",
+      "moves": [
+        {
+          "name": "Sucker Punch",
+          "percent": 98.3,
+          "rank": 1
+        },
+        {
+          "name": "Kowtow Cleave",
+          "percent": 97.0,
+          "rank": 2
+        },
+        {
+          "name": "Iron Head",
+          "percent": 87.8,
+          "rank": 3
+        },
+        {
+          "name": "Swords Dance",
+          "percent": 73.7,
+          "rank": 4
+        },
+        {
+          "name": "Guillotine",
+          "percent": 10.4,
+          "rank": 5
+        },
+        {
+          "name": "Metal Burst",
+          "percent": 10.1,
+          "rank": 6
+        },
+        {
+          "name": "Brick Break",
+          "percent": 6.7,
+          "rank": 7
+        },
+        {
+          "name": "Low Kick",
+          "percent": 4.9,
+          "rank": 8
+        },
+        {
+          "name": "Stealth Rock",
+          "percent": 2.0,
+          "rank": 9
+        },
+        {
+          "name": "Protect",
+          "percent": 1.6,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Black Glasses",
+          "percent": 60.3,
+          "rank": 1
+        },
+        {
+          "name": "Focus Sash",
+          "percent": 10.3,
+          "rank": 2
+        },
+        {
+          "name": "Life Orb",
+          "percent": 7.4,
+          "rank": 3
+        },
+        {
+          "name": "Lum Berry",
+          "percent": 4.1,
+          "rank": 4
+        },
+        {
+          "name": "Air Balloon",
+          "percent": 3.5,
+          "rank": 5
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 3.2,
+          "rank": 6
+        },
+        {
+          "name": "Chople Berry",
+          "percent": 3.1,
+          "rank": 7
+        },
+        {
+          "name": "Leftovers",
+          "percent": 2.3,
+          "rank": 8
+        },
+        {
+          "name": "Quick Claw",
+          "percent": 0.9,
+          "rank": 9
+        },
+        {
+          "name": "Shuca Berry",
+          "percent": 0.8,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Supreme Overlord",
+          "percent": 83.9,
+          "rank": 1
+        },
+        {
+          "name": "Defiant",
+          "percent": 15.7,
+          "rank": 2
+        },
+        {
+          "name": "Pressure",
+          "percent": 0.4,
+          "rank": 3
+        }
+      ],
+      "natures": [
+        {
+          "name": "Adamant",
+          "percent": 91.5,
+          "rank": 1
+        },
+        {
+          "name": "Brave",
+          "percent": 4.4,
+          "rank": 2
+        },
+        {
+          "name": "Careful",
+          "percent": 1.2,
+          "rank": 3
+        },
+        {
+          "name": "Impish",
+          "percent": 1.2,
+          "rank": 4
+        },
+        {
+          "name": "Jolly",
+          "percent": 0.8,
+          "rank": 5
+        },
+        {
+          "name": "Naughty",
+          "percent": 0.2,
+          "rank": 6
+        },
+        {
+          "name": "Relaxed",
+          "percent": 0.2,
+          "rank": 7
+        },
+        {
+          "name": "Lonely",
+          "percent": 0.1,
+          "rank": 8
+        },
+        {
+          "name": "Sassy",
+          "percent": 0.1,
+          "rank": 9
+        },
+        {
+          "name": "Modest",
+          "percent": 0.0,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 21.3,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 2,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 13.4,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 10.5,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 10,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 24
+          },
+          "percent": 8.7,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 8,
+            "atk": 32,
+            "def": 1,
+            "spa": 0,
+            "spd": 0,
+            "spe": 25
+          },
+          "percent": 3.5,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 3.1,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 0,
+            "atk": 32,
+            "def": 2,
+            "spa": 0,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 2.6,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 1,
+            "spa": 0,
+            "spd": 1,
+            "spe": 0
+          },
+          "percent": 1.7,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 8,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 26
+          },
+          "percent": 1.4,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 8,
+            "atk": 32,
+            "def": 2,
+            "spa": 0,
+            "spd": 0,
+            "spe": 24
+          },
+          "percent": 1.4,
+          "rank": 10
+        }
+      ]
+    },
+    "Doubles": {
+      "name": "Kingambit",
+      "rank": 5,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Doubles/Kingambit.csv",
+      "moves": [
+        {
+          "name": "Kowtow Cleave",
+          "percent": 98.8,
+          "rank": 1
+        },
+        {
+          "name": "Sucker Punch",
+          "percent": 98.3,
+          "rank": 2
+        },
+        {
+          "name": "Iron Head",
+          "percent": 75.8,
+          "rank": 3
+        },
+        {
+          "name": "Protect",
+          "percent": 59.2,
+          "rank": 4
+        },
+        {
+          "name": "Low Kick",
+          "percent": 40.0,
+          "rank": 5
+        },
+        {
+          "name": "Swords Dance",
+          "percent": 23.1,
+          "rank": 6
+        },
+        {
+          "name": "Brick Break",
+          "percent": 2.6,
+          "rank": 7
+        },
+        {
+          "name": "Metal Burst",
+          "percent": 0.3,
+          "rank": 8
+        },
+        {
+          "name": "Assurance",
+          "percent": 0.2,
+          "rank": 9
+        },
+        {
+          "name": "Low Sweep",
+          "percent": 0.2,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Chople Berry",
+          "percent": 44.8,
+          "rank": 1
+        },
+        {
+          "name": "Life Orb",
+          "percent": 25.0,
+          "rank": 2
+        },
+        {
+          "name": "Focus Sash",
+          "percent": 12.6,
+          "rank": 3
+        },
+        {
+          "name": "Black Glasses",
+          "percent": 12.2,
+          "rank": 4
+        },
+        {
+          "name": "Occa Berry",
+          "percent": 2.8,
+          "rank": 5
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 0.4,
+          "rank": 6
+        },
+        {
+          "name": "Expert Belt",
+          "percent": 0.4,
+          "rank": 7
+        },
+        {
+          "name": "Leftovers",
+          "percent": 0.2,
+          "rank": 8
+        },
+        {
+          "name": "Rocky Helmet",
+          "percent": 0.2,
+          "rank": 9
+        },
+        {
+          "name": "Muscle Band",
+          "percent": 0.1,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Defiant",
+          "percent": 96.8,
+          "rank": 1
+        },
+        {
+          "name": "Supreme Overlord",
+          "percent": 3.1,
+          "rank": 2
+        },
+        {
+          "name": "Pressure",
+          "percent": 0.1,
+          "rank": 3
+        }
+      ],
+      "natures": [
+        {
+          "name": "Adamant",
+          "percent": 88.9,
+          "rank": 1
+        },
+        {
+          "name": "Brave",
+          "percent": 9.5,
+          "rank": 2
+        },
+        {
+          "name": "Jolly",
+          "percent": 0.4,
+          "rank": 3
+        },
+        {
+          "name": "Careful",
+          "percent": 0.4,
+          "rank": 4
+        },
+        {
+          "name": "Impish",
+          "percent": 0.3,
+          "rank": 5
+        },
+        {
+          "name": "Naughty",
+          "percent": 0.2,
+          "rank": 6
+        },
+        {
+          "name": "Relaxed",
+          "percent": 0.1,
+          "rank": 7
+        },
+        {
+          "name": "Sassy",
+          "percent": 0.1,
+          "rank": 8
+        },
+        {
+          "name": "Lonely",
+          "percent": 0.1,
+          "rank": 9
+        },
+        {
+          "name": "Serious",
+          "percent": 0.0,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 14.8,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 2,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 5.9,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 5.5,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 4.9,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 25,
+            "def": 8,
+            "spa": 0,
+            "spd": 0,
+            "spe": 1
+          },
+          "percent": 3.8,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 25,
+            "def": 9,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 3.4,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 30,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 4
+          },
+          "percent": 3.4,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 1,
+            "spe": 1
+          },
+          "percent": 3.2,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 20,
+            "def": 11,
+            "spa": 0,
+            "spd": 2,
+            "spe": 1
+          },
+          "percent": 3.1,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 1,
+            "spa": 0,
+            "spd": 0,
+            "spe": 1
+          },
+          "percent": 1.8,
+          "rank": 10
+        }
+      ]
+    }
+  },
+  "Mega Kangaskhan": {
+    "Singles": {
+      "name": "Kangaskhan",
+      "rank": 86,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Singles/Kangaskhan.csv",
+      "moves": [
+        {
+          "name": "Ice Punch",
+          "percent": 68.9,
+          "rank": 1
+        },
+        {
+          "name": "Earthquake",
+          "percent": 67.9,
+          "rank": 2
+        },
+        {
+          "name": "Body Slam",
+          "percent": 43.5,
+          "rank": 3
+        },
+        {
+          "name": "Sucker Punch",
+          "percent": 39.7,
+          "rank": 4
+        },
+        {
+          "name": "Fake Out",
+          "percent": 34.8,
+          "rank": 5
+        },
+        {
+          "name": "Double-Edge",
+          "percent": 22.8,
+          "rank": 6
+        },
+        {
+          "name": "Fire Punch",
+          "percent": 22.1,
+          "rank": 7
+        },
+        {
+          "name": "Circle Throw",
+          "percent": 20.4,
+          "rank": 8
+        },
+        {
+          "name": "Drain Punch",
+          "percent": 12.0,
+          "rank": 9
+        },
+        {
+          "name": "Rock Slide",
+          "percent": 7.3,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Kangaskhanite",
+          "percent": 93.2,
+          "rank": 1
+        },
+        {
+          "name": "Silk Scarf",
+          "percent": 3.2,
+          "rank": 2
+        },
+        {
+          "name": "Chople Berry",
+          "percent": 0.8,
+          "rank": 3
+        },
+        {
+          "name": "Life Orb",
+          "percent": 0.5,
+          "rank": 4
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 0.4,
+          "rank": 5
+        },
+        {
+          "name": "Rocky Helmet",
+          "percent": 0.3,
+          "rank": 6
+        },
+        {
+          "name": "Focus Sash",
+          "percent": 0.3,
+          "rank": 7
+        },
+        {
+          "name": "Leftovers",
+          "percent": 0.3,
+          "rank": 8
+        },
+        {
+          "name": "Metronome",
+          "percent": 0.2,
+          "rank": 9
+        },
+        {
+          "name": "Normal Gem",
+          "percent": 0.2,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Scrappy",
+          "percent": 88.4,
+          "rank": 1
+        },
+        {
+          "name": "Inner Focus",
+          "percent": 9.5,
+          "rank": 2
+        },
+        {
+          "name": "Early Bird",
+          "percent": 2.1,
+          "rank": 3
+        }
+      ],
+      "natures": [
+        {
+          "name": "Adamant",
+          "percent": 83.9,
+          "rank": 1
+        },
+        {
+          "name": "Jolly",
+          "percent": 6.7,
+          "rank": 2
+        },
+        {
+          "name": "Quiet",
+          "percent": 4.2,
+          "rank": 3
+        },
+        {
+          "name": "Impish",
+          "percent": 1.5,
+          "rank": 4
+        },
+        {
+          "name": "Modest",
+          "percent": 1.2,
+          "rank": 5
+        },
+        {
+          "name": "Brave",
+          "percent": 1.0,
+          "rank": 6
+        },
+        {
+          "name": "Naughty",
+          "percent": 0.6,
+          "rank": 7
+        },
+        {
+          "name": "Careful",
+          "percent": 0.5,
+          "rank": 8
+        },
+        {
+          "name": "Lonely",
+          "percent": 0.1,
+          "rank": 9
+        },
+        {
+          "name": "Sassy",
+          "percent": 0.1,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 27,
+            "atk": 32,
+            "def": 1,
+            "spa": 0,
+            "spd": 6,
+            "spe": 0
+          },
+          "percent": 17.0,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 10.9,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 1,
+            "atk": 32,
+            "def": 1,
+            "spa": 0,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 7.1,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 6.1,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 2,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 5.5,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 27,
+            "atk": 0,
+            "def": 0,
+            "spa": 32,
+            "spd": 7,
+            "spe": 0
+          },
+          "percent": 3.8,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 2.7,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 27,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 7
+          },
+          "percent": 2.5,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 31,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 3
+          },
+          "percent": 2.0,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 29,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 5
+          },
+          "percent": 1.9,
+          "rank": 10
+        }
+      ]
+    },
+    "Doubles": {
+      "name": "Kangaskhan",
+      "rank": 74,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Doubles/Kangaskhan.csv",
+      "moves": [
+        {
+          "name": "Fake Out",
+          "percent": 94.3,
+          "rank": 1
+        },
+        {
+          "name": "Double-Edge",
+          "percent": 46.0,
+          "rank": 2
+        },
+        {
+          "name": "Last Resort",
+          "percent": 39.2,
+          "rank": 3
+        },
+        {
+          "name": "Ice Punch",
+          "percent": 23.6,
+          "rank": 4
+        },
+        {
+          "name": "Hammer Arm",
+          "percent": 21.3,
+          "rank": 5
+        },
+        {
+          "name": "Sucker Punch",
+          "percent": 19.0,
+          "rank": 6
+        },
+        {
+          "name": "Drain Punch",
+          "percent": 17.0,
+          "rank": 7
+        },
+        {
+          "name": "Crunch",
+          "percent": 10.5,
+          "rank": 8
+        },
+        {
+          "name": "Protect",
+          "percent": 10.3,
+          "rank": 9
+        },
+        {
+          "name": "Low Kick",
+          "percent": 8.7,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Kangaskhanite",
+          "percent": 49.5,
+          "rank": 1
+        },
+        {
+          "name": "Silk Scarf",
+          "percent": 29.0,
+          "rank": 2
+        },
+        {
+          "name": "Life Orb",
+          "percent": 11.9,
+          "rank": 3
+        },
+        {
+          "name": "Chople Berry",
+          "percent": 2.8,
+          "rank": 4
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 1.5,
+          "rank": 5
+        },
+        {
+          "name": "Iron Ball",
+          "percent": 0.9,
+          "rank": 6
+        },
+        {
+          "name": "Expert Belt",
+          "percent": 0.7,
+          "rank": 7
+        },
+        {
+          "name": "Eject Button",
+          "percent": 0.6,
+          "rank": 8
+        },
+        {
+          "name": "Normal Gem",
+          "percent": 0.6,
+          "rank": 9
+        },
+        {
+          "name": "Leftovers",
+          "percent": 0.5,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Scrappy",
+          "percent": 94.2,
+          "rank": 1
+        },
+        {
+          "name": "Inner Focus",
+          "percent": 5.5,
+          "rank": 2
+        },
+        {
+          "name": "Early Bird",
+          "percent": 0.3,
+          "rank": 3
+        }
+      ],
+      "natures": [
+        {
+          "name": "Adamant",
+          "percent": 54.1,
+          "rank": 1
+        },
+        {
+          "name": "Brave",
+          "percent": 37.5,
+          "rank": 2
+        },
+        {
+          "name": "Jolly",
+          "percent": 5.3,
+          "rank": 3
+        },
+        {
+          "name": "Careful",
+          "percent": 0.9,
+          "rank": 4
+        },
+        {
+          "name": "Lonely",
+          "percent": 0.5,
+          "rank": 5
+        },
+        {
+          "name": "Naughty",
+          "percent": 0.5,
+          "rank": 6
+        },
+        {
+          "name": "Impish",
+          "percent": 0.4,
+          "rank": 7
+        },
+        {
+          "name": "Relaxed",
+          "percent": 0.3,
+          "rank": 8
+        },
+        {
+          "name": "Timid",
+          "percent": 0.2,
+          "rank": 9
+        },
+        {
+          "name": "Modest",
+          "percent": 0.1,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 2,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 20.7,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 1,
+            "spa": 0,
+            "spd": 1,
+            "spe": 0
+          },
+          "percent": 19.8,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 8.2,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 5.9,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 14,
+            "atk": 32,
+            "def": 12,
+            "spa": 0,
+            "spd": 8,
+            "spe": 0
+          },
+          "percent": 3.3,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 3.3,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 29,
+            "atk": 32,
+            "def": 5,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 1.8,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 0,
+            "atk": 32,
+            "def": 0,
+            "spa": 0,
+            "spd": 2,
+            "spe": 32
+          },
+          "percent": 1.1,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 0,
+            "atk": 32,
+            "def": 2,
+            "spa": 0,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 1.0,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 32,
+            "def": 32,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 0.9,
+          "rank": 10
+        }
+      ]
+    }
+  },
+  "Sylveon": {
+    "Singles": {
+      "name": "Sylveon",
+      "rank": 59,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Singles/Sylveon.csv",
+      "moves": [
+        {
+          "name": "Hyper Voice",
+          "percent": 96.7,
+          "rank": 1
+        },
+        {
+          "name": "Yawn",
+          "percent": 71.9,
+          "rank": 2
+        },
+        {
+          "name": "Wish",
+          "percent": 50.0,
+          "rank": 3
+        },
+        {
+          "name": "Mystical Fire",
+          "percent": 45.6,
+          "rank": 4
+        },
+        {
+          "name": "Protect",
+          "percent": 41.8,
+          "rank": 5
+        },
+        {
+          "name": "Quick Attack",
+          "percent": 34.0,
+          "rank": 6
+        },
+        {
+          "name": "Calm Mind",
+          "percent": 13.4,
+          "rank": 7
+        },
+        {
+          "name": "Hyper Beam",
+          "percent": 10.8,
+          "rank": 8
+        },
+        {
+          "name": "Shadow Ball",
+          "percent": 9.1,
+          "rank": 9
+        },
+        {
+          "name": "Detect",
+          "percent": 5.6,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Leftovers",
+          "percent": 53.5,
+          "rank": 1
+        },
+        {
+          "name": "Fairy Feather",
+          "percent": 17.2,
+          "rank": 2
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 10.0,
+          "rank": 3
+        },
+        {
+          "name": "Life Orb",
+          "percent": 7.9,
+          "rank": 4
+        },
+        {
+          "name": "Babiri Berry",
+          "percent": 2.7,
+          "rank": 5
+        },
+        {
+          "name": "Air Balloon",
+          "percent": 1.3,
+          "rank": 6
+        },
+        {
+          "name": "Quick Claw",
+          "percent": 1.1,
+          "rank": 7
+        },
+        {
+          "name": "Red Card",
+          "percent": 1.1,
+          "rank": 8
+        },
+        {
+          "name": "Lum Berry",
+          "percent": 1.0,
+          "rank": 9
+        },
+        {
+          "name": "Rocky Helmet",
+          "percent": 0.7,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Pixilate",
+          "percent": 98.7,
+          "rank": 1
+        },
+        {
+          "name": "Cute Charm",
+          "percent": 1.3,
+          "rank": 2
+        }
+      ],
+      "natures": [
+        {
+          "name": "Bold",
+          "percent": 44.0,
+          "rank": 1
+        },
+        {
+          "name": "Modest",
+          "percent": 39.7,
+          "rank": 2
+        },
+        {
+          "name": "Calm",
+          "percent": 9.2,
+          "rank": 3
+        },
+        {
+          "name": "Quiet",
+          "percent": 2.9,
+          "rank": 4
+        },
+        {
+          "name": "Relaxed",
+          "percent": 1.6,
+          "rank": 5
+        },
+        {
+          "name": "Timid",
+          "percent": 1.2,
+          "rank": 6
+        },
+        {
+          "name": "Sassy",
+          "percent": 0.6,
+          "rank": 7
+        },
+        {
+          "name": "Mild",
+          "percent": 0.2,
+          "rank": 8
+        },
+        {
+          "name": "Rash",
+          "percent": 0.2,
+          "rank": 9
+        },
+        {
+          "name": "Adamant",
+          "percent": 0.1,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 16.6,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 5.7,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 0,
+            "spa": 32,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 4.7,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 2,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 4.3,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 2,
+            "spa": 32,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 3.4,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 1,
+            "atk": 0,
+            "def": 1,
+            "spa": 32,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 2.6,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 1,
+            "spe": 1
+          },
+          "percent": 2.6,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 31,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 3,
+            "spe": 0
+          },
+          "percent": 2.3,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 0,
+            "spa": 2,
+            "spd": 32,
+            "spe": 0
+          },
+          "percent": 2.0,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 0,
+            "spa": 32,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 1.7,
+          "rank": 10
+        }
+      ]
+    },
+    "Doubles": {
+      "name": "Sylveon",
+      "rank": 21,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Doubles/Sylveon.csv",
+      "moves": [
+        {
+          "name": "Hyper Voice",
+          "percent": 99.7,
+          "rank": 1
+        },
+        {
+          "name": "Detect",
+          "percent": 68.1,
+          "rank": 2
+        },
+        {
+          "name": "Hyper Beam",
+          "percent": 56.0,
+          "rank": 3
+        },
+        {
+          "name": "Quick Attack",
+          "percent": 52.6,
+          "rank": 4
+        },
+        {
+          "name": "Moonblast",
+          "percent": 27.5,
+          "rank": 5
+        },
+        {
+          "name": "Protect",
+          "percent": 27.2,
+          "rank": 6
+        },
+        {
+          "name": "Calm Mind",
+          "percent": 22.1,
+          "rank": 7
+        },
+        {
+          "name": "Yawn",
+          "percent": 15.5,
+          "rank": 8
+        },
+        {
+          "name": "Mystical Fire",
+          "percent": 10.4,
+          "rank": 9
+        },
+        {
+          "name": "Shadow Ball",
+          "percent": 4.3,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Fairy Feather",
+          "percent": 84.9,
+          "rank": 1
+        },
+        {
+          "name": "Life Orb",
+          "percent": 6.4,
+          "rank": 2
+        },
+        {
+          "name": "Quick Claw",
+          "percent": 2.4,
+          "rank": 3
+        },
+        {
+          "name": "Leftovers",
+          "percent": 2.0,
+          "rank": 4
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 1.8,
+          "rank": 5
+        },
+        {
+          "name": "Choice Scarf",
+          "percent": 0.6,
+          "rank": 6
+        },
+        {
+          "name": "Focus Sash",
+          "percent": 0.4,
+          "rank": 7
+        },
+        {
+          "name": "Wise Glasses",
+          "percent": 0.2,
+          "rank": 8
+        },
+        {
+          "name": "Metronome",
+          "percent": 0.2,
+          "rank": 9
+        },
+        {
+          "name": "Grassy Seed",
+          "percent": 0.2,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Pixilate",
+          "percent": 99.9,
+          "rank": 1
+        },
+        {
+          "name": "Cute Charm",
+          "percent": 0.1,
+          "rank": 2
+        }
+      ],
+      "natures": [
+        {
+          "name": "Modest",
+          "percent": 79.8,
+          "rank": 1
+        },
+        {
+          "name": "Quiet",
+          "percent": 14.9,
+          "rank": 2
+        },
+        {
+          "name": "Bold",
+          "percent": 1.7,
+          "rank": 3
+        },
+        {
+          "name": "Timid",
+          "percent": 1.5,
+          "rank": 4
+        },
+        {
+          "name": "Calm",
+          "percent": 0.6,
+          "rank": 5
+        },
+        {
+          "name": "Relaxed",
+          "percent": 0.5,
+          "rank": 6
+        },
+        {
+          "name": "Mild",
+          "percent": 0.3,
+          "rank": 7
+        },
+        {
+          "name": "Sassy",
+          "percent": 0.2,
+          "rank": 8
+        },
+        {
+          "name": "Bashful",
+          "percent": 0.1,
+          "rank": 9
+        },
+        {
+          "name": "Gentle",
+          "percent": 0.1,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 2,
+            "spa": 32,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 11.3,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 7,
+            "atk": 0,
+            "def": 32,
+            "spa": 20,
+            "spd": 0,
+            "spe": 7
+          },
+          "percent": 7.6,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 0,
+            "spa": 32,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 4.1,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 9,
+            "atk": 0,
+            "def": 22,
+            "spa": 20,
+            "spd": 0,
+            "spe": 15
+          },
+          "percent": 3.5,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 21,
+            "atk": 0,
+            "def": 0,
+            "spa": 30,
+            "spd": 0,
+            "spe": 15
+          },
+          "percent": 2.7,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 13,
+            "atk": 0,
+            "def": 32,
+            "spa": 20,
+            "spd": 0,
+            "spe": 1
+          },
+          "percent": 2.3,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 0,
+            "spa": 32,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 2.3,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 0,
+            "def": 0,
+            "spa": 32,
+            "spd": 0,
+            "spe": 32
+          },
+          "percent": 2.1,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 0,
+            "def": 32,
+            "spa": 32,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 1.8,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 19,
+            "atk": 0,
+            "def": 19,
+            "spa": 20,
+            "spd": 0,
+            "spe": 8
+          },
+          "percent": 1.4,
+          "rank": 10
+        }
+      ]
+    }
+  },
+  "Umbreon": {
+    "Singles": {
+      "name": "Umbreon",
+      "rank": 23,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Singles/Umbreon.csv",
+      "moves": [
+        {
+          "name": "Foul Play",
+          "percent": 96.5,
+          "rank": 1
+        },
+        {
+          "name": "Wish",
+          "percent": 77.5,
+          "rank": 2
+        },
+        {
+          "name": "Protect",
+          "percent": 74.2,
+          "rank": 3
+        },
+        {
+          "name": "Yawn",
+          "percent": 58.5,
+          "rank": 4
+        },
+        {
+          "name": "Toxic",
+          "percent": 39.5,
+          "rank": 5
+        },
+        {
+          "name": "Moonlight",
+          "percent": 21.7,
+          "rank": 6
+        },
+        {
+          "name": "Detect",
+          "percent": 8.0,
+          "rank": 7
+        },
+        {
+          "name": "Roar",
+          "percent": 5.4,
+          "rank": 8
+        },
+        {
+          "name": "Taunt",
+          "percent": 4.2,
+          "rank": 9
+        },
+        {
+          "name": "Baton Pass",
+          "percent": 3.3,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Leftovers",
+          "percent": 88.3,
+          "rank": 1
+        },
+        {
+          "name": "Rocky Helmet",
+          "percent": 4.6,
+          "rank": 2
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 3.3,
+          "rank": 3
+        },
+        {
+          "name": "Black Glasses",
+          "percent": 1.3,
+          "rank": 4
+        },
+        {
+          "name": "Mental Herb",
+          "percent": 0.6,
+          "rank": 5
+        },
+        {
+          "name": "Lum Berry",
+          "percent": 0.4,
+          "rank": 6
+        },
+        {
+          "name": "Bright Powder",
+          "percent": 0.3,
+          "rank": 7
+        },
+        {
+          "name": "Light Clay",
+          "percent": 0.3,
+          "rank": 8
+        },
+        {
+          "name": "Chople Berry",
+          "percent": 0.2,
+          "rank": 9
+        },
+        {
+          "name": "Roseli Berry",
+          "percent": 0.2,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Inner Focus",
+          "percent": 71.9,
+          "rank": 1
+        },
+        {
+          "name": "Synchronize",
+          "percent": 28.1,
+          "rank": 2
+        }
+      ],
+      "natures": [
+        {
+          "name": "Bold",
+          "percent": 59.8,
+          "rank": 1
+        },
+        {
+          "name": "Impish",
+          "percent": 21.9,
+          "rank": 2
+        },
+        {
+          "name": "Calm",
+          "percent": 8.1,
+          "rank": 3
+        },
+        {
+          "name": "Careful",
+          "percent": 5.8,
+          "rank": 4
+        },
+        {
+          "name": "Relaxed",
+          "percent": 2.8,
+          "rank": 5
+        },
+        {
+          "name": "Sassy",
+          "percent": 0.6,
+          "rank": 6
+        },
+        {
+          "name": "Adamant",
+          "percent": 0.3,
+          "rank": 7
+        },
+        {
+          "name": "Jolly",
+          "percent": 0.2,
+          "rank": 8
+        },
+        {
+          "name": "Lonely",
+          "percent": 0.1,
+          "rank": 9
+        },
+        {
+          "name": "Modest",
+          "percent": 0.1,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 50.8,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 31,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 3,
+            "spe": 0
+          },
+          "percent": 6.4,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 2,
+            "spa": 0,
+            "spd": 32,
+            "spe": 0
+          },
+          "percent": 4.2,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 1,
+            "spe": 1
+          },
+          "percent": 4.0,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 0,
+            "spe": 2
+          },
+          "percent": 2.7,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 30,
+            "spa": 0,
+            "spd": 4,
+            "spe": 0
+          },
+          "percent": 1.9,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 20,
+            "spa": 0,
+            "spd": 14,
+            "spe": 0
+          },
+          "percent": 1.8,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 24,
+            "spa": 0,
+            "spd": 10,
+            "spe": 0
+          },
+          "percent": 1.8,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 30,
+            "spa": 0,
+            "spd": 0,
+            "spe": 4
+          },
+          "percent": 1.6,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 32,
+            "spe": 0
+          },
+          "percent": 1.0,
+          "rank": 10
+        }
+      ]
+    },
+    "Doubles": {
+      "name": "Umbreon",
+      "rank": 128,
+      "source": "https://championsbattledata.com/pokemon_champions_assets/battle_data/Doubles/Umbreon.csv",
+      "moves": [
+        {
+          "name": "Foul Play",
+          "percent": 77.2,
+          "rank": 1
+        },
+        {
+          "name": "Snarl",
+          "percent": 52.5,
+          "rank": 2
+        },
+        {
+          "name": "Moonlight",
+          "percent": 52.5,
+          "rank": 3
+        },
+        {
+          "name": "Toxic",
+          "percent": 37.1,
+          "rank": 4
+        },
+        {
+          "name": "Yawn",
+          "percent": 26.6,
+          "rank": 5
+        },
+        {
+          "name": "Protect",
+          "percent": 26.5,
+          "rank": 6
+        },
+        {
+          "name": "Detect",
+          "percent": 17.3,
+          "rank": 7
+        },
+        {
+          "name": "Wish",
+          "percent": 12.3,
+          "rank": 8
+        },
+        {
+          "name": "Helping Hand",
+          "percent": 10.4,
+          "rank": 9
+        },
+        {
+          "name": "Taunt",
+          "percent": 10.0,
+          "rank": 10
+        }
+      ],
+      "items": [
+        {
+          "name": "Leftovers",
+          "percent": 51.9,
+          "rank": 1
+        },
+        {
+          "name": "Sitrus Berry",
+          "percent": 17.7,
+          "rank": 2
+        },
+        {
+          "name": "Black Glasses",
+          "percent": 6.7,
+          "rank": 3
+        },
+        {
+          "name": "Chople Berry",
+          "percent": 5.4,
+          "rank": 4
+        },
+        {
+          "name": "Rocky Helmet",
+          "percent": 5.4,
+          "rank": 5
+        },
+        {
+          "name": "Lum Berry",
+          "percent": 2.3,
+          "rank": 6
+        },
+        {
+          "name": "Quick Claw",
+          "percent": 2.2,
+          "rank": 7
+        },
+        {
+          "name": "Light Clay",
+          "percent": 1.9,
+          "rank": 8
+        },
+        {
+          "name": "Psychic Seed",
+          "percent": 1.3,
+          "rank": 9
+        },
+        {
+          "name": "Roseli Berry",
+          "percent": 1.2,
+          "rank": 10
+        }
+      ],
+      "abilities": [
+        {
+          "name": "Inner Focus",
+          "percent": 80.7,
+          "rank": 1
+        },
+        {
+          "name": "Synchronize",
+          "percent": 19.3,
+          "rank": 2
+        }
+      ],
+      "natures": [
+        {
+          "name": "Bold",
+          "percent": 37.5,
+          "rank": 1
+        },
+        {
+          "name": "Calm",
+          "percent": 25.2,
+          "rank": 2
+        },
+        {
+          "name": "Relaxed",
+          "percent": 12.3,
+          "rank": 3
+        },
+        {
+          "name": "Impish",
+          "percent": 11.2,
+          "rank": 4
+        },
+        {
+          "name": "Sassy",
+          "percent": 4.5,
+          "rank": 5
+        },
+        {
+          "name": "Careful",
+          "percent": 4.4,
+          "rank": 6
+        },
+        {
+          "name": "Modest",
+          "percent": 1.2,
+          "rank": 7
+        },
+        {
+          "name": "Adamant",
+          "percent": 0.9,
+          "rank": 8
+        },
+        {
+          "name": "Timid",
+          "percent": 0.8,
+          "rank": 9
+        },
+        {
+          "name": "Jolly",
+          "percent": 0.6,
+          "rank": 10
+        }
+      ],
+      "spreads": [
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 2,
+            "spe": 0
+          },
+          "percent": 27.8,
+          "rank": 1
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 20,
+            "spa": 0,
+            "spd": 14,
+            "spe": 0
+          },
+          "percent": 9.0,
+          "rank": 2
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 32,
+            "spe": 0
+          },
+          "percent": 8.7,
+          "rank": 3
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 2,
+            "spa": 0,
+            "spd": 32,
+            "spe": 0
+          },
+          "percent": 3.0,
+          "rank": 4
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 24,
+            "spa": 0,
+            "spd": 10,
+            "spe": 0
+          },
+          "percent": 2.7,
+          "rank": 5
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 32,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 2.4,
+          "rank": 6
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 24,
+            "spa": 10,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 2.4,
+          "rank": 7
+        },
+        {
+          "investment": {
+            "hp": 2,
+            "atk": 32,
+            "def": 32,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "percent": 1.8,
+          "rank": 8
+        },
+        {
+          "investment": {
+            "hp": 32,
+            "atk": 0,
+            "def": 1,
+            "spa": 0,
+            "spd": 32,
+            "spe": 0
+          },
+          "percent": 1.7,
+          "rank": 9
+        },
+        {
+          "investment": {
+            "hp": 31,
+            "atk": 0,
+            "def": 20,
+            "spa": 0,
+            "spd": 15,
+            "spe": 0
+          },
+          "percent": 1.5,
+          "rank": 10
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,7 @@
 # Pokelator field reports
 
+Production setup completed November 19, 2026: Cloudflare D1 `pokelator-usage` is bound as `USAGE_DB` in production only, with the report credential stored as secrets in Cloudflare and GitHub. Resend uses its test sender while the custom domain is being connected. The audit still targets `https://pokelator-pro.pages.dev`. The setup sections below are retained for recovery or another deployment.
+
 **Pokelator field report** runs on the **1st and 15th at 14:37 UTC** and supports manual runs in GitHub Actions. It checks production and emails a “Looking battle-ready” / “Needs a Potion” report. This is a deterministic automated auditor, with no paid AI model, autonomous code changes, or claim of AI visual inspection.
 
 ## The report

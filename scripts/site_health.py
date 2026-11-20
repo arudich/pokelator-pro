@@ -196,6 +196,7 @@ def send_email(report,warnings,run_id):
          'subject':'Pokelator field report · '+('Needs a Potion' if warnings else 'Looking battle-ready'),
          'text':report,'html':'<div style="font:16px/1.6 system-ui;white-space:pre-wrap">'+html.escape(report)+'</div>'})
     if not result.get('id'):raise RuntimeError('Email provider did not confirm acceptance')
+    print('Resend accepted the field report for delivery.')
 
 
 def main():

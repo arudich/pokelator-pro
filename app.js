@@ -8,7 +8,7 @@ const APP_COLOR_OPTIONS = [
   ['bg','Page background','#101827'],['bg-strong','Deep background','#70d7ff'],['control-bg','Control background','#0c1320'],
   ['panel','Panels','#172334'],['panel-alt','Secondary panels','#1b2a40'],['panel-soft','Raised surfaces','#233852'],
   ['soft-border','Borders','#2f4565'],['text','Text','#edf3ff'],['muted','Secondary text','#9fb5d0'],
-  ['accent','Accent','#6cc3ff'],['accent-strong','Active buttons','#748498'],
+  ['accent','Accent','#6cc3ff'],['accent-strong','Active buttons','#64a6ff'],
   ['toolbar-accent','Toolbar Accent','#9cd67f'],['toolbar-button','Toolbar Active','#2b83d7'],
   ['success','Positive','#4ad7a5']
 ];

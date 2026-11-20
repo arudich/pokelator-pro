@@ -1,8 +1,8 @@
-# Pokelator field reports
+# Pokelator health reports
 
 Production setup completed November 19, 2026: Cloudflare D1 `pokelator-usage` is bound as `USAGE_DB` in production only, with the report credential stored as secrets in Cloudflare and GitHub. Resend uses its test sender while the custom domain is being connected. The audit still targets `https://pokelator-pro.pages.dev`. The setup sections below are retained for recovery or another deployment.
 
-**Pokelator field report** runs on the **1st and 15th at 14:37 UTC** and supports manual runs in GitHub Actions. It checks production and emails a “Looking battle-ready” / “Needs a Potion” report. This is a deterministic automated auditor, with no paid AI model, autonomous code changes, or claim of AI visual inspection.
+**Pokelator health report** runs on the **1st and 15th at 14:37 UTC** and supports manual runs in GitHub Actions. It checks production and emails a “Healthy” / “Attention needed” report. This is a deterministic automated auditor, with no paid AI model, autonomous code changes, or claim of AI visual inspection.
 
 ## The report
 
@@ -23,12 +23,12 @@ Production setup completed November 19, 2026: Cloudflare D1 `pokelator-usage` is
    | --- | --- |
    | `RESEND_API_KEY` | Your sending API key |
    | `HEALTH_EMAIL_TO` | Your report recipient address |
-   | `HEALTH_EMAIL_FROM` | E.g. `Pokelator Field Reports <health@reports.pokelator.win>` after verifying that subdomain |
+   | `HEALTH_EMAIL_FROM` | E.g. `Pokelator Health Reports <health@reports.pokelator.win>` after verifying that subdomain |
    | `USAGE_REPORT_TOKEN` | The random secret from the counter setup below |
 
    Keep keys and recipient addresses out of public source files and issues.
 4. Optionally add the Actions **variable** `HEALTH_SITE_URL=https://pokelator.win` after the custom domain works. Until then the auditor uses `https://pokelator-pro.pages.dev`.
-5. Run **Actions → Pokelator field report → Run workflow**. Check actual inbox delivery; provider acceptance alone is not an inbox guarantee. Missing email configuration causes a visible failure instead of silently discarding a report.
+5. Run **Actions → Pokelator health report → Run workflow**. Check actual inbox delivery; provider acceptance alone is not an inbox guarantee. Missing email configuration causes a visible failure instead of silently discarding a report.
 
 ## One-time setup: counters
 

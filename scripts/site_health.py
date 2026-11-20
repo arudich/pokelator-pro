@@ -1,4 +1,4 @@
-"""Audit production, compare historical coverage, and send the Pokelator field report."""
+"""Audit production, compare historical coverage, and send the Pokelator health report."""
 import argparse
 import datetime as dt
 import hashlib
@@ -160,16 +160,16 @@ def usage_report(url,token,now):
 
 
 def render_report(snapshot,checks,warnings,usage,baseline,run_url):
-    heading='Needs a Potion' if warnings else 'Looking battle-ready'
-    lines=[f'# Pokelator field report · {heading}',f'Checked {snapshot["auditedAt"][:10]} · {snapshot["url"]}',
-           '', '## Nurse Joy’s rounds',*['- '+x for x in checks],
+    heading='Attention needed' if warnings else 'Healthy'
+    lines=[f'# Pokelator health report · {heading}',f'Checked {snapshot["auditedAt"][:10]} · {snapshot["url"]}',
+           '', '## Checks completed',*['- '+x for x in checks],
            '', '## Things to investigate' if warnings else 'No problems detected by these checks.',*['- '+x for x in warnings],
-           '', '## The Pokédex shelf',f'- Species/forms: {snapshot.get("coverage",{}).get("species","unavailable")}',
+           '', '## Data status',f'- Species/forms: {snapshot.get("coverage",{}).get("species","unavailable")}',
            f'- Last successful refresh: {snapshot.get("checkedAt","unavailable")}',
            f'- Engine: {snapshot.get("engine",{}).get("version","unavailable")}']
     for label,data in snapshot.get('formats',{}).items():lines.append(f'- {label} usage: {data["month"]} · {data["species"]} entries')
     lines+=['- Coverage compared with '+baseline['auditedAt'][:10]+'.' if baseline else '- A month-old comparison will become available after 25 days of reports.',
-            '', '## Around the battle lab']
+            '', '## Usage statistics']
     if usage.get('available'):
         lines.append(f'{usage["since"]} through {usage["until"]} (end exclusive, UTC):')
         for key,label in EVENT_LABELS.items():
@@ -178,7 +178,6 @@ def render_report(snapshot,checks,warnings,usage,baseline,run_url):
             lines.append(f'- {count:,} {label}{change}')
         if not usage['firstRecordedDay']:lines.append('No events recorded yet; zero counts do not establish working delivery.')
         elif not usage['previousPeriodComplete']:lines.append('Tracking is new; previous-period comparisons are not complete yet. First event: '+usage['firstRecordedDay'])
-        if usage['totals']['color_change']:lines.append('The shiny hunters have been repainting the lab.')
     else:lines.append('Usage unavailable: '+usage['reason'])
     lines+=['', 'Counts are approximate browser actions, not unique people, actual battles, or currently saved teams. Team contents stay local. Blocking, batching and public-endpoint abuse can affect totals.',
             '', 'Screenshots and machine-readable evidence: '+run_url,
@@ -193,10 +192,10 @@ def send_email(report,warnings,run_id):
         {'Authorization':'Bearer '+os.environ['RESEND_API_KEY'],'Content-Type':'application/json',
          'Idempotency-Key':'pokelator-health-'+run_id},
         {'from':os.environ['HEALTH_EMAIL_FROM'],'to':[os.environ['HEALTH_EMAIL_TO']],
-         'subject':'Pokelator field report · '+('Needs a Potion' if warnings else 'Looking battle-ready'),
+         'subject':'Pokelator health report · '+('Attention needed' if warnings else 'Healthy'),
          'text':report,'html':'<div style="font:16px/1.6 system-ui;white-space:pre-wrap">'+html.escape(report)+'</div>'})
     if not result.get('id'):raise RuntimeError('Email provider did not confirm acceptance')
-    print('Resend accepted the field report for delivery.')
+    print('Resend accepted the health report for delivery.')
 
 
 def main():

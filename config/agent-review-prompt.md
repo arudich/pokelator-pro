@@ -53,6 +53,9 @@ the owner's private working note and not part of this task.
 Keep the investigation bounded: inspect prepared summaries before large data
 files, use selective searches, and finish within the allotted time. Return the
 required JSON, with a concise summary and at most five actionable findings.
+Keep the summary to two short sentences about current actionable concerns. Routine
+successful checks and unchanged future watch items should not become findings;
+include an informational finding only when there is new information worth noting.
 Use status healthy only when no material concern was found within the stated
 scope; use uncertain for incomplete evidence and attention for identified risks.
 Include meaningful reasoning and evidence even when every automated check passes.

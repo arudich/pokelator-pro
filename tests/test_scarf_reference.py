@@ -12,6 +12,7 @@ class ScarfReferenceTests(unittest.TestCase):
 
     def test_common_threshold_highlight_persistence_and_no_calculation_effect(self):
         self.load()
+        self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.evaluate("""() => {
           const usage=getUsage(getPokemonByName('Kingambit'));
           usage.items=usage.items.filter(row=>row.name!=='Choice Scarf');
@@ -29,11 +30,12 @@ class ScarfReferenceTests(unittest.TestCase):
         self.assertEqual(scarf.get_attribute('aria-pressed'),'true')
         self.assertIn('Reference only',scarf.get_attribute('aria-label'))
         self.assertEqual(self.evaluate('appliedOpponentItem(state.opponentList[0])'),'')
-        self.assertEqual(self.page.locator('#opponentList [aria-pressed="true"]').count(),1)
+        self.assertEqual(self.page.locator('#opponentList [data-opponent-item][aria-pressed="true"]').count(),1)
         self.assertNotEqual(self.page.locator('#damageRangeSummary').inner_html(),damage)
         self.assertEqual(self.page.locator('#speedSummary').inner_html(),speed)
         self.page.reload()
         self.assertEqual(scarf.get_attribute('aria-pressed'),'true')
+        self.evaluate("state.activeOpponentIndex=state.opponentList.findIndex(p=>p.name==='Kingambit');render()")
         scarf.click()
         self.assertEqual(self.evaluate('getOpponentPreferences().itemChoice'),'')
         self.evaluate("getOpponentPreferences().itemChoice='Choice Scarf';savePreferences();render()")

@@ -6,10 +6,27 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from agent_review import unavailable_reason,validated_review,deliver
+from agent_review import unavailable_reason,validated_review,deliver,email_review
 
 
 class AgentReviewTests(unittest.TestCase):
+    def test_email_is_concise_without_discarding_full_artifact_evidence(self):
+        data={'status':'attention','summary':'A refresh was blocked.',
+              'findings':[{'severity':'high','finding':'The CSV species differs.',
+                           'evidence':'Very detailed evidence. '*300,'recommendation':'Reject the mismatched source.'},
+                          {'severity':'info','finding':'December maintenance is upcoming.',
+                           'evidence':'Routine watch detail. '*300,'recommendation':'Check after maintenance.'}],
+              'sources':['https://example.test/source'],'limitations':[]}
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'assessment.json';path.write_text(json.dumps(data))
+            parsed,full=validated_review(path);brief=email_review(parsed)
+        self.assertIn('Very detailed evidence.',full)
+        self.assertIn('Reject the mismatched source.',brief)
+        self.assertNotIn('Very detailed evidence.',brief)
+        self.assertNotIn('December maintenance',brief)
+        self.assertIn('1 background/watch observations',brief)
+        self.assertLess(len(brief),600)
+
     def test_credit_failures_are_distinct_from_rate_limits_and_permissions(self):
         self.assertIn('credit or spending limit exhausted',unavailable_reason('HTTP 429 insufficient_quota'))
         self.assertIn('rate limit',unavailable_reason('HTTP 429 rate_limit_exceeded'))

@@ -9,12 +9,39 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 from refresh_meta_usage import snapshot
 from validate_site_data import payload,validate
+from build_roster import build
 
 INDEX=''.join(f'<a href="{name}-1630.txt">' for name in ['gen9championsbssregmc','gen9championsvgc2026regmc'])
 TABLE=('Total battles: 1000\n'+''.join(f' | {i} | Species{i} | 0.5% | 10 |\n' for i in range(1,101))).encode()
 
 
 class RefreshSafetyTests(unittest.TestCase):
+    def test_csv_body_identity_must_match_source_record_including_shared_forms(self):
+        record={'showdownName':'Venusaur','summary':{'forms':[]},'battleDataCsvs':[
+            {'season':'Current','format':'Singles','path':'Singles/Venusaur.csv'}]}
+        for name,kind in [('Venusaur','Base'),('Venusaur-Mega','Mega')]:
+            record['summary']['forms'].append({'saved_name':name,'showdown_name':name,'form_kind':kind,
+                'hp':100,'attack':100,'defense':100,'sp_attack':100,'sp_defense':100,'speed':100,
+                'image_path':'pokemon_champions_assets/pokemon/test.png','types':['Grass','Poison'],'abilities':'Overgrow'})
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'Singles/Venusaur.csv';path.parent.mkdir()
+            path.write_text('pokemon,column_position,category,rank,name,percentage\nVenusaur,10,ability,1,Overgrow,100%\n')
+            self.assertEqual(len(build({'pokemon':[record],'generatedAt':'2026-11-20'},temp)['pokemon']),2)
+            for body in ['Furfrou,10,ability,1,Fur Coat,100%',
+                         'Venusaur,10,ability,1,Overgrow,100%\nFurfrou,10,move,1,Cotton Guard,67.9%']:
+                path.write_text('pokemon,column_position,category,rank,name,percentage\n'+body+'\n')
+                with self.assertRaisesRegex(ValueError,'CSV species mismatch.*Venusaur Singles.*Furfrou'):
+                    build({'pokemon':[record],'generatedAt':'2026-11-20'},temp)
+
+    def test_complete_furfrou_csv_cannot_be_imported_as_gogoat(self):
+        fixture=ROOT/'tests/fixtures/furfrou-usage.csv'
+        record={'showdownName':'Gogoat','summary':{'forms':[]},'battleDataCsvs':[
+            {'season':'Current','format':'Singles','path':'Singles/Gogoat.csv'}]}
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'Singles/Gogoat.csv';path.parent.mkdir();shutil.copyfile(fixture,path)
+            with self.assertRaisesRegex(ValueError,'CSV species mismatch.*Gogoat Singles.*Furfrou'):
+                build({'pokemon':[record],'generatedAt':'2026-11-20'},temp)
+
     def fetch(self,url):
         if url=='https://www.smogon.com/stats/':return b'<a href="2026-11/"><a href="2026-10/">'
         if url.endswith('/'):return INDEX.encode()

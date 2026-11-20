@@ -28,6 +28,11 @@ def build(index, usage_dir=None):
                 path = Path(usage_dir) / source['format'] / Path(source['path']).name
                 with path.open() as file:
                     rows = list(csv.DictReader(file))
+                # Validate the source species, not each derived cosmetic/Mega form.
+                # Those forms legitimately share their source record's usage.
+                identities = {row.get('pokemon', '').strip() for row in rows}
+                if identities != {record['showdownName']}:
+                    raise ValueError(f"CSV species mismatch for {record['showdownName']} {source['format']} in {path}: found {sorted(identities)}")
                 # This is species usage order, not a move/item's conditional rank.
                 positions = {int(row['column_position']) for row in rows if row.get('column_position')}
                 if len(positions) > 1 or any(position < 1 for position in positions):

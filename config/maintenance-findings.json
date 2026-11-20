@@ -1,7 +1,17 @@
 {
-  "reviewedOn": "2026-11-19",
+  "reviewedOn": "2026-11-20",
   "purpose": "Verified dispositions, not a blanket suppression list. Reopen when evidence contradicts a disposition.",
   "findings": [
+    {
+      "id": "starter-battle-browser-fixtures",
+      "disposition": "fixed",
+      "verification": "The November 20 nightly collected all data but three UI tests assumed the old one-opponent, no-Mega starter. Tests now select Kingambit explicitly and scope item activation separately from Mega toggles. Uniform-list expectations include the added opponent and our Mega Stone. These were test setup failures, not a downloader outage."
+    },
+    {
+      "id": "csv-body-species-identity",
+      "disposition": "fixed",
+      "verification": "build_roster.py rejects every cached/downloaded CSV unless all pokemon cells match the source record showdownName. Derived Mega/cosmetic forms still share that record's usage. Regression includes the complete captured Furfrou Singles CSV substituted for Gogoat, mixed identities, and valid shared forms."
+    },
     {
       "id": "usage-silent-fallback",
       "disposition": "fixed",

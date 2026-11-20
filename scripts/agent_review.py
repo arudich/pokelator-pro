@@ -111,6 +111,23 @@ def validated_review(path):
     return data,'\n'.join(lines)
 
 
+def email_review(data):
+    """Keep routine mail brief; the artifact retains full evidence and sources."""
+    def short(value,limit):
+        value=' '.join(value.split())
+        return value if len(value)<=limit else value[:limit-1].rstrip()+'…'
+    lines=[short(data['summary'],350)]
+    actionable=[finding for finding in data['findings'] if finding['severity'] in ['high','warning']]
+    for finding in actionable[:3]:
+        lines+=['',short(finding['finding'],180),'Next step: '+short(finding['recommendation'],220)]
+    if len(actionable)>3:lines+=['',f'{len(actionable)-3} more actionable findings in the full report.']
+    background=len(data['findings'])-len(actionable)
+    if background:lines+=['',f'{background} background/watch observations are in the full report.']
+    if data['status']=='uncertain' and data['limitations']:
+        lines+=['', 'Review limitation: '+short(str(data['limitations'][0]),180)]
+    return '\n'.join(lines)
+
+
 def deliver(directory,result,outcome):
     source=json.loads((directory/'source.json').read_text())
     snapshot_path=directory/'health-report/snapshot.json'
@@ -120,9 +137,11 @@ def deliver(directory,result,outcome):
     warnings=list(snapshot.get('warnings',[]))
     if not snapshot_path.exists():warnings.append('Nightly data refresh failed; inspect the investigation below.' if 'Nightly' in source['name'] else 'The automated workflow did not produce a complete live audit.')
     review=None
+    concise=None
     if outcome=='success':
         try:
             data,review=validated_review(result)
+            concise=email_review(data)
             if data['status']!='healthy':warnings.append('The agent identified concerns or incomplete evidence; see its assessment below.')
         except Exception:pass
     if review is None:
@@ -134,10 +153,12 @@ def deliver(directory,result,outcome):
                     log+=download(f'https://api.github.com/repos/{os.environ["GITHUB_REPOSITORY"]}/actions/jobs/{job["id"]}/logs',headers).decode(errors='replace')
         except Exception:pass
         review=unavailable_reason(log);warnings.append(review)
+        concise=review
+    email=report+'\n## Agent assessment\n'+concise+'\n\nFull report and evidence: https://github.com/'+os.environ.get('GITHUB_REPOSITORY','arudich/pokelator-pro')+'/actions/runs/'+os.environ['GITHUB_RUN_ID']+'\n'
     report+='\n## Agent assessment\n'+review+'\n\nSource workflow: '+source['url']+'\n'
     (directory/'combined-report.md').write_text(report)
     summary=directory/'health-report/summary.png'
-    send_email(report,warnings,'agent-'+os.environ['GITHUB_RUN_ID'],summary if summary.exists() else None,source['url'],review=review)
+    send_email(email,warnings,'agent-'+os.environ['GITHUB_RUN_ID'],summary if summary.exists() else None,source['url'],review=concise)
     if os.getenv('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as file:file.write(report)
     print('Agent outcome:',outcome)

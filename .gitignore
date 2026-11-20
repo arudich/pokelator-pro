@@ -14,3 +14,4 @@ test-results/
 # Built static site and downloaded refresh inputs
 dist/
 .refresh-cache/
+.wrangler/

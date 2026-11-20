@@ -11,7 +11,7 @@ concurrency:
 jobs:
   refresh:
     if: github.repository == 'arudich/pokelator-pro' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
       base: ${{ steps.base.outputs.sha }}
@@ -45,7 +45,7 @@ jobs:
         run: echo 'Refresh rejected. The last successful production snapshot remains live. Inspect the failed step.' >> "$GITHUB_STEP_SUMMARY"
   publish:
     needs: refresh
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

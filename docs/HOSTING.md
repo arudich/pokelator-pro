@@ -64,7 +64,7 @@ This cannot guarantee same-day game-patch support: upstream packages may lag the
 ## Cost and limits
 
 - Cloudflare Pages Free currently permits **500 builds/month**. A nightly deployment consumes roughly 30–31, leaving room for normal development and previews.
-- Standard GitHub Actions runners are free for public repositories. The workflows use standard Ubuntu runners, not paid larger runners.
+- Standard GitHub Actions runners are free for public repositories. The workflows pin standard Ubuntu 24.04 runners for Playwright compatibility, not paid larger runners.
 - The `pages.dev` hostname and HTTPS are included. A personally owned domain is optional and has its own registration cost.
 - There is no server-side damage computation or database bill. Pokémon/item art still comes from the existing external Champions data source.
 

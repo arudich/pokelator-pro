@@ -32,7 +32,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
       - run: python scripts/refresh_site_data.py
-      - run: node --test tests/test_usage_endpoint.mjs
+      - run: node --test tests/test_usage_endpoint.mjs tests/test_move_effect_projection.mjs
       - run: python -m unittest discover -s tests -v
       - run: python scripts/build_site.py
       - uses: actions/upload-artifact@v7.0.2
@@ -47,12 +47,15 @@ jobs:
   publish:
     needs: refresh
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: verified-nightly
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           ref: main
+          persist-credentials: false
       - uses: actions/download-artifact@v8.0.2
         with:
           name: verified-refresh
@@ -60,6 +63,8 @@ jobs:
       - name: Publish verified snapshot
         env:
           EXPECTED_BASE: ${{ needs.refresh.outputs.base }}
+          NIGHTLY_DEPLOY_KEY: ${{ secrets.NIGHTLY_DEPLOY_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_BASE" || { echo 'main changed during validation; refresh will retry tomorrow.'; exit 1; }
           cp -R /tmp/verified-refresh/data/. data/
@@ -69,4 +74,4 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'Refresh verified Champions data and engine'
-          git push origin HEAD:main
+          python3 scripts/publish_verified.py

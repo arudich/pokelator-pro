@@ -105,7 +105,8 @@ def main():
         if missing:raise ValueError('Missing ability descriptions: '+', '.join(missing))
         status={'checkedAt':checked,'rosterGeneratedAt':roster['generatedAt'],'rosterSource':config['roster'],'rosterSha256':hashlib.sha256(index_raw).hexdigest(),
           'engine':engine,'moveMetadata':moves,'formats':{key:{field:value[field] for field in ['month','format','source','sha256']} for key,value in meta['formats'].items()},
-          'sources':{key:{'url':urls[key],'sha256':hashlib.sha256(raw).hexdigest()} for key,raw in source_bytes.items()}}
+          'sources':{key:{'url':urls[key],'sha256':hashlib.sha256(raw).hexdigest()} for key,raw in source_bytes.items()},
+          'usageDiscovery':meta.get('discovery',{})}
         (stage/'data/refresh-status.json').write_text(json.dumps(status,indent=2)+'\n')
         validate(stage)
         # No live checkout files change until every download/build/structural check succeeds.

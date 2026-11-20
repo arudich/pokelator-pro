@@ -1,0 +1,47 @@
+{
+  "reviewedOn": "2026-11-19",
+  "purpose": "Verified dispositions, not a blanket suppression list. Reopen when evidence contradicts a disposition.",
+  "findings": [
+    {
+      "id": "usage-silent-fallback",
+      "disposition": "fixed",
+      "verification": "tests/test_refresh_safety.py rejects newer-month transport errors and incomplete tables. Only an explicitly unpublished format pair can fall back; discovery records retain that fact."
+    },
+    {
+      "id": "missing-usage-category",
+      "disposition": "fixed",
+      "verification": "scripts/validate_site_data.py checks declared/prior formats and nonempty categories with source identity. tests/test_refresh_safety.py reproduces Gogoat Singles removal and Furfrou Doubles empty spreads."
+    },
+    {
+      "id": "dire-claw-status-export",
+      "disposition": "fixed",
+      "verification": "scripts/move_effect_projection.cjs preserves callback status choices, retaining upstream chance. Node exporter and deterministic Balance tests cover all three statuses and blockers."
+    },
+    {
+      "id": "last-respects-adapter",
+      "disposition": "verified-current-assumption",
+      "verification": "Upstream Showdown data/moves.ts uses 50 + 50 * side.totalFainted; the current Champions mod does not override it. The pinned calc does not scale it, so battle.js supplies that power. Existing tests detect damage/double-scaling regressions. This is source-based verification, not an independently measured in-game fixture.",
+      "reopenWhen": "Official Champions patch changes this rule, upstream callback/mod changes, or a newer engine scales it differently. Lack of an empirical game fixture alone is a watch item, not a fresh defect."
+    },
+    {
+      "id": "usage-top-ten-turnover",
+      "disposition": "expected-with-caveat",
+      "verification": "Reported moves/items/spreads are top lists, not exhaustive sets. Rows can leave the list while remaining legal. Slurpuff duplicate item rows were observed upstream and were informational; do not infer data loss from identity turnover alone.",
+      "reopenWhen": "Live CSV contradicts the built data, completeness checks fail, a meaningful category disappears, or duplicates demonstrably distort modeled probability."
+    },
+    {
+      "id": "sandbox-dns",
+      "disposition": "known-environment-constraint",
+      "verification": "The agent shell is intentionally read-only with restricted network access. review-input/upstream contains independently fetched public source evidence. Shell DNS failure alone does not establish a public-site outage.",
+      "reopenWhen": "The trusted collector also fails to fetch the relevant source, or necessary evidence is absent. Name the specific unavailable source and uncertainty."
+    },
+    {
+      "id": "december-2026-balance-announcement",
+      "disposition": "scheduled-change",
+      "effectiveDate": "2026-12-02",
+      "source": "https://champions-news.pokemon-home.com/en/page/877.html",
+      "verification": "Official in-game news confirms scheduled December 2 maintenance, accuracy changes, Rock Slide flinch chance, learnset additions, Flash Fire and Stalwart changes. Read current feed/captures; do not apply these future rules before maintenance.",
+      "reopenWhen": "After effective maintenance, compare updated upstream support and actual app mechanics. Warn if sources or adapters have not adopted live rules."
+    }
+  ]
+}

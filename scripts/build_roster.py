@@ -88,7 +88,7 @@ def build(index, usage_dir=None):
                                 types=form['types'], stats=stats, image=image,
                                 abilities=form['abilities'].split('|'),
                                 moves=moves or learnset[:4], learnset=learnset,
-                                usage=reference)
+                                usage=reference,expectedUsageFormats=sorted({source['format'] for source in record.get('battleDataCsvs',[]) if source['season']=='Current' and not source.get('daily')}))
     return {'source': 'https://championsbattledata.com/data/pokemon-index.json',
             'generatedAt': index['generatedAt'], 'statModel': 'Champions uninvested level 50',
             'pokemon': sorted(roster.values(), key=lambda p: p['name'])}

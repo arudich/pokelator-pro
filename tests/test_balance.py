@@ -35,6 +35,57 @@ class BalanceTests(unittest.TestCase):
         self.assertTrue(500<=result['counts']['rare']<=850)
         self.assertTrue(4100<=result['counts']['common']<=4600)
 
+    def test_dire_claw_random_status_survives_projection_and_respects_blockers(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const base={investment:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ability:'No Ability'};
+          const run=(choice,{terrain='',ability='No Ability',item=''}={})=>{
+            const a=Balance.side(getPokemonByName('Sneasler'),base,['Dire Claw']);
+            const b=Balance.side(getPokemonByName('Blastoise'),{...base,ability,item},['Body Slam']);
+            const applied=[];let current=b.entry.status || '';
+            Object.defineProperty(b.entry,'status',{get:()=>current,set:value=>{current=value;if(value) applied.push(value)}});
+            const rolls=[0.1,0.1,0.1,choice],rng=()=>rolls.length ? rolls.shift() : 0.9;
+            const range=(attacker,defender)=>({rolls:[attacker===a ? 10 : 999],hp:defender.maxHP,
+              defenderAbility:defender.entry.ability,meta:{type:attacker===a ? 'Poison' : 'Normal',category:'Physical'}});
+            Balance.duel(a,b,{terrain},range,rng);
+            return applied[0] || '';
+          };
+          return {poison:run(0.1),paralysis:run(0.5),sleep:run(0.9),misty:run(0.1,{terrain:'Misty'}),
+            electricSleep:run(0.9,{terrain:'Electric'}),shield:run(0.1,{ability:'Shield Dust'}),cloak:run(0.1,{item:'Covert Cloak'})};
+        }""")
+        self.assertEqual(result,{'poison':'psn','paralysis':'par','sleep':'slp','misty':'','electricSleep':'','shield':'','cloak':''})
+
+    def test_lum_berry_wakes_secondary_sleep_without_losing_a_turn(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const base={investment:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ability:'No Ability'};
+          const a=Balance.side(getPokemonByName('Sneasler'),base,['Dire Claw']);
+          const b=Balance.side(getPokemonByName('Blastoise'),{...base,item:'Lum Berry'},['Body Slam']);
+          const rolls=[0.1,0.1,0.1,0.9],rng=()=>rolls.length ? rolls.shift() : 0.9;
+          let hits=0;
+          const range=(attacker,defender,name,count)=>{
+            if(attacker===a && count!==undefined) hits++;
+            return {rolls:[attacker===a ? 10 : 999],hp:defender.maxHP,defenderAbility:defender.entry.ability,meta:{type:attacker===a ? 'Poison' : 'Normal',category:'Physical'}};
+          };
+          Balance.duel(a,b,{},range,rng);
+          return {hits,status:b.entry.status,sleep:b.sleep,item:b.entry.item};
+        }""")
+        self.assertEqual(result,{'hits':1,'status':'','sleep':0,'item':''})
+
+    def test_champions_self_drop_metadata_wins_when_engine_data_lags(self):
+        self.load()
+        result=self.evaluate("""() => {
+          window.BALANCE_MOVES.moves.overheat.self={boosts:{spa:-1}};
+          const base={investment:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ability:'No Ability'};
+          const a=Balance.side(getPokemonByName('Sneasler'),base,['Overheat']);
+          const b=Balance.side(getPokemonByName('Blastoise'),base,['Body Slam']);
+          const range=(attacker,defender)=>({rolls:[attacker===a ? 10 : 999],hp:defender.maxHP,
+            defenderAbility:defender.entry.ability,meta:{type:'Normal',category:'Special'}});
+          Balance.duel(a,b,{},range,()=>0.5);
+          return a.entry.boosts.spa;
+        }""")
+        self.assertEqual(result,-1)
+
     def test_only_top_two_lock_even_when_more_moves_exceed_half_usage(self):
         self.load()
         result=self.evaluate("""() => {

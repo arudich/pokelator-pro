@@ -12,8 +12,10 @@ def payload(path):
     return json.loads(text[start:].strip().rstrip(';'))
 
 
-def validate(root=ROOT):
+def validate(root=ROOT,baseline_root=ROOT):
     root=Path(root);roster=payload(root/'data/champions-roster.js')
+    baseline=payload(Path(baseline_root)/'data/champions-roster.js') if baseline_root else {'pokemon':[]}
+    previous={p['id']:p for p in baseline['pokemon']}
     if len(roster.get('pokemon',[]))<100:raise ValueError('Unexpectedly incomplete roster')
     ids=set()
     for species in roster['pokemon']:
@@ -21,17 +23,24 @@ def validate(root=ROOT):
         ids.add(species['id'])
         if not species.get('learnset') or not species.get('abilities'):raise ValueError('Missing moves or abilities')
         if any(not isinstance(species['stats'].get(stat),int) or species['stats'][stat]<=0 for stat in STATS):raise ValueError('Invalid species stats')
-        for usage in species.get('usage',{}).values():
+        usage_by_format=species.get('usage',{})
+        expected=set(species.get('expectedUsageFormats',['Singles','Doubles'])) | set(previous.get(species['id'],{}).get('usage',{}))
+        if expected-set(usage_by_format):raise ValueError(f'{species["id"]}: missing expected usage formats {sorted(expected-set(usage_by_format))}')
+        for format,usage in usage_by_format.items():
             for category in ['moves','items','abilities','natures','spreads']:
+                if not usage.get(category):raise ValueError(f'{species["id"]} {format}: empty {category}; source {usage.get("source","unknown")}')
                 for row in usage.get(category,[]):
                     if row.get('percent') is not None and not 0<=row['percent']<=100:raise ValueError('Invalid usage percentage')
                     if category=='spreads':
                         values=[row['investment'][stat] for stat in STATS]
                         if any(not isinstance(n,int) or not 0<=n<=32 for n in values) or sum(values)>66:raise ValueError('Invalid spread')
     meta=payload(root/'data/meta-usage.js')
+    prior_meta=payload(Path(baseline_root)/'data/meta-usage.js') if baseline_root else {'formats':{}}
     if set(meta['formats'])!={'Singles','Doubles'}:raise ValueError('Missing meta format')
-    for value in meta['formats'].values():
+    for format,value in meta['formats'].items():
         if not value['species']:raise ValueError('Empty meta usage')
+        previous_count=len(prior_meta['formats'].get(format,{}).get('species',{}))
+        if previous_count and len(value['species'])<previous_count*0.9:raise ValueError(f'{format}: meta coverage fell from {previous_count} to {len(value["species"])} species; review before publishing')
         if any(not 0<=row['percent']<=100 for row in value['species'].values()):raise ValueError('Invalid meta usage')
     for line in (root/'vendor/SHA256SUMS').read_text().splitlines():
         digest,name=line.split(maxsplit=1);path=root/name

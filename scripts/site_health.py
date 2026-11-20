@@ -107,7 +107,7 @@ def audit_browser(url,output):
               coverage.moveEffects=Object.keys(moveData.moves).length;
               for(const [format,data] of Object.entries(window.META_USAGE.formats)) coverage[format+' meta species']=Object.keys(data.species).length;
               return {...status,coverage,formats:window.META_USAGE.formats && Object.fromEntries(
-                Object.entries(window.META_USAGE.formats).map(([k,v])=>[k,{month:v.month,format:v.format,species:Object.keys(v.species).length}]))};
+                Object.entries(window.META_USAGE.formats).map(([k,v])=>[k,{month:v.month,format:v.format,sha256:v.sha256,species:Object.keys(v.species).length}]))};
             }""")
             checks.append('Battle page loaded and calculated damage.')
             damage=page.evaluate("""() => {
@@ -214,7 +214,7 @@ def send_email(report,warnings,run_id,figure=None,run_url=None,review=None):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--url',default=os.getenv('HEALTH_SITE_URL') or 'https://pokelator-pro.pages.dev')
+    parser.add_argument('--url',default=os.getenv('HEALTH_SITE_URL') or 'https://pokelator.win')
     parser.add_argument('--output',default='health-report');parser.add_argument('--send',action='store_true')
     args=parser.parse_args();output=Path(args.output);output.mkdir(parents=True,exist_ok=True)
     now=dt.datetime.now(UTC);warnings=[]
@@ -229,9 +229,9 @@ def main():
         latest=latest_usage(discover=True)
         for label,data in latest['formats'].items():
             live=snapshot.get('formats',{}).get(label,{})
-            if (live.get('month'),live.get('format'))!=(data['month'],data['format']):warnings.append(label+' has newer published usage not yet deployed.')
+            if (live.get('month'),live.get('format'),live.get('sha256'))!=(data['month'],data['format'],data['sha256']):warnings.append(label+' has newer or corrected published usage not yet deployed.')
         checks.append('Checked the upstream archive for newer complete usage formats.')
-    except Exception:warnings.append('Could not independently check the latest upstream usage archive.')
+    except Exception as error:warnings.append('Could not independently check the latest upstream usage archive: '+str(error)[:250])
     try:usage=usage_report(args.url,os.getenv('USAGE_REPORT_TOKEN'),now)
     except Exception:usage={'available':False,'reason':'The counter endpoint could not be read.'}
     if not usage['available']:warnings.append(usage['reason'])

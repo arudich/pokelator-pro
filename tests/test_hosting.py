@@ -45,7 +45,7 @@ class HostingTests(unittest.TestCase):
         def fetch(url):
             if url=='https://www.smogon.com/stats/':return b'<a href="2026-11/">'
             if url.endswith('/'):return index.encode()
-            return b'Total battles: 100\n | 1 | Kingambit | 22.5% | 10 |'
+            return ('Total battles: 100\n'+''.join(f' | {i} | Species{i} | 0.5% | 10 |\n' for i in range(1,101))).encode()
         data=snapshot(discover=True,fetcher=fetch)
         self.assertEqual(set(data['formats']),{'Singles','Doubles'})
         self.assertTrue(all(row['month']=='2026-11' for row in data['formats'].values()))

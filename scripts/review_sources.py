@@ -17,7 +17,7 @@ SOURCES={
     'champions-abilities':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/champions/abilities.ts',
     'usage-archive':'https://www.smogon.com/stats/',
     'official-news':'https://champions.pokemon.com/en-us/news/',
-    'official-in-game-news':'https://champions-news.pokemon-home.com/en/',
+    'official-in-game-news':'https://champions-news.pokemon-home.com/en/json/list.json',
 }
 
 
@@ -48,7 +48,14 @@ def capture(directory,name,url):
             text=json.dumps(data,ensure_ascii=False)
             if isinstance(data,dict):
                 record['collectionSizes']={key:len(value) for key,value in data.items() if isinstance(value,(list,dict))}
-        if 'news' in name:
+        if name=='official-in-game-news':
+            data=json.loads(text)
+            articles=sorted(data['data'],key=lambda row:int(row.get('pubAt',0)),reverse=True)
+            link=lambda row:urllib.parse.urljoin(url,'../'+row['link'])
+            record['links']=[link(row) for row in articles if row.get('link')]
+            record['preferredLinks']=[link(row) for row in articles if row.get('link') and re.search(r'balance|adjustment|update|maintenance',row.get('title','')+' '+row.get('kindTxt',''),re.I)][:5]
+            text=json.dumps(data,ensure_ascii=False)
+        elif 'news' in name:
             parser=NewsText();parser.feed(text);record['links']=list(dict.fromkeys(parser.links))[:150]
             text='\n'.join(parser.text)
             if not text.strip():raise ValueError('No readable news text returned; this source may need browser rendering')
@@ -75,7 +82,8 @@ def collect(directory):
             url=urllib.parse.urljoin(record['url'],href);parsed=urllib.parse.urlsplit(url)
             if parsed.scheme=='https' and parsed.netloc==urllib.parse.urlsplit(record['url']).netloc and parsed.path not in ['/en/','/en-us/news/'] and ('/news/' in parsed.path or '/page/' in parsed.path):links.append(url)
         ordered=list(dict.fromkeys(links))
-        for number,url in enumerate(list(dict.fromkeys(ordered[:3]+ordered[-3:]))):follow.append((record['name']+'-'+str(number),url))
+        selected=ordered[:3]+record.get('preferredLinks',[]) if record['name']=='official-in-game-news' else ordered[:3]+ordered[-3:]
+        for number,url in enumerate(list(dict.fromkeys(selected))):follow.append((record['name']+'-'+str(number),url))
     with ThreadPoolExecutor(max_workers=4) as pool:
         records.extend(record for record,_ in pool.map(lambda item:capture(directory,*item),follow))
     (directory/'index.json').write_text(json.dumps(records,indent=2)+'\n')

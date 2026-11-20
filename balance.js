@@ -132,7 +132,7 @@
     if(opponent.entry.ability==='Unnerve' || !s.hp) return;
     if(s.entry.item==='Sitrus Berry' && s.hp<=s.maxHP/2) {heal(s,s.maxHP/4);consume(s);}
     else if(['Figy Berry','Wiki Berry','Mago Berry','Aguav Berry','Iapapa Berry'].includes(s.entry.item) && s.hp<=s.maxHP*(s.entry.ability==='Gluttony' ? 0.5 : 0.25)) {heal(s,s.maxHP/3);consume(s);}
-    else if(s.entry.item==='Lum Berry' && s.entry.status) {s.entry.status='';consume(s);}
+    else if(s.entry.item==='Lum Berry' && s.entry.status) {s.entry.status='';s.sleep=0;consume(s);}
   }
   function change(s,boosts) {
     for(const [stat,delta] of Object.entries(boosts || {})) s.entry.boosts[stat]=Math.max(-6,Math.min(6,(s.entry.boosts[stat] || 0)+delta*(s.entry.ability==='Contrary' ? -1 : s.entry.ability==='Simple' ? 2 : 1)));
@@ -178,7 +178,7 @@
     if(a.flinched) return;
     if(a.entry.status==='par' && rng()<0.25) return;
     if(a.entry.status==='frz') {if(rng()<0.2) a.entry.status='';else return;}
-    if(a.sleep>0) {a.sleep--;return;}
+    if(a.sleep>0) {a.sleep--;if(!a.sleep) a.entry.status='';return;}
     const name=action.name,meta=effect(name);a.used.add(name);
     if(['Choice Band','Choice Specs','Choice Scarf'].includes(a.entry.item)) a.lock=name;
     if(name==='Sucker Punch' && (!other || b.acted)) return;
@@ -210,14 +210,14 @@
         for(const secondary of meta.secondaries || (meta.secondary ? [meta.secondary] : [])) if(rng()<(secondary.chance || 100)/100*(a.entry.ability==='Serene Grace' ? 2 : 1)) {
           if(secondary.volatileStatus==='flinch' && b.entry.ability!=='Inner Focus') b.flinched=true;
           if(secondary.boosts) change(b,secondary.boosts);
-          if(secondary.status && !b.entry.status && !(field.terrain==='Misty' && grounded(b))) {
-            const status=secondary.status;
+          const status=secondary.status || (secondary.statusChoices?.length ? secondary.statusChoices[Math.floor(rng()*secondary.statusChoices.length)] : '');
+          if(status && !b.entry.status && !(field.terrain==='Misty' && grounded(b)) && !(status==='slp' && field.terrain==='Electric' && grounded(b))) {
             if(!(status==='brn' && b.species.types.includes('Fire')) && !(status==='par' && b.species.types.includes('Electric')) && !(status==='frz' && b.species.types.includes('Ice')) && !(['psn','tox'].includes(status) && b.species.types.some(t=>['Steel','Poison'].includes(t)))) {b.entry.status=status;if(status==='slp') b.sleep=2;berry(b,a);}
           }
         }
       }
     }
-    change(a,{...meta.self?.boosts,...moveMeta(name).selfBoosts});
+    change(a,{...moveMeta(name).selfBoosts,...meta.self?.boosts});
     if(meta.selfdestruct) a.hp=0;
   }
   function residual(s,other,field) {

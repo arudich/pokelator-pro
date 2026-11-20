@@ -11,6 +11,10 @@ ROOT=Path(__file__).resolve().parents[1]
 FORMATS={'Doubles':'gen9championsvgc2026regmc','Singles':'gen9championsbssregmc'}
 
 
+class IncompleteFormatPair(ValueError):
+    """A month was published without a complete Champions pair yet."""
+
+
 def fetch(url):
     return urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'PokelatorPro usage snapshot'}),timeout=40).read()
 
@@ -35,29 +39,40 @@ def discover_formats(index,cutoff):
         key=(int(match[2]),match[5]);label='Singles' if match[3]=='bss' else 'Doubles'
         pairs.setdefault(key,{})[label]=match[1]
     complete=[(key,value) for key,value in pairs.items() if set(value)=={'Singles','Doubles'}]
-    if not complete:raise ValueError('No matching Singles/Doubles Champions regulation pair')
+    if not complete:raise IncompleteFormatPair('No matching Singles/Doubles Champions regulation pair')
     return max(complete,key=lambda row:row[0])[1]
 
 
-def snapshot(month='latest',cutoff=1630,formats=None,discover=False,fetcher=fetch):
+def snapshot(month='latest',cutoff=1630,formats=None,discover=False,fetcher=fetch,minimum_species=100):
     months=sorted(set(re.findall(r'href="(\d{4}-\d{2})/"',fetcher('https://www.smogon.com/stats/').decode())),reverse=True)[:3] if month=='latest' else [month]
-    errors=[]
+    skipped=[]
     for candidate in months:
         datasets={}
+        url=f'https://www.smogon.com/stats/{candidate}/'
         try:
-            selected=discover_formats(fetcher(f'https://www.smogon.com/stats/{candidate}/').decode(),cutoff) if discover else formats or FORMATS
+            if discover:
+                index=fetcher(url).decode()
+                if not re.search(r'href="[^"/]+\.txt"',index):raise ValueError('Archive listing contains no usage tables; source completeness cannot be verified')
+                try:selected=discover_formats(index,cutoff)
+                except IncompleteFormatPair as error:
+                    if month!='latest':raise
+                    skipped.append({'month':candidate,'reason':str(error),'source':url})
+                    continue
+            else:selected=formats or FORMATS
             for label,format_id in selected.items():
                 url=f'https://www.smogon.com/stats/{candidate}/{format_id}-{cutoff}.txt'
                 raw=fetcher(url);text=raw.decode()
+                species=parse_usage(text)
+                if len(species)<minimum_species:raise ValueError(f'Incomplete usage table: {len(species)} species, expected at least {minimum_species}')
                 datasets[label]={'source':url,'month':candidate,'format':format_id,'ratingCutoff':cutoff,
                     'totalBattles':int(re.search(r'Total battles:\s*(\d+)',text)[1]),
-                    'sha256':hashlib.sha256(raw).hexdigest(),'species':parse_usage(text)}
+                    'sha256':hashlib.sha256(raw).hexdigest(),'species':species}
             return {'provider':'Smogon / Pokémon Showdown','retrievedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                'population':'Champions Showdown ladder; not in-game ladder','formats':datasets}
+                'population':'Champions Showdown ladder; not in-game ladder','formats':datasets,
+                'discovery':{'latestArchiveMonth':months[0],'skippedUnpublishedFormats':skipped}}
         except Exception as error:
-            errors.append(f'{candidate}: {error}')
-            if month!='latest':raise
-    raise RuntimeError('No complete matching snapshot found; previous snapshot retained. '+'; '.join(errors))
+            raise RuntimeError(f'{candidate} source check failed at {url}; refusing silent fallback: {error}') from error
+    raise RuntimeError('No complete matching snapshot found; previous snapshot retained. '+json.dumps(skipped))
 
 
 if __name__=='__main__':

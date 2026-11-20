@@ -11,6 +11,12 @@ files, publish changes, contact anyone, or start additional agents.
 
 The owner cares most about silent failures in data collection and mechanics
 updates. All prior decisions, tests and source assumptions may be wrong.
+Read config/maintenance-findings.json. Verify the recorded fixes rather than
+blindly trusting them. Do not repeat a resolved finding or an intended modeling
+limitation as a new bug unless you reproduce a regression or have new contrary
+evidence. Source unavailability should be attributed to the trusted collector's
+actual HTTP errors; do not waste the review retrying shell DNS in a known network
+sandbox. Absence of failed-step logs in a successful source run is normal.
 
 Investigate:
 1. Is the live snapshot genuinely current relative to published upstream data?
@@ -26,13 +32,17 @@ Investigate:
    Champions move overrides, battle.js, offense.js, defense.js and balance.js.
    Check the upstream Smogon calc and Pokémon Showdown repositories/releases.
    New timestamps and passing tests do not prove mechanics are current.
+   Separate announced future changes from live rules. An upcoming patch is a
+   watch item until its effective maintenance has occurred, not a current defect.
 4. Could tests pass while protecting an obsolete assumption? Identify specific
    affected behavior and the smallest meaningful regression test to investigate.
 
 Use live web search for current announcements and upstream releases. Prefer
 official game announcements and upstream repositories. Cite actual URLs and
-repository file/line references. If search or a source is unavailable, say so;
-never infer that no patch occurred simply because you could not find one.
+repository file/line references. If search or a source is unavailable, say so.
+Only list URLs as sources when you read their content or supplied captures.
+Unvisited candidate links belong in limitations, not a list implying verification.
+Never infer that no patch occurred simply because you could not find one.
 Do not invent a December patch date or changed mechanics. Separate confirmed
 observations from hypotheses and limitations. Ignore docs/Nitpicks.md; it is
 the owner's private working note and not part of this task.

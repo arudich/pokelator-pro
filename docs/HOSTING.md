@@ -1,6 +1,6 @@
 # Hosting and automatic updates
 
-Production: **https://pokelator-pro.pages.dev** (connected and verified November 19, 2026).
+Production: **https://pokelator.win** (verified November 19, 2026). The original https://pokelator-pro.pages.dev address remains available.
 
 Twice-monthly production audits, direct email, and optional aggregate usage counters are implemented in [HEALTH-REPORTS.md](HEALTH-REPORTS.md). Email secrets and a Cloudflare D1 binding need one-time configuration before delivery/counting are active. `pokelator.win` is the purchased custom domain; switch the report URL after it is connected.
 
@@ -23,7 +23,7 @@ Recommended setup: **Cloudflare Pages Free + this GitHub repository**. The app r
 4. Save and deploy. Cloudflare supplies an HTTPS address such as `https://YOUR-PROJECT.pages.dev`; the exact project name must be available. A custom domain can be added later, but is unnecessary to launch.
 5. Under the Pages project's branch controls, enable preview deployments for all non-production branches. In GitHub, enable Actions if prompted. Open **Actions → Nightly data and engine refresh → Run workflow** once to verify the hosted automation.
 
-No Cloudflare API token or custom deployment secret is needed for Git integration. GitHub's automatic token publishes validated nightly snapshots; the workflow requests `contents: write` only in that final job. If organization/repository policy denies this, allow the workflow write access in Actions settings. A branch rule that blocks bot pushes to main must grant the nightly bot permission, or updates will need a maintainer merge.
+No Cloudflare API token or custom deployment secret is needed for Git integration. Validated nightly snapshots are published with a repository-scoped deploy key, stored only in the `verified-nightly` environment. Its branch policy permits `main` only; collaborator branches cannot access that credential. The key has a ruleset exception, and `scripts/publish_verified.py` refuses non-main runs, changed bases and commits outside data/vendor. The ordinary workflow token stays read-only. Owner/admin bypass remains separate; collaborators still require reviewed PRs. Revoke/rotate this key through repository Deploy keys and the environment secret together.
 
 ## Updating and sharing versions
 

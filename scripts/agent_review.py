@@ -88,6 +88,11 @@ def source_evidence(run_id,directory):
     history=subprocess.run(['git','log','--since=40 days ago','--oneline','--stat','--','data','vendor','scripts/refresh_site_data.py'],
                            capture_output=True,text=True,check=True).stdout
     lines+=['## Recent changes (investigate using git history)',history[-30000:]]
+    from review_sources import collect
+    sources=collect(directory/'upstream')
+    lines+=['## Fresh independent upstream captures',
+            'Read upstream/index.json and corresponding text files. Fetch failures are limitations, not evidence that a source is current.',
+            json.dumps([{k:v for k,v in record.items() if k not in ['links','topLevelKeys']} for record in sources],indent=2)]
     (directory/'evidence.md').write_text('\n\n'.join(lines))
     (directory/'source.json').write_text(json.dumps({'run':run_id,'url':run['html_url'],'name':run['name']}))
 

@@ -87,8 +87,10 @@ def main():
             shutil.copy2(engine_dir/source,stage/'vendor'/target)
         (stage/'vendor/engine.json').write_text(json.dumps(engine,indent=2)+'\n')
         (stage/'vendor/SHA256SUMS').write_text(''.join(hashlib.sha256((stage/'vendor'/name).read_bytes()).hexdigest()+'  vendor/'+name+'\n' for name in ['smogon-calc.min.js','smogon-data.min.js']))
+        champions_raw=fetch(config['championsMoveOverrides']);champions_path=work/'champions-moves.ts';champions_path.write_bytes(champions_raw)
+        moves['championsOverrides']={'source':config['championsMoveOverrides'],'sha256':hashlib.sha256(champions_raw).hexdigest()}
         move_meta={**moves,'license':'MIT','downloadedAt':checked[:10]};meta_path=work/'move-source.json';meta_path.write_text(json.dumps(move_meta))
-        subprocess.run(['node',str(ROOT/'scripts/extract_balance_moves.cjs'),str(move_dir),str(meta_path),str(stage/'data/balance-moves.js')],check=True)
+        subprocess.run(['node',str(ROOT/'scripts/extract_balance_moves.cjs'),str(move_dir),str(meta_path),str(stage/'data/balance-moves.js'),str(champions_path)],check=True)
         print('Refreshing ability/item descriptions and sprite references…',flush=True)
         urls={'abilities':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/abilities.ts',
           'items':'https://play.pokemonshowdown.com/data/items.js','itemText':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/items.ts',

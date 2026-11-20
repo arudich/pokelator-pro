@@ -15,7 +15,11 @@
     "version": "0.11.0",
     "source": "https://registry.npmjs.org/@pkmn/dex/-/dex-0.11.0.tgz",
     "integrity": "sha512-WRauv0I3TZ4Xp8iN5HsaclfFOwEIEtu+L15nk01fga9BOIsQHIxw/zIObWrLcE4x2F9wta5I+7ty1m5TPvl1kQ==",
-    "sha256": "8802524c1b3ac34b62e5c4075d0c949041774bc162ba242fe1d3bc9c531657f4"
+    "sha256": "8802524c1b3ac34b62e5c4075d0c949041774bc162ba242fe1d3bc9c531657f4",
+    "championsOverrides": {
+      "source": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/champions/moves.ts",
+      "sha256": "bcd4263a7c72e8c1d9ec0e4ffb9f1b63e6d936994c79acfc0a33f2dcc3ab2f04"
+    }
   },
   "formats": {
     "Singles": {

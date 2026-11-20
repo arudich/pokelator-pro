@@ -3,5 +3,6 @@
   "usageRatingCutoff": 1630,
   "discoverCurrentRegulation": true,
   "enginePackage": "@smogon/calc",
-  "movePackage": "@pkmn/dex"
+  "movePackage": "@pkmn/dex",
+  "championsMoveOverrides": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/champions/moves.ts"
 }

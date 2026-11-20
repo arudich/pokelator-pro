@@ -47,7 +47,7 @@ The schedule is **06:23 UTC**, approximately 1:23 a.m. New York standard time / 
 
 1. Download the current Champions roster and both formats' complete usage CSVs.
 2. Find the newest published complete Singles/Doubles Champions regulation pair in Smogon's monthly archive. Monthly data remains monthly; checking nightly cannot create unavailable statistics. Source month and exact regulation identifiers remain in the data.
-3. Download the latest stable published `@smogon/calc` and `@pkmn/dex` releases. Verify npm SHA-512 integrity, retain their version/hash information, and rebuild supplemental move effects. Refresh ability/item descriptions and item sprite paths too.
+3. Download the latest stable published `@smogon/calc` and `@pkmn/dex` releases. Verify npm SHA-512 integrity, retain their version/hash information, and rebuild supplemental move effects using Pokémon Showdown’s Champions-specific move overrides (including accuracy, PP and secondary effects). Refresh ability/item descriptions and item sprite paths too.
 4. Validate schemas, stat budgets, source coverage and bundle checksums. Run the browser, damage, optimizer and packaging regression suite.
 5. Only after success, commit the verified `data/` and `vendor/` snapshot to main. Cloudflare deploys that push. The publishing job refuses to overwrite main if a contributor changed it during validation.
 

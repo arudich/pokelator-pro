@@ -1,12 +1,15 @@
 import datetime as dt
+import base64
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from site_health import inspect_snapshot,usage_report,render_report,send_email
+from health_figure import summary_html
 
 
 class SiteHealthTests(unittest.TestCase):
@@ -54,6 +57,31 @@ class SiteHealthTests(unittest.TestCase):
         self.assertEqual(payload['to'],['recipient@example.test'])
         self.assertIn('&lt;script&gt;',payload['html'])
         self.assertEqual(headers['Idempotency-Key'],'pokelator-health-123')
+
+    def test_visual_summary_does_not_invent_bars_or_comparisons_for_new_tracking(self):
+        usage={'available':True,'since':'2026-11-06','until':'2026-11-20',
+               'totals':{'visit':0},'previous':{'visit':100},'previousPeriodComplete':False}
+        markup=summary_html(self.current,[],[],usage,None)
+        self.assertIn('width:0.000%',markup)
+        self.assertNotIn('vs prior',markup)
+        self.assertNotIn('class="track prior"',markup)
+        self.assertIn('No activity recorded',markup)
+        unavailable=summary_html(self.current,[],[],{'available':False,'reason':'Not connected'},None)
+        self.assertIn('Usage unavailable',unavailable)
+        self.assertNotIn('class="bar-row"',unavailable)
+
+    def test_summary_email_embeds_the_png_and_keeps_full_plain_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            figure=Path(directory)/'summary.png';figure.write_bytes(b'\x89PNG\r\n\x1a\n')
+            with patch.dict('os.environ',{'RESEND_API_KEY':'private','HEALTH_EMAIL_TO':'recipient@example.test',
+                                         'HEALTH_EMAIL_FROM':'sender@example.test'}),patch('site_health.request_json',return_value={'id':'accepted'}) as send:
+                send_email('Detailed report', ['<script>warning</script>'],'124',figure,'https://example.test/run')
+            payload=send.call_args.args[2]
+            self.assertEqual(base64.b64decode(payload['attachments'][0]['content']),figure.read_bytes())
+            self.assertEqual(payload['attachments'][0]['content_id'],'health-summary')
+            self.assertIn('src="cid:health-summary"',payload['html'])
+            self.assertIn('&lt;script&gt;warning',payload['html'])
+            self.assertEqual(payload['text'],'Detailed report')
 
 
 class UsageBrowserTests(unittest.TestCase):

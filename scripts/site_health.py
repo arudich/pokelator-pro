@@ -1,5 +1,6 @@
 """Audit production, compare historical coverage, and send the Pokelator health report."""
 import argparse
+import base64
 import datetime as dt
 import hashlib
 import html
@@ -185,15 +186,26 @@ def render_report(snapshot,checks,warnings,usage,baseline,run_url):
     return '\n'.join(lines)+'\n'
 
 
-def send_email(report,warnings,run_id):
+def send_email(report,warnings,run_id,figure=None,run_url=None):
     required=['RESEND_API_KEY','HEALTH_EMAIL_TO','HEALTH_EMAIL_FROM']
     if not all(os.getenv(key) for key in required):raise RuntimeError('Email setup incomplete: configure RESEND_API_KEY, HEALTH_EMAIL_TO and HEALTH_EMAIL_FROM in GitHub Actions secrets.')
+    payload={'from':os.environ['HEALTH_EMAIL_FROM'],'to':[os.environ['HEALTH_EMAIL_TO']],
+         'subject':'Pokelator health report · '+('Attention needed' if warnings else 'Healthy'),
+         'text':report,'html':'<div style="font:16px/1.6 system-ui;white-space:pre-wrap">'+html.escape(report)+'</div>'}
+    if figure:
+        status='Attention needed' if warnings else 'Healthy'
+        findings='<ul>'+''.join('<li>'+html.escape(warning)+'</li>' for warning in warnings)+'</ul>' if warnings else '<p>All scheduled checks passed.</p>'
+        link=f'<p><a href="{html.escape(run_url,quote=True)}">View full report and screenshots</a></p>' if run_url else ''
+        payload['html']=f'''<div style="max-width:760px;margin:auto;font:15px/1.6 Arial,sans-serif;color:#192b3e">
+          <img src="cid:health-summary" width="760" style="display:block;width:100%;max-width:760px;height:auto" alt="Pokelator health report: {status}. Detailed results follow in this email and the linked report.">
+          <div style="padding:16px 24px"><strong>{status}</strong>{findings}{link}
+          <p style="color:#607589;font-size:12px">If images are hidden, the summary is attached as a PNG. The plain-text version contains the full report.</p></div></div>'''
+        payload['attachments']=[{'filename':'pokelator-health-summary.png','content_type':'image/png',
+                                 'content_id':'health-summary','content':base64.b64encode(Path(figure).read_bytes()).decode()}]
     result=request_json('https://api.resend.com/emails',
         {'Authorization':'Bearer '+os.environ['RESEND_API_KEY'],'Content-Type':'application/json',
          'Idempotency-Key':'pokelator-health-'+run_id},
-        {'from':os.environ['HEALTH_EMAIL_FROM'],'to':[os.environ['HEALTH_EMAIL_TO']],
-         'subject':'Pokelator health report · '+('Attention needed' if warnings else 'Healthy'),
-         'text':report,'html':'<div style="font:16px/1.6 system-ui;white-space:pre-wrap">'+html.escape(report)+'</div>'})
+        payload)
     if not result.get('id'):raise RuntimeError('Email provider did not confirm acceptance')
     print('Resend accepted the health report for delivery.')
 
@@ -223,6 +235,13 @@ def main():
     if not usage['available']:warnings.append(usage['reason'])
     repo=os.getenv('GITHUB_REPOSITORY','arudich/pokelator-pro');run=os.getenv('GITHUB_RUN_ID','local')
     run_url=f'https://github.com/{repo}/actions/runs/{run}'
+    figure=None
+    try:
+        from health_figure import render_summary
+        figure=render_summary(snapshot,checks,warnings,usage,baseline,output/'summary.png')
+    except Exception:
+        # A rendering failure must not suppress a useful health email.
+        warnings.append('The visual summary could not be rendered; the text report is available.')
     report=render_report(snapshot,checks,warnings,usage,baseline,run_url)
     snapshot.update(warnings=warnings,checks=checks,usage=usage)
     (output/'snapshot.json').write_text(json.dumps(snapshot,indent=2)+'\n')
@@ -230,7 +249,7 @@ def main():
     print(report)
     if os.getenv('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as file:file.write(report)
-    if args.send:send_email(report,warnings,run)
+    if args.send:send_email(report,warnings,run,figure,run_url)
     if warnings:raise SystemExit(1)
 
 

@@ -6,6 +6,8 @@ Production setup completed November 19, 2026: Cloudflare D1 `pokelator-usage` is
 
 ## The report
 
+Emails lead with an embedded PNG dashboard: health status, refresh age, activity bars and (once history exists) period/coverage comparisons. The image is attached inline, so it needs no external image hosting. A full plain-text version and linked workflow evidence remain available. `scripts/health_figure.py` renders the figure using the existing Chromium dependency; `summary.png` and its HTML source are also retained with each report artifact. Missing counters are shown as unavailable, and zero counts get zero-length bars.
+
 - Chromium loads the live Battle view and calculates damage. A Last Respects reference checks four fainted counts. All five builder panels must populate. JavaScript errors and mobile horizontal overflow are flagged. Desktop/mobile screenshots accompany the report for human review.
 - The live engine bundles must match their published integrity manifest.
 - A successful refresh older than 72 hours, source roster older than 14 days, missing usage categories, and old monthly usage are flagged. An independent upstream archive check looks for newer complete usage formats; monthly statistics are not expected to change nightly.

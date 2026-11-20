@@ -1,5 +1,7 @@
 # Hosting and automatic updates
 
+Production: **https://pokelator-pro.pages.dev** (connected and verified November 19, 2026).
+
 Recommended setup: **Cloudflare Pages Free + this GitHub repository**. The app remains static: damage calculations run in the visitor's browser. No rented server, database, paid build service, or site account system is needed.
 
 ## One-time setup

@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     outputs:
-      outcome: ${{ steps.codex.outcome }}
+      outcome: ${{ steps.result.outputs.outcome }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -77,7 +77,25 @@ jobs:
           permission-profile: ':read-only'
           safety-strategy: drop-sudo
           allow-bots: true
-          codex-args: '["--search"]'
+          codex-args: '["-c", "web_search=\"live\""]'
+      - name: Verify an actual assessment was generated
+        id: result
+        if: always()
+        run: |
+          python - <<'PY'
+          import os,sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          from agent_review import validated_review
+          try:
+              validated_review(Path('assessment.json'))
+              outcome='success'
+          except Exception:
+              outcome='failure'
+          with open(os.environ['GITHUB_OUTPUT'],'a') as file:
+              file.write('outcome='+outcome+'\n')
+          print('Validated agent assessment:',outcome)
+          PY
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:

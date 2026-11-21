@@ -10,7 +10,7 @@
     {
       "id": "first-impression-repeat",
       "disposition": "fixed",
-      "verification": "Balance tracks move actions and disables First Impression after the first action, including misses. A flinched opening turn does not consume that action. It is excluded from repeatable core attacks. Seeded Golisopod duels cover ordinary and opening-flinch cases with only one First Impression attempt."
+      "verification": "Balance tracks move actions and disables First Impression after the first action, including misses and flinches. Independently verified sim/battle-actions.ts increments activeMoveActions at runMove entry before failure checks. It is excluded from repeatable core attacks. Seeded Golisopod duels cover ordinary and opening-flinch cases with only one First Impression attempt."
     },
     {
       "id": "interior-usage-rank-gap",

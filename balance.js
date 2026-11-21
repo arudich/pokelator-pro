@@ -176,11 +176,13 @@
   }
   function hit(a,b,action,other,turn,field,range,rng) {
     if(!action || !a.hp || !b.hp) return;
+    // Showdown counts a move action before flinch, paralysis and sleep checks.
+    a.actions++;
     if(a.flinched) return;
     if(a.entry.status==='par' && rng()<0.25) return;
     if(a.entry.status==='frz') {if(rng()<0.2) a.entry.status='';else return;}
     if(a.sleep>0) {a.sleep--;if(!a.sleep) a.entry.status='';return;}
-    const name=action.name,meta=effect(name);a.used.add(name);a.actions++;
+    const name=action.name,meta=effect(name);a.used.add(name);
     if(['Choice Band','Choice Specs','Choice Scarf'].includes(a.entry.item)) a.lock=name;
     if(name==='Sucker Punch' && (!other || b.acted)) return;
     if(rng()>accuracy(a,b,name,field)) return;

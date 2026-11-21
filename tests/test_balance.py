@@ -35,8 +35,9 @@ class BalanceTests(unittest.TestCase):
         }""")
         for duel in [result['normal'],result['flinched']]:
             self.assertLess(duel['opening'],duel['hp'])
-            self.assertEqual(duel['attempts'],['First Impression'])
             self.assertEqual(duel['winner'],'them')
+        self.assertEqual(result['normal']['attempts'],['First Impression'])
+        self.assertEqual(result['flinched']['attempts'],[])
         self.assertTrue(any('Neither fixed move is a repeatable' in warning for warning in result['warnings']))
 
     def test_thresholds_fixed_core_and_weighted_two_slot_sampling(self):

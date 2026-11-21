@@ -28,7 +28,7 @@
     else if(core[1].percent<=50) warnings.push(`Weak fixed pair: ${core[1].name} appears on only ${core[1].percent}% of sets.`);
     else if(core[1].percent<75) warnings.push(`Variable fixed pair: ${core[1].name} appears on ${core[1].percent}% of sets.`);
     const attack=move=>{const meta=moveMeta(move.name);return meta && meta.category!=='Status' && !immuneItems.has(move.name)
-      && !['Fake Out','Last Resort','Hyper Beam','Giga Impact','Blast Burn','Hydro Cannon','Frenzy Plant','Rock Wrecker','Phantom Force','Fly','Dig','Dive','Bounce','Solar Beam','Solar Blade','Meteor Beam','Electro Shot','Sky Attack'].includes(move.name);};
+      && !['Fake Out','First Impression','Last Resort','Hyper Beam','Giga Impact','Blast Burn','Hydro Cannon','Frenzy Plant','Rock Wrecker','Phantom Force','Fly','Dig','Dive','Bounce','Solar Beam','Solar Blade','Meteor Beam','Electro Shot','Sky Attack'].includes(move.name);};
     if(core.length && !core.some(attack)) warnings.push('Neither fixed move is a repeatable supported attack; results depend on sampled coverage and omit status strategies.');
     if(coverage.length<2) warnings.push('Fewer than two reported coverage options; the four-move set is incomplete.');
     const overlapLower=Math.max(0,core.reduce((sum,move)=>sum+move.percent,0)-100);
@@ -93,7 +93,7 @@
   }
   function side(species,entry,moves,fainted=0) {
     const s={species,entry:{...entry,investment:{...entry.investment},boosts:{...entry.boosts},item:(species.isMega || species.megaStoneName) ? Battle.requiredMegaItem(species) : entry.item || ''},
-      moves,fainted,lock:'',used:new Set(),consumed:false};
+      moves,fainted,lock:'',used:new Set(),actions:0,consumed:false};
     s.maxHP=maxHP(s);s.hp=s.maxHP;return s;
   }
   function priority(s,move,field) {
@@ -106,7 +106,8 @@
   function usable(s,name,turn) {
     const meta=moveMeta(name);
     return meta && meta.category!=='Status' && !immuneItems.has(name) && (!s.lock || s.lock===name || !['Choice Band','Choice Specs','Choice Scarf'].includes(s.entry.item))
-      && !(name==='Fake Out' && turn>0) && !(name==='Last Resort' && s.moves.some(m=>m!==name && !s.used.has(m)))
+      && !(name==='Fake Out' && turn>0) && !(name==='First Impression' && s.actions>0)
+      && !(name==='Last Resort' && s.moves.some(m=>m!==name && !s.used.has(m)))
       && !['Hyper Beam','Giga Impact','Blast Burn','Hydro Cannon','Frenzy Plant','Rock Wrecker','Phantom Force','Fly','Dig','Dive','Bounce','Solar Beam','Solar Blade','Meteor Beam','Electro Shot','Sky Attack'].includes(name);
   }
   function choose(a,b,turn,field,range) {
@@ -179,7 +180,7 @@
     if(a.entry.status==='par' && rng()<0.25) return;
     if(a.entry.status==='frz') {if(rng()<0.2) a.entry.status='';else return;}
     if(a.sleep>0) {a.sleep--;if(!a.sleep) a.entry.status='';return;}
-    const name=action.name,meta=effect(name);a.used.add(name);
+    const name=action.name,meta=effect(name);a.used.add(name);a.actions++;
     if(['Choice Band','Choice Specs','Choice Scarf'].includes(a.entry.item)) a.lock=name;
     if(name==='Sucker Punch' && (!other || b.acted)) return;
     if(rng()>accuracy(a,b,name,field)) return;

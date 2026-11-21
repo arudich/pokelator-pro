@@ -14,6 +14,31 @@ class BalanceTests(unittest.TestCase):
         app_tests.AppTests.load(self)
         self.page.add_script_tag(url=self.url+'/data/balance-moves.js')
 
+    def test_first_impression_is_only_available_before_first_move_action(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const entry={investment:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ability:'No Ability'};
+          const run=opponentMoves=>{
+            const a=Balance.side(getPokemonByName('Golisopod'),entry,['First Impression']);
+            const b=Balance.side(getPokemonByName('Blastoise'),entry,opponentMoves);
+            const damage=Balance.context({}),attempts=[];
+            const range=(attacker,defender,name,hits)=>{
+              if(attacker===a && hits!==undefined) attempts.push(name);
+              return damage(attacker,defender,name,hits);
+            };
+            const opening=damage(a,b,'First Impression');
+            const result=Balance.duel(a,b,{},range,()=>0.5);
+            return {attempts,winner:result.winner,opening:opening.maxDamage,hp:b.maxHP};
+          };
+          return {normal:run(['Body Slam']),flinched:run(['Fake Out','Body Slam']),
+            warnings:Balance.movesetModel([{name:'First Impression',percent:100},{name:'Protect',percent:100}]).warnings};
+        }""")
+        for duel in [result['normal'],result['flinched']]:
+            self.assertLess(duel['opening'],duel['hp'])
+            self.assertEqual(duel['attempts'],['First Impression'])
+            self.assertEqual(duel['winner'],'them')
+        self.assertTrue(any('Neither fixed move is a repeatable' in warning for warning in result['warnings']))
+
     def test_thresholds_fixed_core_and_weighted_two_slot_sampling(self):
         self.load()
         result=self.evaluate("""() => {

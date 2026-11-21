@@ -10,6 +10,22 @@ class UsagePickerTests(unittest.TestCase):
     load = app_tests.AppTests.load
     evaluate = app_tests.AppTests.evaluate
 
+    def test_picker_only_offers_moves_that_survive_saving_and_have_engine_metadata(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const unsupported=[];
+          for(const species of pokerData) for(const move of buildMoveChoices(species)) {
+            const saved=sanitizeTeamEntry({name:species.name,moveSet:[move.name]});
+            if(!Battle.moveMeta(move.name) || saved.moveSet[0]!==move.name) unsupported.push([species.name,move.name]);
+          }
+          const rotom=getPokemonByName('Rotom Wash');
+          return {unsupported,sourceRetainsMove:rotom.learnset.includes('Thunder Shock'),
+            offered:buildMoveChoices(rotom,'Thunder Shock').map(move=>move.name)};
+        }""")
+        self.assertEqual(result['unsupported'],[])
+        self.assertTrue(result['sourceRetainsMove'])
+        self.assertEqual(result['offered'],[])
+
     def test_pokemon_results_usage_stats_and_click_add(self):
         self.load()
         self.assertFalse(self.page.locator('#searchResults').is_visible())

@@ -31,6 +31,9 @@ def validate(root=ROOT,baseline_root=ROOT):
                 if not usage.get(category):raise ValueError(f'{species["id"]} {format}: empty {category}; source {usage.get("source","unknown")}')
                 old_rows=previous.get(species['id'],{}).get('usage',{}).get(format,{}).get(category,[])
                 rows=usage[category]
+                ranks=[row.get('rank') for row in rows]
+                if any(type(rank) is not int for rank in ranks) or sorted(ranks)!=list(range(1,len(rows)+1)):
+                    raise ValueError(f'{species["id"]} {format}: nonconsecutive {category} ranks; review source {usage.get("source","unknown")}')
                 if len(old_rows)>=5 and len(rows)<len(old_rows)*0.5 and (category=='moves' or sum(row.get('percent') or 0 for row in rows)<95):
                     raise ValueError(f'{species["id"]} {format}: {category} sharply reduced from {len(old_rows)} to {len(rows)} rows; review source {usage.get("source","unknown")}')
                 for row in usage.get(category,[]):

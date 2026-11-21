@@ -10,7 +10,7 @@ class DefenseChanceTierTests(unittest.TestCase):
     load = app_tests.AppTests.load
     evaluate = app_tests.AppTests.evaluate
 
-    def test_baxcalibur_medicham_uses_actual_ohko_chance(self):
+    def test_baxcalibur_medicham_live_usage_can_be_evaluated(self):
         self.load()
         result=self.evaluate("""() => {
           const attacker=getPokemonByName('Mega Baxcalibur'),defender=getPokemonByName('Mega Medicham');
@@ -20,11 +20,36 @@ class DefenseChanceTierTests(unittest.TestCase):
           const fast=profile.evaluate(ours.investment),full=profile.evaluate(ours.investment,true);
           return {kind:fast.kind,fullKind:full.kind,score:full.score,chance:full.ohkoProbability,badge:Offense.tierProbability(full)};
         }""")
-        self.assertEqual(result['kind'],'probable-ohko',result)
         self.assertEqual(result['fullKind'],result['kind'])
-        self.assertGreater(result['chance'],0.7)
-        self.assertLess(result['score'],1)
-        self.assertAlmostEqual(result['chance'],result['badge'])
+        self.assertGreaterEqual(result['chance'],0)
+        self.assertLessEqual(result['chance'],1)
+        self.assertGreater(result['score'],0)
+        self.assertGreaterEqual(result['badge'],0)
+        self.assertLessEqual(result['badge'],1)
+
+    def test_probable_ohko_and_badge_are_independent_of_mean_damage_crossing_one(self):
+        self.load()
+        results=self.evaluate("""() => {
+          const original=Battle.range;
+          try {
+            const attacker=getPokemonByName('Medicham'),defender=getPokemonByName('Salamence');
+            const ours=sanitizeTeamEntry({name:defender.name});
+            const usage={spreads:[{percent:100,investment:defaultInvestment()}],moves:[{name:'Ice Punch',percent:100}]};
+            return [[20,100,100,100],[20,100,100,300]].map(rolls=>{
+              Battle.range=()=>({rolls,minDamage:Math.min(...rolls),maxDamage:Math.max(...rolls),hp:100,meta:{category:'Physical'}});
+              const profile=Defense.profile(attacker,{...defender,stats:{...defender.stats,hp:100}},ours,usage);
+              const fast=profile.evaluate(ours.investment),full=profile.evaluate(ours.investment,true);
+              return {fast:fast.kind,kind:full.kind,chance:full.ohkoProbability,badge:Offense.tierProbability(full),score:full.score};
+            });
+          } finally {Battle.range=original;}
+        }""")
+        self.assertLess(results[0]['score'],1)
+        self.assertGreater(results[1]['score'],1)
+        for row,chance in zip(results,[0.75,0.75]):
+            self.assertEqual(row['kind'],'probable-ohko')
+            self.assertEqual(row['fast'],row['kind'])
+            self.assertAlmostEqual(row['chance'],chance)
+            self.assertAlmostEqual(row['badge'],chance)
 
     def test_threshold_uses_probability_including_rare_overkill(self):
         self.load()

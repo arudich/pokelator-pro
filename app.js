@@ -850,7 +850,10 @@ function pokemonChoiceMarkup(species) {
 function buildMoveChoices(species,query='') {
   const clean=query.trim().toLowerCase();
   const usage=new Map((getUsage(species)?.moves || []).map(row=>[calc.toID(row.name),row.percent]));
-  return species.learnset.map(name=>({...Battle.moveMeta(name),name,percent:usage.get(calc.toID(name)) ?? null}))
+  return species.learnset.flatMap(name=>{
+    const meta=Battle.moveMeta(name);
+    return meta ? [{...meta,name,percent:usage.get(calc.toID(name)) ?? null}] : [];
+  })
     .filter(move=>!clean || move.name.toLowerCase().includes(clean) || move.type?.toLowerCase().includes(clean))
     .sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || a.name.localeCompare(b.name));
 }

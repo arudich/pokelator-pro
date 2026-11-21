@@ -1,7 +1,28 @@
 {
-  "reviewedOn": "2026-11-20",
+  "reviewedOn": "2026-11-21",
   "purpose": "Verified dispositions, not a blanket suppression list. Reopen when evidence contradicts a disposition.",
   "findings": [
+    {
+      "id": "daily-defense-test-score-threshold",
+      "disposition": "fixed",
+      "verification": "November 21 nightly failed solely because the live Baxcalibur weighted mean crossed 1. The real-usage test now checks evaluability; deterministic rolls at identical 75% OHKO probability on both sides of mean 1 verify the tier and badge exactly. Daily usage is no longer expected to preserve a numeric mean or classification."
+    },
+    {
+      "id": "first-impression-repeat",
+      "disposition": "fixed",
+      "verification": "Balance tracks move actions and disables First Impression after the first action, including misses. A flinched opening turn does not consume that action. It is excluded from repeatable core attacks. Seeded Golisopod duels cover ordinary and opening-flinch cases with only one First Impression attempt."
+    },
+    {
+      "id": "interior-usage-rank-gap",
+      "disposition": "fixed",
+      "verification": "Validator requires unique consecutive integer ranks starting at one for each reported category. Regressions remove interior rows from all five categories, while a shorter consecutive spread list remains accepted."
+    },
+    {
+      "id": "unavailable-move-picker",
+      "disposition": "fixed-with-source-caveat",
+      "verification": "The picker offers only moves with Champions engine metadata and a regression checks that every offered move survives sanitization. Rotom Thunder Shock remains in the source learnset, but is not offered while the engine cannot model it. This does not claim independent verification of in-game legality.",
+      "reopenWhen": "A reported common move is unmodelable, an offered move cannot be saved/evaluated, or new primary game/engine evidence changes availability."
+    },
     {
       "id": "starter-battle-browser-fixtures",
       "disposition": "fixed",

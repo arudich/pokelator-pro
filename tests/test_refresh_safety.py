@@ -117,3 +117,19 @@ class RefreshSafetyTests(unittest.TestCase):
             usage['spreads']=usage['spreads'][:1];usage['spreads'][0]['percent']=100
             (root/'data/champions-roster.js').write_text('window.CHAMPIONS_ROSTER = '+json.dumps(roster)+';')
             validate(root)
+
+    def test_interior_rank_gaps_are_rejected_but_short_consecutive_lists_are_valid(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);shutil.copytree(ROOT/'data',root/'data');shutil.copytree(ROOT/'vendor',root/'vendor')
+            original=payload(root/'data/champions-roster.js')
+            for category in ['moves','items','abilities','natures','spreads']:
+                roster=json.loads(json.dumps(original))
+                species=next(p for p in roster['pokemon'] if len(p['usage']['Doubles'][category])>=3)
+                del species['usage']['Doubles'][category][1]
+                (root/'data/champions-roster.js').write_text('window.CHAMPIONS_ROSTER = '+json.dumps(roster)+';')
+                with self.assertRaisesRegex(ValueError,'nonconsecutive '+category+' ranks'):validate(root)
+            roster=json.loads(json.dumps(original))
+            species=next(p for p in roster['pokemon'] if p['id']=='Furfrou')
+            species['usage']['Doubles']['spreads']=species['usage']['Doubles']['spreads'][:-1]
+            (root/'data/champions-roster.js').write_text('window.CHAMPIONS_ROSTER = '+json.dumps(roster)+';')
+            validate(root)

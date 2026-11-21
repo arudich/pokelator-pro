@@ -65,7 +65,7 @@
   const immuneItems=new Set(['Counter','Mirror Coat','Metal Burst','Comeuppance','Guillotine','Fissure','Horn Drill','Sheer Cold','Bide','Focus Punch']);
   function context(field,{limit=Infinity,reuseOffense=false} = {}) {
     const cache=new Map();
-    return (a,b,name,hits=1)=>{
+    return (a,b,name,hits)=>{
       const hp=hpMoves.has(name),meta=moveMeta(name);
       const state=(s,attacker)=>{
         // Ordinary damage never reads the attacker's unused defensive stats.
@@ -84,7 +84,7 @@
       const key=JSON.stringify([state(a,true),state(b,false),name,hits]);
       if(!cache.has(key)) {
         const result=Battle.range(a.species,{...a.entry,curHP:a.hp},b.species,{...b.entry,curHP:b.hp},name,
-          {...field,format:'Singles',hits,attackerAlliesFainted:a.fainted});
+          {...field,format:'Singles',...(hits===undefined ? {} : {hits}),attackerAlliesFainted:a.fainted});
         if(cache.size>=limit) cache.delete(cache.keys().next().value);
         cache.set(key,result);
       }
@@ -116,7 +116,7 @@
       if(!usable(a,name,turn)) continue;
       const result=range(a,b,name),mean=Offense.meanDamage(result.rolls)*(a.multiplier || 1);
       if(result.error || !mean) continue;
-      const accuracy=effect(name).accuracy===true ? 1 : (effect(name).accuracy || 100)/100;
+      const accuracy=result.multiHit ? 1 : effect(name).accuracy===true ? 1 : (effect(name).accuracy || 100)/100;
       const drop=moveMeta(name).selfBoosts?.[moveMeta(name).offensiveStat] || 0;
       const first=mean*accuracy,repeat=drop<0 && a.entry.ability!=='Contrary' ? first*stage(Math.max(-6,drop*(a.entry.ability==='Simple' ? 2 : 1))) : first;
       const turns=first>=b.hp ? b.hp/first : 1+(b.hp-first)/Math.max(1,repeat);
@@ -141,7 +141,8 @@
   }
   const resistBerries={Occa:'Fire',Passho:'Water',Wacan:'Electric',Rindo:'Grass',Yache:'Ice',Chople:'Fighting',Kebia:'Poison',Shuca:'Ground',Coba:'Flying',Payapa:'Psychic',Tanga:'Bug',Charti:'Rock',Kasib:'Ghost',Haban:'Dragon',Colbur:'Dark',Babiri:'Steel',Roseli:'Fairy',Chilan:'Normal'};
   function contact(a,b,meta) {
-    if(!meta.flags?.contact || a.entry.ability==='Long Reach' || a.entry.item==='Protective Pads' || a.entry.ability==='Magic Guard') return;
+    if(!meta.flags?.contact || a.entry.ability==='Long Reach' || a.entry.item==='Protective Pads' || a.entry.ability==='Magic Guard'
+      || (a.entry.item==='Punching Glove' && meta.flags?.punch)) return;
     if(b.entry.item==='Rocky Helmet') a.hp=Math.max(0,a.hp-Math.max(1,Math.floor(a.maxHP/6)));
     if(['Rough Skin','Iron Barbs'].includes(b.entry.ability)) a.hp=Math.max(0,a.hp-Math.max(1,Math.floor(a.maxHP/8)));
   }
@@ -185,12 +186,26 @@
     const name=action.name,meta=effect(name);a.used.add(name);
     if(['Choice Band','Choice Specs','Choice Scarf'].includes(a.entry.item)) a.lock=name;
     if(name==='Sucker Punch' && (!other || b.acted)) return;
-    if(rng()>accuracy(a,b,name,field)) return;
     const multi=moveMeta(name).multihit;
-    let hits=typeof multi==='number' ? multi : Array.isArray(multi) ? (a.entry.ability==='Skill Link' ? multi[1] : a.entry.item==='Loaded Dice' ? 4+(rng()<0.5 ? 1 : 0) : [2,2,2,2,2,2,2,3,3,3,3,3,3,3,4,4,4,5,5,5][Math.floor(rng()*20)]) : 1;
+    let hits=1;
+    if(multi) {
+      const model=MultiHit.plan({...moveMeta(name),...meta},a.entry,b.entry,{...field,attackerMovesLast:b.acted});
+      let pick=rng();
+      for(const [n,p] of model.counts) {hits=n;pick-=p;if(pick<0) break;}
+      if(!hits) return;
+    } else if(rng()>accuracy(a,b,name,field)) return;
     const result=range(a,b,name,hits);if(result.error) return;
+    const breaksDisguise=result.defenderAbility==='Disguise' && !b.disguiseBroken;
+    const breaksIceFace=result.defenderAbility==='Ice Face' && !b.iceFaceBroken && result.meta.category==='Physical';
+    let hitRolls=result.rolls;
+    if(breaksDisguise || breaksIceFace) {
+      const original=b.entry.ability;b.entry.ability='No Ability';
+      const normal=range(a,b,name,hits);b.entry.ability=original;
+      if(normal.error) return;
+      hitRolls=normal.rolls;
+    }
     const sample=rolls=>typeof rolls==='number' ? rolls : rolls[Math.floor(rng()*rolls.length)];
-    const damages=Array.isArray(result.rolls?.[0]) ? result.rolls.map(sample) : Array.from({length:hits},()=>sample(result.rolls));
+    const damages=Array.isArray(hitRolls?.[0]) ? hitRolls.map(sample) : Array.from({length:hits},()=>sample(hitRolls));
     let dealt=0;
     for(let damage of damages) {
       if(!b.hp || !a.hp) break;
@@ -198,6 +213,7 @@
       if(result.defenderAbility==='Disguise' && !b.disguiseBroken && damage) {
         b.disguiseBroken=true;b.entry.ability='No Ability';b.hp=Math.max(0,b.hp-Math.floor(b.maxHP/8));contact(a,b,meta);continue;
       }
+      if(breaksIceFace && !b.iceFaceBroken && damage) {b.iceFaceBroken=true;b.entry.ability='No Ability';contact(a,b,meta);continue;}
       if(damage>=b.hp && b.hp===b.maxHP && (b.entry.item==='Focus Sash' || result.defenderAbility==='Sturdy')) {
         damage=b.hp-1;if(b.entry.item==='Focus Sash') consume(b);
       } else if(damage>=b.hp && b.entry.item==='Focus Band' && rng()<0.1) damage=b.hp-1;

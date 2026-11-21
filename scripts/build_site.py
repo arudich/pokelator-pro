@@ -15,6 +15,8 @@ def build(output=None, root=ROOT):
     sources=[root/'index.html',root/'styles.css',*sorted(root.glob('*.js'))]
     for folder in ['components','data','vendor']:
         sources.extend(p for p in sorted((root/folder).rglob('*')) if p.is_file() and (p.suffix in ['.js','.json','.txt'] or p.parent==root/'vendor' and p.name in ['SHA256SUMS','SMOGON-LICENSE','SHOWDOWN-LICENSE']))
+    for folder in ['tutorial','branding']:
+        sources.extend(p for p in sorted((root/'assets'/folder).glob('*.png')) if p.is_file())
     digest=hashlib.sha256()
     for path in sources:
         digest.update(str(path.relative_to(root)).encode());digest.update(path.read_bytes())

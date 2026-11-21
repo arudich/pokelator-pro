@@ -27,6 +27,11 @@ class HostingTests(unittest.TestCase):
             self.assertTrue((target/'vendor/smogon-calc.min.js').is_file())
             self.assertTrue((target/'vendor/SMOGON-LICENSE').is_file())
             self.assertTrue((target/'_headers').is_file())
+            for picture in ['overview','battle','builder','highlights']:
+                self.assertTrue((target/'assets/tutorial'/f'{picture}.png').is_file())
+            self.assertTrue((target/'components/tutorial.js').is_file())
+            for icon in ['site-icon','favicon','apple-touch-icon']:
+                self.assertTrue((target/'assets/branding'/f'{icon}.png').is_file())
             for name in ['.git','.env','.github','docs','scripts','tests','.venv']:
                 self.assertFalse((target/name).exists(),name)
             versions=set()

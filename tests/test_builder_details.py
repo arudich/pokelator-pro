@@ -82,7 +82,7 @@ class BuilderDetailTests(unittest.TestCase):
         self.assertIn('Speed-boosting nature',badge.get_attribute('title'))
         tip=self.page.locator('[data-tier-species=Salamence]').get_attribute('title')
         self.assertIn('With a Speed-boosting nature',tip)
-        self.assertTrue(tip.endswith(f'Invest {badge.inner_text()} more to always be faster'))
+        self.assertTrue(tip.endswith(f'Invest {badge.inner_text()} or more to always be faster'))
         self.assertNotIn('Our Speed',self.page.locator('#builderSpeedTiers').inner_html())
         self.assertEqual(self.page.locator('[data-speed-group=always-slower] [data-tier-species=Kingambit] .speed-investment-badge').count(),0)
         self.assertEqual(self.evaluate('state.ourTeam[0].investment.spe'),32)

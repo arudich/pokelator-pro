@@ -4,6 +4,7 @@
   const groups = Offense.groups.map(group=>group.kind==='rest' ? {...group,label:'4+ hits / other'} : group);
   const freePoints = ours => Math.max(0,66-Object.values(ours.investment).reduce((sum,value)=>sum+value,0));
   function profile(attackerSpecies,defenderSpecies,ours,usage,options = {}) {
+    options={...options,ignoreFocusSash:true};
     const spreads = (usage?.spreads || []).filter(row => Number.isFinite(row.percent) && row.percent > 0);
     const moves = (usage?.moves || []).map(row => ({...row,meta:Battle.moveMeta(row.name)}))
       .filter(row => row.meta && row.meta.category !== 'Status' && Number.isFinite(row.percent) && row.percent > 0);
@@ -46,8 +47,9 @@
           const attacks=models.map(model => {
           const range = model.range(investment);
           const followupRange = ['Multiscale','Shadow Shield'].includes(range.defenderAbility) ? model.range(investment,true) : null;
-          const survival = range.defenderAbility === 'Sturdy' || (range.defenderAbility === 'Ice Face' && range.meta?.category === 'Physical')
-            || ['Focus Sash','Focus Band'].includes(range.defenderItem);
+          // Defense tiers measure bulk; ignore Focus Sash's one-time survival.
+          const survival = !range.multiHit && (range.defenderAbility === 'Sturdy' || (range.defenderAbility === 'Ice Face' && range.meta?.category === 'Physical')
+            || range.defenderItem === 'Focus Band');
           return {move:model.move,followupRange,
             range:survival ? {...range,error:`${range.defenderAbility || range.defenderItem} requires survival/turn context.`} : range};
           }).filter(attack=>{
@@ -77,7 +79,7 @@
           return selected;
         });
         const result = Offense.summarize(samples,options.multiplier ?? 1,withProbability);
-        if (!result.error && samples.some(sample=>sample.range.defenderAbility === 'Disguise')) {
+        if (!result.error && samples.some(sample=>sample.range.defenderAbility === 'Disguise' && !sample.range.multiHit)) {
           result.score = result.score/(1+result.score);result.guaranteed=false;result.kind=Offense.category(result.score);
         }
         const ohkoProbability=result.error ? null : Offense.firstHitProbability(samples,options.multiplier ?? 1);
@@ -89,7 +91,8 @@
         const selectedMoves=bestAttacks.map(move=>`${move.name} (${move.percent.toFixed(1)}% estimated best-attack share; ${move.usage}% move usage)`);
         const ineffectiveMoves=[...ineffective].filter(name=>!shares.has(name));
         const detail = `Weather: ${options.weather || 'None'}; Terrain: ${options.terrain || 'None'}. Strongest effective attacks per estimated set: ${selectedMoves.join(', ') || 'None'}. ${noAttackShare.toFixed(1)}% of estimated sets have no effective reported attack; this probability contributes zero damage, not an ineffective move choice. This is a weighted tier; individual sets may KO sooner. Move inclusion is approximated independently; actual joint movesets are unavailable.${ineffectiveMoves.length ? ` Zero damage against this target in the current field: ${ineffectiveMoves.map(name=>`${name} (${usable.find(move=>move.name===name).percent}% move usage)`).join(', ')}.` : ''}${unsupported.length ? ` Excluded unmodeled counter/OHKO moves: ${unsupported.map(row=>row.name).join(', ')}.` : ''} ${spreads.length} reported spreads cover ${coverage.toFixed(1)}% of sets (${usage?.name || attackerSpecies.name}).`;
-        const row = {...result,ohkoProbability,kind:result.kind || 'rest',coverage,count:spreads.length,detail,bestAttacks,ineffectiveMoves,noAttackShare};
+        const row = {...result,ohkoProbability,kind:result.kind || 'rest',coverage,count:spreads.length,detail,bestAttacks,ineffectiveMoves,noAttackShare,
+          accuracyMode:samples.some(sample=>sample.range.multiHit) ? 'multi-hit' : undefined};
         cache.set(key,row);return row;
       }};
   }

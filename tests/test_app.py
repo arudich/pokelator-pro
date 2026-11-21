@@ -41,6 +41,7 @@ class AppTests(unittest.TestCase):
         self.context = self.browser.new_context(viewport={'width': 1440, 'height': 900})
         # Network-independent tests; real asset availability is checked separately.
         self.context.route('https://**/*', lambda route: route.abort())
+        self.context.add_init_script("localStorage.setItem('pokelator-pro-tutorial-seen-v1','true')")
         self.page = self.context.new_page()
         self.page.set_default_timeout(5000)
         self.errors = []

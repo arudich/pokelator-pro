@@ -4,18 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pokelator Pro</title>
-    <link rel="stylesheet" href="styles.css?v=20261119-cyan-background-default" />
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/branding/favicon.png?v=20261121-math-icon" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/branding/apple-touch-icon.png?v=20261121-math-icon" />
+    <link rel="stylesheet" href="styles.css?v=20261121-math-icon" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand-wrap">
           <button id="metaModeToggle" type="button" class="mini-button meta-mode active" aria-pressed="true" title="Meta Mode weights all scoring of stat distributions by opposing Pokémon’s relative frequency in the meta. Uses measured Smogon Champions Showdown usage; hover updates with format and snapshot date.">Meta Mode</button>
-          <div class="brand-badge">P</div>
+          <img class="brand-badge" src="assets/branding/site-icon.png?v=20261121-math-icon" width="40" height="40" alt="" />
           <div>
             <div class="brand-title">Pokelator Pro</div>
             <div class="brand-subtitle">Battle calculator</div>
           </div>
+          <button id="tutorialButton" type="button" class="mini-button" title="A quick picture tour of Pokelator Pro">Huh?</button>
         </div>
 
         <div class="format-toggle" role="group" aria-label="Battle format">
@@ -63,8 +66,21 @@
         </aside>
 
         <section id="teamBuilderPanel" class="panel builder-panel" hidden>
-          <div class="panel-header"><h2 id="builderPanelTitle">Speed tiers</h2>
+          <div class="panel-header builder-heading"><h2 id="builderPanelTitle">Speed tiers</h2>
+            <div class="builder-reference-toolbar" role="group" aria-label="Reference highlights">
+              <input id="builderReferenceSearch" type="search" placeholder="Find Pokémon…" aria-label="Find Pokémon to highlight" />
+              <button id="builderReferenceOnly" type="button" class="mini-button" aria-pressed="false" title="Show only highlighted Pokémon; score and optimize over this set">★ <span id="builderReferenceCount">0</span></button>
+              <button id="builderReferenceSetsButton" type="button" class="mini-button" aria-label="Manage named highlight sets" title="Named highlight sets">Sets</button>
+              <button id="builderReferenceClear" type="button" class="mini-button" aria-label="Clear highlights and restore the usual Top N list" title="Clear highlights and restore the usual Top N list">×</button>
+            </div>
             <label class="builder-usage-filter" for="builderTopN">Top <input id="builderTopN" type="text" inputmode="numeric" value="100" aria-label="Show top Pokémon by usage" /><span id="builderUsageFormat">by Doubles usage</span></label>
+          </div>
+          <div id="builderReferenceSets" class="reference-sets-popup" popover="auto" aria-label="Named highlight sets">
+            <div class="reference-sets-heading"><strong>Highlight sets</strong><button id="builderReferenceSetsClose" class="mini-button" type="button" aria-label="Close highlight sets">×</button></div>
+            <label class="field-label">Name<input id="builderReferenceSetName" type="text" maxlength="80" /></label>
+            <small id="builderReferenceSetStatus" class="reference-set-status" role="status"></small>
+            <div class="reference-set-actions"><button id="builderReferenceSave" type="button" class="mini-button" title="Save the highlighted set · Ctrl+S or ⌘S">Save</button><button id="builderReferenceSaveAs" type="button" class="mini-button" title="Save this draft as a separate group">Save As</button><button id="builderReferenceRevert" type="button" class="mini-button">Revert</button><button id="builderReferenceDelete" type="button" class="mini-button">Delete</button></div>
+            <div id="builderReferenceSetList" role="group" aria-label="Saved highlight sets"></div>
           </div>
           <div class="inline-actions builder-analysis-tabs" aria-label="Team Builder analysis">
             <button type="button" class="mini-button active" data-builder-panel="speed" aria-pressed="true">Speed</button>
@@ -79,6 +95,7 @@
             <div id="offenseTerrainInput" class="field-icon-options" data-field-options="terrain" role="group" aria-label="Terrain"></div>
             <div class="fainted-control"><div id="offenseFaintedInput" class="field-icon-options" role="group" aria-label="Fainted Team Members"></div></div>
             <div class="fainted-control" hidden><div id="defenseFaintedInput" class="field-icon-options" role="group" aria-label="Fainted Opponents"></div></div>
+            <div id="builderStages" class="compact-stages"></div>
           </div>
           <div id="builderSelectedSummary" class="builder-selected-summary"></div>
           <div id="builderScore" class="builder-score" hidden></div>
@@ -192,7 +209,7 @@
               <div class="card-header">
                 <h3>Opponent Speed</h3>
               </div>
-              <dl id="speedSummary" class="speed-summary" aria-label="Opponent Speed against our selected Pokémon"></dl>
+              <div class="speed-card-content"><dl id="speedSummary" class="speed-summary" aria-label="Opponent Speed against our selected Pokémon"></dl><div id="battleSpeedStages" class="battle-speed-stages"></div></div>
             </article>
           </div>
         </section>
@@ -244,12 +261,17 @@
     <script src="data/item-sprites.js?v=20261118-mega-toggle"></script>
     <script src="team-files.js?v=20261118-mega-toggle"></script>
     <script src="data/move-types.js?v=20261120-champions-types"></script>
-    <script src="battle.js?v=20261118-fainted-skulls"></script>
-    <script src="offense.js?v=20261118-equal-two-hit-points"></script>
-    <script src="defense.js?v=20261118-offense-might-ohko"></script>
-    <script src="balance.js?v=20261118-mega-toggle"></script>
+    <script src="data/balance-moves.js?v=20261121-move-archetypes"></script>
+    <script src="components/move-summary.js?v=20261121-move-archetypes"></script>
+    <script src="components/reference-sets.js?v=20261121-reference-drafts"></script>
+    <script src="multi-hit.js?v=20261121-full-attacks"></script>
+    <script src="battle.js?v=20261121-speed-stage-labels"></script>
+    <script src="offense.js?v=20261121-full-attacks"></script>
+    <script src="defense.js?v=20261121-full-attacks"></script>
+    <script src="balance.js?v=20261121-full-attacks"></script>
     <script src="data/meta-usage.js?v=20261118-mega-toggle"></script>
     <script src="analytics.js?v=20261120-health-reports"></script>
-    <script src="app.js?v=20261120-health-reports"></script>
+    <script src="app.js?v=20261121-speed-stage-labels"></script>
+    <script src="components/tutorial.js?v=20261121-tour-title-case"></script>
   </body>
 </html>

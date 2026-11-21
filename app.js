@@ -24,6 +24,7 @@ const ABILITY_USAGE_THRESHOLD = 50;
 const NATURE_USAGE_THRESHOLD = 50;
 const rosterSnapshot = window.CHAMPIONS_ROSTER;
 const pokerData = rosterSnapshot.pokemon;
+const builderReferences=new ReferenceSets(pokerData.map(species=>species.id));
 const ordinaryForms=new Map();
 const natureOptions = Battle.natureOptions;
 const itemOptions = [...Battle.generation.items].map(item => item.name);
@@ -236,8 +237,114 @@ function builderRankLimit() {
 }
 
 function builderRoster(selected, includeBaseMatches = true) {
-  return pokerData.map(species=>battleSpecies(species,'opponent')).filter(species => (includeBaseMatches && species.stats.spe === selected.stats.spe) ||
+  return pokerData.map(species=>battleSpecies(species,'opponent')).filter(species => builderReferences.only ? builderReferences.has(species.id)
+    : builderReferences.has(species.id) || (includeBaseMatches && species.stats.spe === selected.stats.spe) ||
     (Number.isInteger(species.usage?.[state.format]?.rank) && species.usage[state.format].rank <= state.builderTopN));
+}
+function referenceAttributes(id) {
+  return `data-reference-id="${escapeHtml(id)}" role="button" tabindex="0" aria-pressed="${builderReferences.has(id)}"`;
+}
+function syncReferenceHighlights() {
+  for(const icon of document.querySelectorAll('[data-reference-id]')) {
+    const active=builderReferences.has(icon.dataset.referenceId);
+    icon.classList.toggle('reference-highlighted',active);icon.setAttribute('aria-pressed',String(active));
+  }
+}
+function renderReferenceControls() {
+  document.getElementById('builderReferenceCount').textContent=builderReferences.active.ids.length;
+  const only=document.getElementById('builderReferenceOnly');
+  only.classList.toggle('active',builderReferences.only);only.setAttribute('aria-pressed',String(builderReferences.only));
+  only.setAttribute('aria-label',`Show only highlighted Pokémon (${builderReferences.active.ids.length})`);
+  document.getElementById('builderTopN').disabled=builderReferences.only;
+  const button=document.getElementById('builderReferenceSetsButton');
+  button.textContent=builderReferences.dirty ? 'Sets *' : 'Sets';
+  button.title=`Highlight sets · ${builderReferences.active.name} · ${builderReferences.dirty ? 'unsaved draft; saved group unchanged' : 'saved'} · Ctrl+S or ⌘S saves this set`;
+}
+function referenceRosterSignature() {
+  const selected=state.ourTeam[state.activeOurIndex];
+  return selected ? builderRoster(battleSpecies(selected,'our'),state.builderPanel==='speed').map(species=>species.id).join('|') : '';
+}
+function updateReferences(change) {
+  const before=referenceRosterSignature();change();
+  renderReferenceControls();
+  if(before!==referenceRosterSignature()) {
+    cancelDefenseSearch();cancelOffenseThresholdSearch();cancelBalanceSearch();
+    renderTeamBuilder();
+  }
+  syncReferenceHighlights();
+  if(document.getElementById('builderReferenceSets').matches(':popover-open')) renderReferenceSets();
+}
+function renderReferenceSets() {
+  const input=document.getElementById('builderReferenceSetName');
+  if(document.activeElement!==input) input.value=builderReferences.active.name;
+  document.getElementById('builderReferenceSetStatus').textContent=builderReferences.dirty ? 'Unsaved changes · saved group unchanged' : 'Saved';
+  document.getElementById('builderReferenceSetStatus').title='The working draft survives reloads separately. Save replaces the loaded group; Save As creates a new group.';
+  document.getElementById('builderReferenceSave').disabled=!builderReferences.dirty;
+  document.getElementById('builderReferenceRevert').disabled=!builderReferences.dirty;
+  document.getElementById('builderReferenceSetList').innerHTML=builderReferences.sets.map(set=>
+    `<button type="button" class="reference-set-option${set.id===builderReferences.activeId ? ' active' : ''}" data-reference-set="${escapeHtml(set.id)}" aria-pressed="${set.id===builderReferences.activeId}"><span>${escapeHtml(set.name)}</span><small>${set.ids.length}</small></button>`).join('');
+}
+function bindReferenceControls() {
+  const search=document.getElementById('builderReferenceSearch');
+  bindUsagePicker(search,{kind:'pokemon',hint:'Reference highlights · search the full roster',
+    choices:query=>buildSearchResults(query,true),
+    markup:species=>pokemonChoiceMarkup(species)+(builderReferences.has(species.id) ? '<span class="choice-reference-check" aria-label="Highlighted">✓</span>' : ''),
+    choose:species=>{
+      search.value='';search.blur();
+      updateReferences(()=>builderReferences.toggle(species.id,true));
+      const icon=[...document.querySelectorAll('[data-reference-id]')].find(icon=>icon.dataset.referenceId===species.id);
+      icon?.scrollIntoView({block:'center',behavior:'smooth'});
+    }});
+  const panel=document.getElementById('teamBuilderPanel');
+  panel.addEventListener('click',event=>{
+    const icon=event.target.closest('[data-reference-id]');if(!icon) return;
+    updateReferences(()=>builderReferences.toggle(icon.dataset.referenceId));
+  });
+  panel.addEventListener('keydown',event=>{
+    const icon=event.target.closest('[data-reference-id]');
+    if(icon && ['Enter',' '].includes(event.key)) {event.preventDefault();icon.click();}
+  });
+  document.addEventListener('keydown',event=>{
+    if(state.view!=='builder' || event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey
+      || event.key.length!==1 || !event.key.trim() || document.querySelector('dialog[open]') || event.target.isContentEditable
+      || event.target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="combobox"],#builderReferenceSets')) return;
+    event.preventDefault();search.value=event.key;search.focus();search.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  document.getElementById('builderReferenceOnly').addEventListener('click',()=>updateReferences(()=>{
+    builderReferences.only=!builderReferences.only;builderReferences.save();
+  }));
+  document.getElementById('builderReferenceClear').addEventListener('click',()=>updateReferences(()=>builderReferences.clear()));
+  const popup=document.getElementById('builderReferenceSets'),button=document.getElementById('builderReferenceSetsButton');
+  button.addEventListener('click',()=>{
+    if(popup.matches(':popover-open')) {popup.hidePopover();return;}
+    closeUsagePicker();renderReferenceSets();popup.showPopover();
+    const box=button.getBoundingClientRect();
+    popup.style.left=`${clamp(box.right-popup.offsetWidth,8,Math.max(8,innerWidth-popup.offsetWidth-8))}px`;
+    popup.style.top=`${clamp(box.bottom+7,8,Math.max(8,innerHeight-popup.offsetHeight-8))}px`;
+  });
+  document.getElementById('builderReferenceSetsClose').addEventListener('click',()=>popup.hidePopover());
+  const name=document.getElementById('builderReferenceSetName');
+  name.addEventListener('input',()=>{builderReferences.rename(name.value);renderReferenceSets();renderReferenceControls();});
+  name.addEventListener('change',()=>{builderReferences.rename(name.value);name.value=builderReferences.active.name;renderReferenceSets();renderReferenceControls();});
+  name.addEventListener('keydown',event=>{if(event.key==='Enter') {event.preventDefault();name.blur();}});
+  const save=()=>{
+    builderReferences.commit();name.value=builderReferences.active.name;renderReferenceSets();renderReferenceControls();
+  };
+  document.getElementById('builderReferenceSave').addEventListener('click',save);
+  document.addEventListener('keydown',event=>{
+    if(state.view!=='builder' || event.isComposing || event.altKey || event.shiftKey
+      || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase()!=='s') return;
+    event.preventDefault();save();
+  });
+  document.getElementById('builderReferenceRevert').addEventListener('click',()=>updateReferences(()=>builderReferences.load(builderReferences.activeId)));
+  document.getElementById('builderReferenceSaveAs').addEventListener('click',()=>{
+    builderReferences.copy();renderReferenceSets();renderReferenceControls();name.focus();name.select();
+  });
+  document.getElementById('builderReferenceDelete').addEventListener('click',()=>updateReferences(()=>builderReferences.remove()));
+  document.getElementById('builderReferenceSetList').addEventListener('click',event=>{
+    const set=event.target.closest('[data-reference-set]');if(!set) return;
+    updateReferences(()=>builderReferences.load(set.dataset.referenceSet));
+  });
 }
 
 function natureChoice(raw, field, legacyField) {
@@ -248,6 +355,9 @@ function natureChoice(raw, field, legacyField) {
 }
 function sanitizePreferences(raw = {}) {
   return {megaActive:raw?.megaActive!==false,baseAbilityChoice:typeof raw?.baseAbilityChoice==='string' ? raw.baseAbilityChoice : 'auto',offenseStage:Number.isInteger(raw?.offenseStage) ? clamp(raw.offenseStage,-6,6) : 0,
+    speedStage:Number.isInteger(raw?.speedStage) ? clamp(raw.speedStage,-2,2) : 0,
+    builderOpponentOffenseStage:Number.isInteger(raw?.builderOpponentOffenseStage) ? clamp(raw.builderOpponentOffenseStage,-2,2) : 0,
+    builderOpponentSpeedStage:Number.isInteger(raw?.builderOpponentSpeedStage) ? clamp(raw.builderOpponentSpeedStage,-2,2) : 0,
     defenseStage:Number.isInteger(raw?.defenseStage) ? clamp(raw.defenseStage,-6,6) : 0,
     defenseNatureChoice: natureChoice(raw, 'defenseNatureChoice', 'boostDefenseNature'),
     offenseNatureChoice: natureChoice(raw, 'offenseNatureChoice', 'boostOffenseNature'),
@@ -271,6 +381,31 @@ function getPreferences(entry, side) {
 function statStages(entry,side) {
   const prefs=getPreferences(entry,side);
   return {offense:prefs.offenseStage,defense:prefs.defenseStage};
+}
+function compactStages(role,label,value,description,disabled=false) {
+  return `<fieldset class="compact-stage-control stat-stage-control" ${disabled ? 'disabled' : ''}><legend>${label}</legend><div class="stat-stage-options compact-stage-options">${[-2,-1,0,1,2].map(stage=>{
+    const text=stage>0 ? `+${stage}` : stage<0 ? `−${-stage}` : '0';
+    const factor=stage>=0 ? (2+stage)/2 : 2/(2-stage);
+    const hint=`${description} Stage ${text}: ×${Number(factor.toFixed(3))}.`;
+    return `<label class="stat-stage-option" title="${escapeHtml(hint)}"><input type="radio" name="compact-${role}" data-compact-stage="${role}" value="${stage}" aria-label="${escapeHtml(label)} stage ${stage}" ${stage===value ? 'checked' : ''} /><span>${text}</span></label>`;
+  }).join('')}</div></fieldset>`;
+}
+function renderBuilderStages(selected) {
+  const control=document.getElementById('builderStages');
+  const panel=state.builderPanel,prefs=getPreferences(selected,'our');
+  control.hidden=panel==='balance' || !selected;
+  if(panel==='speed') {
+    control.innerHTML=compactStages('builder-our-speed','Our Speed',prefs.speedStage,'Our selected Pokémon’s Speed; shared with Battle and remembered per Pokémon.')
+      +compactStages('builder-opponent-speed','Op. Speed',prefs.builderOpponentSpeedStage,'Speed stage assumed for every opposing Pokémon in these tiers. Remembered for our selected Pokémon.');
+  } else {
+    const defense=panel==='defense';
+    const teamStages=panel==='team-offense' ? teamOffenseSelected().map(({entry})=>getPreferences(entry,'our').offenseStage) : [];
+    const offenseStage=panel==='team-offense' ? teamStages.every(stage=>stage===teamStages[0]) ? teamStages[0] : null : prefs.offenseStage;
+    control.innerHTML=compactStages(defense ? 'builder-opponent-offense' : 'builder-offense',defense ? 'Opponent Atk / SpA' : 'Our Atk / SpA',
+      defense ? prefs.builderOpponentOffenseStage : offenseStage,
+      defense ? 'Attack and Sp. Atk stage assumed for all opposing attackers, not our defenses. Remembered for our selected Pokémon.'
+      : panel==='team-offense' ? 'Our highlighted team members’ Attack and Sp. Atk stages; shared with the damage pane and remembered per Pokémon.' : 'Our selected Pokémon’s Attack and Sp. Atk stages; shared with the damage pane and remembered per Pokémon.');
+  }
 }
 function renderStatStages(ours,theirs) {
   const outgoing=state.damageDirection==='outgoing';
@@ -815,9 +950,9 @@ function pokemonUsageReference(species) {
     || (exact.startsWith('vivillon') ? 'vivillon' : null);
   return data[exact] || (shared && data[shared]) || (!species.isMega && data[reference]) || null;
 }
-function buildSearchResults(query) {
+function buildSearchResults(query,includeAll=false) {
   const clean=query.trim().toLowerCase();
-  if(!clean) return [];
+  if(!clean && !includeAll) return [];
   return pokerData.filter(p=>p.name.toLowerCase().includes(clean) || p.id.toLowerCase().includes(clean))
     .sort((a,b)=>(pokemonUsageReference(b)?.percent ?? -1)-(pokemonUsageReference(a)?.percent ?? -1)
       || (getUsage(a)?.rank ?? Infinity)-(getUsage(b)?.rank ?? Infinity) || a.name.localeCompare(b.name));
@@ -858,8 +993,27 @@ function buildMoveChoices(species,query='') {
     .sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || a.name.localeCompare(b.name));
 }
 function moveChoiceMarkup(move) {
+  const effect=window.BALANCE_MOVES?.moves[calc.toID(move.name)];
+  const multihit=move.multihit || effect?.multihit;
+  const hits=Array.isArray(multihit) ? `${multihit[0]}–${multihit[1]} hits`
+    : Number.isInteger(multihit) && multihit>1 ? `${effect?.multiaccuracy ? '1–' : ''}${multihit} hits` : '';
+  const powerLabel=hits && /power rises/i.test(effect?.shortDesc || '') ? 'starting power' : hits ? 'power/hit' : 'power';
+  const accuracy=effect?.accuracy===true ? 'Acc —' : Number.isFinite(effect?.accuracy) ? `${effect.accuracy}% acc` : '';
+  const summary=MoveSummary.describe(effect);
   return `<div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(move.name)}</strong><small>${move.percent===null ? 'Usage unavailable' : `${move.percent}%`}</small></div>
-    <div class="search-item-sub">${escapeHtml(move.type || 'Unknown')} · ${escapeHtml(move.category || '')}${move.power ? ` · ${move.power} power` : ''}</div></div>`;
+    <div class="search-item-sub">${escapeHtml(move.type || 'Unknown')} · ${escapeHtml(move.category || '')}${move.power ? ` · ${move.power} ${powerLabel}` : ''}${hits ? ` · ${escapeHtml(hits)}` : ''}${accuracy ? ` · ${accuracy}` : ''}</div>${summary ? `<div class="search-item-sub move-effect-summary">${escapeHtml(summary)}</div>` : ''}</div>`;
+}
+function buildAbilityChoices(species,query='') {
+  const clean=query.trim().toLowerCase();
+  const usage=new Map((getUsage(species)?.abilities || []).map(row=>[row.name,row.percent]));
+  return species.abilities.map(name=>({name,percent:usage.get(name) ?? null,
+    description:window.ABILITY_EFFECTS?.[calc.toID(name)] || 'Effect description unavailable.'}))
+    .filter(ability=>!clean || ability.name.toLowerCase().includes(clean) || ability.description.toLowerCase().includes(clean))
+    .sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || a.name.localeCompare(b.name));
+}
+function abilityChoiceMarkup(ability) {
+  return `<div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(ability.name)}</strong><small>${ability.percent===null ? 'Usage unavailable' : `${ability.percent}%`}</small></div>
+    <div class="search-item-sub">${escapeHtml(ability.description)}</div></div>`;
 }
 let activeUsagePicker=null;
 function closeUsagePicker() {
@@ -878,7 +1032,7 @@ function bindUsagePicker(input,{choices,markup,choose,kind='pokemon',hint=''}) {
     activeUsagePicker={input,popup,items,cursor:Math.max(0,exact),query,markup,choose,kind,hint};
     updateUsagePicker();
   };
-  input.addEventListener('focus',()=>open(kind==='move' ? '' : input.value));
+  input.addEventListener('focus',()=>open(kind==='move' || kind==='ability' ? '' : input.value));
   input.addEventListener('input',()=>open(input.value));
   input.addEventListener('blur',()=>{if(activeUsagePicker?.input===input) closeUsagePicker();});
   input.addEventListener('keydown',event=>{
@@ -904,7 +1058,7 @@ function updateUsagePicker() {
   if(input.id==='pokemonSearchInput') {state.searchQuery=picker.query;state.searchResults=items;state.searchCursor=cursor;}
   const snapshot=window.META_USAGE?.formats[state.format];
   popup.innerHTML=`<div class="choice-source">${escapeHtml(picker.hint || `${state.format} · ${snapshot?.month || ''} Showdown usage`)}</div>`
-    +(items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="usage-choice-${index}" data-choice-index="${index}" class="${kind==='pokemon' ? 'search-item' : 'move-choice'} usage-choice ${index===cursor ? 'active' : ''}">${picker.markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>');
+    +(items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="usage-choice-${index}" data-choice-index="${index}" class="${kind==='pokemon' ? 'search-item' : kind==='ability' ? 'ability-choice' : 'move-choice'} usage-choice ${index===cursor ? 'active' : ''}">${picker.markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>');
   for(const row of popup.querySelectorAll('[data-choice-index]')) {
     row.addEventListener('pointerdown',event=>event.preventDefault());
     row.addEventListener('click',()=>{const item=items[Number(row.dataset.choiceIndex)];closeUsagePicker();picker.choose(item);});
@@ -962,14 +1116,14 @@ function commitStatInput(event) {
   commitTeamInvestment(entry, stat, event.target.value);
 }
 
+let teamSetEditorExpanded=false;
 function buildSetEditor(entry, index, side) {
   const species = getPokemonByName(entry.name);
-  const activeSpecies=side==='our' ? battleSpecies(entry,'our') : species;
   const activeAbility=side==='our' ? battleEntry(entry).ability : entry.ability;
   const attr = `data-set-side="${side}" data-set-index="${index}"`;
-  return `<details class="set-editor"><summary>Edit ${side === 'our' ? 'Pokémon & moves' : 'opponent set'}</summary>
+  return `<details class="set-editor"${side==='our' && teamSetEditorExpanded ? ' open' : ''}><summary>Edit ${side === 'our' ? 'Pokémon & moves' : 'opponent set'}</summary>
     <label class="field-label">Pokémon<input type="text" list="speciesList" value="${escapeHtml(entry.name)}" ${attr} data-set-field="name" /></label>
-    <label class="field-label">Ability<select ${attr} data-set-field="ability">${activeSpecies.abilities.map(a => `<option ${a === activeAbility ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}</select></label>
+    <label class="field-label">Ability<input type="text" value="${escapeHtml(activeAbility || '')}" ${attr} data-set-field="ability" /></label>
 
     ${Array.from({length: 4}, (_, i) => `<label class="field-label">Move ${i + 1}<input type="text" value="${escapeHtml(entry.moveSet[i] || '')}" ${attr} data-set-field="move-${i}" /></label>`).join('')}
   </details>`;
@@ -977,11 +1131,13 @@ function buildSetEditor(entry, index, side) {
 function bindSetEditors(container) {
   container.querySelectorAll('[data-set-field]').forEach(input => {
     const species=getPokemonByName((input.dataset.setSide==='our' ? state.ourTeam : state.opponentList)[Number(input.dataset.setIndex)].name);
-    if(input.dataset.setField==='name' || input.dataset.setField.startsWith('move-')) {
+    if(input.dataset.setField==='name' || input.dataset.setField==='ability' || input.dataset.setField.startsWith('move-')) {
       const isMove=input.dataset.setField.startsWith('move-');
-      bindUsagePicker(input,{kind:isMove ? 'move' : 'pokemon',choices:query=>isMove ? buildMoveChoices(species,query) : input.dataset.setSide==='our' ? buildTeamSearchResults(query) : buildSearchResults(query),
-        markup:isMove ? moveChoiceMarkup : pokemonChoiceMarkup,
-        hint:isMove ? `${state.format} move usage · ${getUsage(species)?.name || species.name} · Champions Battle Data` : '',
+      const isAbility=input.dataset.setField==='ability';
+      const abilitySpecies=input.dataset.setSide==='our' ? battleSpecies(species,'our') : species;
+      bindUsagePicker(input,{kind:isMove ? 'move' : isAbility ? 'ability' : 'pokemon',choices:query=>isMove ? buildMoveChoices(species,query) : isAbility ? buildAbilityChoices(abilitySpecies,query) : input.dataset.setSide==='our' ? buildTeamSearchResults(query) : buildSearchResults(query),
+        markup:isMove ? moveChoiceMarkup : isAbility ? abilityChoiceMarkup : pokemonChoiceMarkup,
+        hint:isMove || isAbility ? `${state.format} ${isAbility ? 'ability' : 'move'} usage · ${getUsage(isAbility ? abilitySpecies : species)?.name || species.name} · Champions Battle Data` : '',
         choose:item=>{
           if(item.savedBuild && input.dataset.setSide==='our') {
             const index=Number(input.dataset.setIndex),previous=state.ourTeam[index];
@@ -999,6 +1155,12 @@ function bindSetEditors(container) {
       const {setSide: side, setIndex: index, setField: field} = input.dataset;
       const team = side === 'our' ? state.ourTeam : state.opponentList;
       const entry = team[Number(index)];
+      if(field==='ability') {
+        const species=side==='our' ? battleSpecies(entry,'our') : getPokemonByName(entry.name);
+        const choice=species.abilities.find(name=>name.toLowerCase()===input.value.trim().toLowerCase());
+        if(!choice) {input.value=side==='our' ? battleEntry(entry).ability : entry.ability || '';return;}
+        input.value=choice;
+      }
       if (field === 'name') {
         const species = getPokemonByName(input.value);
         if (!species) { input.value = entry.name; return; }
@@ -1031,6 +1193,8 @@ function bindSetEditors(container) {
 
 function renderTeam() {
   const container = document.getElementById('ourTeamList');
+  const editor=container.querySelector('.set-editor');
+  if(editor) teamSetEditorExpanded=editor.open;
   document.getElementById('teamCount').textContent = `${state.ourTeam.length} Pokémon`;
 
   if (!state.ourTeam.length) {
@@ -1161,7 +1325,7 @@ function renderTeam() {
       const interactive = event.target.closest('input, select, label, details, summary, button');
       if (interactive) return;
       const teamIndex = Number.parseInt(row.getAttribute('data-team-index'), 10);
-      if (!Number.isNaN(teamIndex)) {
+      if (!Number.isNaN(teamIndex) && teamIndex!==state.activeOurIndex) {
         state.activeOurIndex = teamIndex;
         render();
       }
@@ -1376,6 +1540,14 @@ function renderActiveSummary() {
   document.querySelector('.opponent-active-heading .base-stat-caption').hidden=!opponentEntry;
 }
 
+function speedEstimateText(estimate) {
+  return !estimate ? '—' : estimate.chance>0 && estimate.chance<0.001 ? '<0.1%'
+    : `${Number((estimate.chance*100).toFixed(1))}%`;
+}
+function speedEstimateDescription(estimate) {
+  return !estimate ? 'Outspeed estimate unavailable: reported Speed spreads or natures are missing.'
+    : `Estimated ${speedEstimateText(estimate)} chance the opponent is strictly faster than our exact build; ${Number((estimate.tieChance*100).toFixed(1))}% chance of an actual Speed tie. Combines reported Speed spreads and nature frequencies independently, normalized over reported data (${estimate.spreadCoverage.toFixed(1)}% spread coverage; ${estimate.natureCoverage.toFixed(1)}% nature coverage). Uses this scenario’s item, ability and field; other item frequencies are not included.`;
+}
 function renderSpeedSummary() {
   const container = document.getElementById('speedSummary');
   if (!container) return;
@@ -1383,6 +1555,8 @@ function renderSpeedSummary() {
   const ourEntry = state.ourTeam[state.activeOurIndex] || state.ourTeam[0];
   const opponentEntry = state.opponentList[state.activeOpponentIndex] || state.opponentList[0];
 
+  document.getElementById('battleSpeedStages').innerHTML=compactStages('battle-our-speed','Our Speed',getPreferences(ourEntry,'our').speedStage,'Our active Pokémon’s Speed stage. Remembered per Pokémon and shared with Team Builder.',!ourEntry)
+    +compactStages('battle-opponent-speed','Op. Speed',getPreferences(opponentEntry,'opponent').speedStage,'Our active opponent’s Speed stage. Applies to Normal, Choice Scarf and Tailwind; remembered per opposing Pokémon.',!opponentEntry);
   if (!ourEntry || !opponentEntry) {
     container.innerHTML = '<div class="empty-state">No matchup selected.</div>';
     return;
@@ -1391,7 +1565,7 @@ function renderSpeedSummary() {
   const species = battleSpecies(opponentEntry,'opponent');
   const ability=appliedOpponentAbility(opponentEntry);
   const field=Battle.speedField(state,battleEntry(ourEntry).ability,ability);
-  const targetSpeed = Battle.speed(getPokemonByName(ourEntry.name),ourEntry,field);
+  const targetSpeed = Battle.speed(getPokemonByName(ourEntry.name),{...battleEntry(ourEntry),speedStage:getPreferences(ourEntry,'our').speedStage},field);
   // These are independent opponent scenarios; our exact build remains fixed.
   const scenarios = [
     {label: 'Normal', item: ''},
@@ -1402,10 +1576,14 @@ function renderSpeedSummary() {
     if ((species.isMega || species.megaStoneName) && scenario.item === 'Choice Scarf') {
       return '<div class="speed-scenario"><dt>Choice Scarf</dt><dd class="speed-unavailable">Unavailable · Mega Stone required</dd></div>';
     }
-    const tier = Battle.speedTier(species, {...opponentEntry,ability,item: scenario.item}, targetSpeed,
+    const tier = Battle.speedTier(species, {...opponentEntry,speedStage:getPreferences(opponentEntry,'opponent').speedStage,ability,item: scenario.item}, targetSpeed,
       {...field,tailwind: !!scenario.tailwind});
+    const showEstimate=tier.kind==='nature' || species.stats.spe===battleSpecies(ourEntry,'our').stats.spe;
+    const estimate=showEstimate ? Battle.speedUsageChance(species,{...opponentEntry,speedStage:getPreferences(opponentEntry,'opponent').speedStage,ability,item:scenario.item},targetSpeed,
+      getUsage(species),{...field,tailwind:!!scenario.tailwind}) : null;
+    const percent=showEstimate ? `<span class="speed-chance" title="${escapeHtml(speedEstimateDescription(estimate))}">${speedEstimateText(estimate)}</span>` : '';
     const detail=`Opponent relative to our exact build (Speed ${targetSpeed}). Weather: ${field.weather || 'None'}; Terrain: ${field.terrain || 'None'}. Opponent ability: ${ability || 'not assumed'}.`;
-    return `<div class="speed-scenario" title="${escapeHtml(detail)}"><dt>${scenario.label}</dt><dd><strong class="speed-tier">${tier.label}</strong></dd></div>`;
+    return `<div class="speed-scenario" title="${escapeHtml(detail)}"><dt>${scenario.label}</dt><dd><strong class="speed-tier">${tier.label}</strong>${percent}</dd></div>`;
   }).join('');
 }
 
@@ -1432,7 +1610,7 @@ function annotateOffenseThresholds(ours,stats,rows) {
   if(key!==offenseThresholdTrial.key) {cancelOffenseThresholdSearch();offenseThresholdTrial={key,worker:null,finished:false,thresholds:null};}
   const trial=offenseThresholdTrial;
   if(!trial.worker && !trial.finished) {
-    const worker=new Worker('stat-threshold-worker.js?v=20261118-equal-two-hit-points');trial.worker=worker;
+    const worker=new Worker('stat-threshold-worker.js?v=20261121-full-attacks');trial.worker=worker;
     worker.onmessage=({data})=>{
       if(offenseThresholdTrial!==trial || trial.worker!==worker) return;
       trial.thresholds=data.thresholds;trial.sweeps=data.sweeps;trial.error=data.error;trial.finished=true;
@@ -1607,11 +1785,13 @@ function renderOffenseRows(rows,key,context = '',groups = Offense.groups) {
     if (!members.length) return '';
     const icons = members.map(member => {
       const coverage = Math.min(100,member.coverage).toFixed(1);
-      const detail = member.error || member.detail || `${member.attacker ? `${member.attacker} · ` : ''}${member.move}${member.meta.multihit ? ' (one hit)' : ''}${member.extraTurns ? ' · +1 turn to break Disguise' : ''}${member.firstHitAbility ? ` · ${member.firstHitAbility} halves the first attack; follow-up attacks use normal damage` : ''}${member.repeatedUse ? ' · Repeated use includes cumulative offensive stat changes' : ''} · ${member.count} reported spreads cover ${coverage}% of sets (${member.reference}).`;
+      const detail = member.error || member.detail || `${member.attacker ? `${member.attacker} · ` : ''}${member.move}${member.hitModel ? ` · Full attack; ${member.hitModel.expected.toFixed(2)} hits on average, including misses` : ''}${member.extraTurns ? ' · +1 turn to break Disguise' : ''}${member.firstHitAbility ? ` · ${member.firstHitAbility} halves the first hit; follow-up hits use normal damage` : ''}${member.repeatedUse ? ' · Repeated use includes cumulative offensive stat changes' : ''} · ${member.count} reported spreads cover ${coverage}% of sets (${member.reference}).`;
       const changed=member.baselineKind;
-      const better=changed && (state.builderPanel === 'balance'
-        ? Balance.groups.findIndex(group=>group.kind===member.kind)<Balance.groups.findIndex(group=>group.kind===changed) : state.builderPanel === 'defense'
-        ? Offense.points(member)<Offense.points({kind:changed}) : Offense.points(member)>Offense.points({kind:changed}));
+      // Tier direction and optimization points differ: Might OHKO and 2HKO
+      // intentionally score equally, but losing the OHKO chance improves defense.
+      const currentTier=groups.findIndex(group=>group.kind===member.kind);
+      const previousTier=groups.findIndex(group=>group.kind===changed);
+      const better=changed && (state.builderPanel==='defense' ? currentTier>previousTier : currentTier<previousTier);
       const scenario=member.scenario;
       const assumption=scenario ? `${scenario.value}${scenario.field==='terrain' ? ' Terrain' : ''} ${scenario.active ? `assumed active (${scenario.ability})` : `not assumed (${scenario.ability})`} · Weather: ${scenario.weather || 'None'} · Terrain: ${scenario.terrain || 'None'} · ` : '';
       const thresholds=(member.statThresholds || []).map(threshold=>{
@@ -1627,13 +1807,13 @@ function renderOffenseRows(rows,key,context = '',groups = Offense.groups) {
       const chanceText=chance===null ? '—' : chance>0 && chance<0.001 ? '<0.1%' : `${(100*chance).toFixed(1).replace(/\.0$/,'')}%`;
       const hits=Offense.tierHits(member.kind),koTarget=state.builderPanel==='defense' ? 'opponent KOing us' : 'KOing the opponent';
       const chanceDetail=showChance ? chance===null ? 'KO probability unavailable for this matchup.'
-        : `${chanceText} chance of ${koTarget} ${hits===Infinity ? 'eventually (4+ tier or better)' : `within ${hits} hit${hits===1 ? '' : 's'}`}, weighted by reported builds and damage rolls${state.builderPanel==='defense' ? ' and estimated strongest-move availability' : ''}. Excludes accuracy and between-hit healing.` : '';
+        : `${chanceText} chance of ${koTarget} ${hits===Infinity ? 'eventually (4+ tier or better)' : `within ${hits} attack${hits===1 ? '' : 's'}`}, weighted by reported builds and damage rolls${state.builderPanel==='defense' ? ' and estimated strongest-move availability' : ''}. ${member.accuracyMode==='multi-hit' ? 'Includes multi-hit accuracy and hit-count probabilities; a complete attack counts as one KO attempt.' : 'Excludes accuracy.'} Excludes healing.` : '';
       const description = `${assumption}${member.species.name} · ${state.format} usage #${member.rank} · ${names[member.kind]}${showChance ? ` · ${chanceDetail}` : ''}${changed ? ` · Preview: ${names[changed]} → ${names[member.kind]}` : ''}${thresholds.length ? ` · ${thresholds.map(t=>t.explanation).join(' ')}` : ''} · ${detail}`;
       const hasModeled=member.samples>(member.unknown || 0);
       const winText=hasModeled ? `${(100*member.wins/member.samples).toFixed(1).replace(/\.0$/,'')}%` : '—';
       const winBadge=state.builderPanel==='balance' ? `<span class="balance-win-badge" aria-label="Estimated win percentage">${winText}</span>` : '';
       const chanceBadge=showChance ? `<span class="ko-chance-badge" title="${escapeHtml(chanceDetail)}" aria-label="${escapeHtml(chanceDetail)}">${chanceText}</span>` : '';
-      return `<span class="tier-pokemon${showChance ? ' has-ko-chance' : ''}${scenario?.active ? ` field-assumed field-${scenario.value.toLowerCase()}` : ''}${changed ? ` tier-changed ${better ? 'tier-improved' : 'tier-worsened'}` : ''}" data-scenario-id="${escapeHtml(member.scenarioId || member.species.id)}" data-scenario-weight="${member.weight ?? 1}" ${scenario ? `data-field-active="${scenario.active}"` : ''} ${changed ? `data-baseline-tier="${changed}"` : ''} data-offense-species="${escapeHtml(member.species.id)}" ${state.builderPanel === 'defense' ? `data-defense-species="${escapeHtml(member.species.id)}"` : state.builderPanel === 'balance' ? `data-balance-species="${escapeHtml(member.species.id)}"` : ''} title="${escapeHtml(description)}">
+      return `<span class="tier-pokemon${builderReferences.has(member.species.id) ? ' reference-highlighted' : ''}${showChance ? ' has-ko-chance' : ''}${scenario?.active ? ` field-assumed field-${scenario.value.toLowerCase()}` : ''}${changed ? ` tier-changed ${better ? 'tier-improved' : 'tier-worsened'}` : ''}" ${referenceAttributes(member.species.id)} data-scenario-id="${escapeHtml(member.scenarioId || member.species.id)}" data-scenario-weight="${member.weight ?? 1}" ${scenario ? `data-field-active="${scenario.active}"` : ''} ${changed ? `data-baseline-tier="${changed}"` : ''} data-offense-species="${escapeHtml(member.species.id)}" ${state.builderPanel === 'defense' ? `data-defense-species="${escapeHtml(member.species.id)}"` : state.builderPanel === 'balance' ? `data-balance-species="${escapeHtml(member.species.id)}"` : ''} title="${escapeHtml(description)}">
         <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${winBadge}${chanceBadge}${thresholds.length ? `<span class="stat-thresholds">${thresholds.map(t=>`<span class="stat-threshold-badge" data-stat-threshold="${t.stat}">${escapeHtml(t.text)}</span>`).join('')}</span>` : ''}</span>`;
     }).join('');
     return `<section class="builder-tier-group" data-offense-group="${group.kind}"><h3>${group.kind === 'guaranteed-ohko' ? 'Nearly Guaranteed OHKO<sup class="ko-caveat" tabindex="0" title="Based on reported statistical usage spreads, not the maximum possible bulk. Unreported builds may survive." aria-label="Based on usage spreads, not maximum possible bulk">?</sup>' : group.label}${state.builderPanel==='balance' ? '' : `<small class="tier-point-value">${Offense.points(group)} points</small>`}<span class="offense-tier-count">${members.length}</span></h3><div class="tier-icon-cloud">${icons}</div></section>`;
@@ -1755,7 +1935,7 @@ function renderBuilderDefense(selected) {
       const usage=getUsage(species),prefs=getPreferences(species,'opponent');
       return {scenarioId:condition.scenarioId,scenario:condition.scenario,weight:condition.weight*(weights.get(species.id) ?? 1),species:defenseSpecies(species),usage:{name:usage?.name,rank:usage?.rank,moves:usage?.moves || [],spreads:usage?.spreads || []},
         options:{weather:condition.weather,terrain:condition.terrain,attackerAbility:condition.ability,attackerItem:appliedOpponentItem(species),
-          attackerStages:statStages(species,'opponent'),defenderStages:statStages(selected,'our')},
+          attackerStages:{...statStages(species,'opponent'),offense:getPreferences(selected,'our').builderOpponentOffenseStage},defenderStages:statStages(selected,'our')},
         boosts:Object.fromEntries(['atk','def','spa','spd','spe'].map(stat=>[stat,natureBoostForMove(species,'offense',stat)]))};
     }))};
   const contextKey=JSON.stringify(job);
@@ -1788,7 +1968,7 @@ function renderBuilderDefense(selected) {
       if (state.view==='builder' && state.builderPanel==='defense') renderTeamBuilder();
     };
     try {
-      const worker=trial.worker || new Worker('defense-worker.js?v=20261118-equal-two-hit-points');
+      const worker=trial.worker || new Worker('defense-worker.js?v=20261121-full-attacks');
       trial.worker=worker;
       worker.onmessage=({data})=>{
         if (defenseTrial!==trial || trial.worker!==worker || data.requestId!==trial.requestId) return;
@@ -1859,7 +2039,7 @@ function startBalanceOptimization() {
   const warm=balanceOptimization.best?.investment;
   const starts=[warm,defenseTrial.buildKey===JSON.stringify(balanceTrial.job.ours) ? defenseTrial.best?.investment : null].filter(Boolean);
   stopBalanceOptimization(true);
-  const opt=balanceOptimization,worker=new Worker('balance-opt-worker.js?v=20261118-mega-toggle');
+  const opt=balanceOptimization,worker=new Worker('balance-opt-worker.js?v=20261121-full-attacks');
   opt.worker=worker;opt.running=true;opt.message='Starting search';
   worker.onmessage=({data})=>{
     if(balanceOptimization!==opt || opt.worker!==worker) return;
@@ -1934,7 +2114,7 @@ function renderBuilderBalance(selected) {
   if(!trial.worker && !trial.finished) {
     const fail=message=>{if(balanceTrial!==trial) return;trial.error=message;trial.finished=true;cancelBalanceSearch();renderBalanceResults();};
     try {
-      const worker=new Worker('balance-worker.js?v=20261118-mega-toggle');trial.worker=worker;
+      const worker=new Worker('balance-worker.js?v=20261121-full-attacks');trial.worker=worker;
       worker.onmessage=({data})=>{
         if(balanceTrial!==trial || trial.worker!==worker) return;
         if(data.type==='error') {fail(data.message);return;}
@@ -1981,6 +2161,7 @@ function setView(view) {
 }
 function renderTeamBuilder() {
   if (state.view !== 'builder') return;
+  renderReferenceControls();
   if(state.builderPanel!=='offense') cancelOffenseThresholdSearch();
   if(state.builderPanel!=='balance') cancelBalanceSearch();
   state.builderTopN = clamp(state.builderTopN,1,builderRankLimit());
@@ -2004,6 +2185,8 @@ function renderTeamBuilder() {
   document.getElementById('builderMoveTrialRow').hidden = !offense || teamOffense || !selected;
   document.getElementById('builderAttackTrialRow').hidden = state.builderPanel!=='offense' || !selected;
   document.getElementById('builderSpecialAttackTrialRow').hidden = state.builderPanel!=='offense' || !selected;
+  document.getElementById('builderOffenseFields').append(document.getElementById('builderStages'));
+  renderBuilderStages(selected);
   document.getElementById('builderOffenseFields').hidden = !damage;
   document.getElementById('offenseFaintedInput').closest('.fainted-control').hidden = defense;
   document.getElementById('defenseFaintedInput').closest('.fainted-control').hidden = !defense && !balance;
@@ -2020,6 +2203,13 @@ function renderTeamBuilder() {
   }
   document.getElementById('builderScore').hidden=!damage || !selected;
   const list = document.getElementById(damage ? 'builderOffenseTiers' : 'builderSpeedTiers');
+  if(builderReferences.only && !builderReferences.active.ids.length) {
+    document.getElementById('builderScore').hidden=true;
+    for(const id of ['builderMoveTrialRow','builderAttackTrialRow','builderSpecialAttackTrialRow','builderDefenseTrialRow','teamOffenseTrials','builderBalanceOptimize']) document.getElementById(id).hidden=true;
+    summary.textContent=selected?.name || '';
+    list.innerHTML='<div class="empty-state">Search above to highlight Pokémon, or turn off ★ to return to Top N.</div>';
+    return;
+  }
   if (teamOffense) { renderTeamOffense(); return; }
   if (!selected) {
     builderAnchorKey = '';
@@ -2034,21 +2224,26 @@ function renderTeamBuilder() {
     summary.innerHTML = `<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>ATK ${getEffectiveStat(selected,'atk')} · SPA ${getEffectiveStat(selected,'spa')}</span>`;
     renderBuilderOffense(selected);return;
   }
-  const data = Battle.builderSpeedGroups(builderRoster(species),species,battleEntry(selected),{...state,opponentAbility:appliedOpponentAbility});
+  const data = Battle.builderSpeedGroups(builderRoster(species),species,{...battleEntry(selected),speedStage:getPreferences(selected,'our').speedStage},{...state,opponentAbility:appliedOpponentAbility,opponentSpeedStage:getPreferences(selected,'our').builderOpponentSpeedStage});
   summary.innerHTML = `<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>Speed <b>${data.target}</b> · ${selected.investment.spe} SP · ${escapeHtml(selected.nature.name)}</span>`;
+  summary.append(document.getElementById('builderStages'));
   const icon = member => {
     const rank = member.species.usage?.[state.format]?.rank;
     let description = `${member.species.name} · Base Speed ${member.baseSpeed} · ${member.tie ? 'Same base Speed. ' : ''}${member.tier.label}${rank ? ` · ${state.format} usage #${rank}` : ''} · Weather: ${member.weather || 'None'}; Terrain: ${member.terrain || 'None'} · Opponent ability: ${member.ability || 'not assumed'}`;
+    const showEstimate=member.tier.kind==='nature' || member.tie;
+    const chanceBadge=showEstimate
+      ? `<span class="speed-chance-badge" title="${escapeHtml(speedEstimateDescription(member.speedEstimate))}">${speedEstimateText(member.speedEstimate)}</span>` : '';
+    if(showEstimate) description+=` · ${speedEstimateDescription(member.speedEstimate)}`;
     const showBadge=member.baseSpeed<data.baseSpeed && !(member.tier.kind==='always-slower' && member.outspeedPoints===0);
     const investmentTip=showBadge && member.outspeedPoints!==null
-      ? `${member.outspeedPoints>32 ? 'With a Speed-boosting nature · ' : ''}Invest ${member.outspeedPoints} more to always be faster` : '';
+      ? `${member.outspeedPoints>32 ? 'With a Speed-boosting nature · ' : ''}Invest ${member.outspeedPoints} or more to always be faster` : '';
     if(investmentTip) description+=` · ${investmentTip}`;
     const speedRequirement=member.outspeedPoints===null ? 'Cannot always outspeed even with 32 Speed SP and a Speed-boosting nature'
       : `${member.outspeedPoints} neutral-nature-equivalent Speed points to always outspeed${member.outspeedPoints>32 ? '; requires a Speed-boosting nature' : ''}`;
     const badge=showBadge ? `<span class="speed-investment-badge" title="${escapeHtml(speedRequirement)}; our item and ability versus 32 Speed SP and a Speed-boosting nature, no opponent item, in this field.${investmentTip ? ` ${investmentTip}` : ''}">${member.outspeedPoints===null ? '—' : member.outspeedPoints}</span>` : '';
 
-    return `<span class="tier-pokemon" data-tier-species="${escapeHtml(member.species.id)}" data-required-points="${member.tier.points ?? ''}" title="${escapeHtml(description)}">
-      <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${badge}</span>`;
+    return `<span class="tier-pokemon${builderReferences.has(member.species.id) ? ' reference-highlighted' : ''}" ${referenceAttributes(member.species.id)} data-tier-species="${escapeHtml(member.species.id)}" data-required-points="${member.tier.points ?? ''}" title="${escapeHtml(description)}">
+      <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${badge}${chanceBadge}</span>`;
   };
   const cloud = members => members.length ? `<div class="tier-icon-cloud">${members.map(icon).join('')}</div>` : '';
   const tie = members => `<section id="builderSpeedTie" class="builder-speed-tie" aria-label="Speed Tie, matching base Speed"><h3>Speed Tie <small>Base ${data.baseSpeed}</small></h3>${cloud(members)}</section>`;
@@ -2094,6 +2289,26 @@ function showItemTooltip(button) {
   tooltip.style.top=`${Math.max(8,Math.min(top,innerHeight-box.height-8))}px`;
 }
 function bindStaticControls() {
+  document.addEventListener('change',event=>{
+    const input=event.target.closest('input[data-compact-stage]');
+    if(!input) return;
+    const role=input.dataset.compactStage,value=Number(input.value),selected=state.ourTeam[state.activeOurIndex];
+    if(!Number.isInteger(value) || value < -2 || value > 2) return;
+    if(role==='battle-opponent-speed') {
+      const opponent=state.opponentList[state.activeOpponentIndex];
+      if(!opponent) return;
+      getPreferences(opponent,'opponent').speedStage=value;
+    } else {
+      if(!selected) return;
+      const field=role==='builder-opponent-speed' ? 'builderOpponentSpeedStage' : role==='builder-opponent-offense' ? 'builderOpponentOffenseStage'
+        : role==='builder-offense' ? 'offenseStage' : 'speedStage';
+      const entries=role==='builder-offense' && state.builderPanel==='team-offense'
+        ? teamOffenseSelected().map(({entry})=>entry) : [selected];
+      for(const entry of entries) getPreferences(entry,'our')[field]=value;
+    }
+    savePreferences();renderDamageRanges();renderSpeedSummary();renderTeamBuilder();
+    document.querySelector(`input[data-compact-stage="${role}"]:checked`)?.focus({preventScroll:true});
+  });
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-mega-side]');if(!button) return;
     const species=getPokemonByName(button.dataset.megaId),prefs=getPreferences(species,button.dataset.megaSide);
@@ -2510,6 +2725,7 @@ function initializeApp() {
 
   setupItemHighlightEditor();
   bindStaticControls();
+  bindReferenceControls();
   bindTeamHistory();
   render();
   setView(state.view);
@@ -2668,7 +2884,7 @@ function renderDamageRanges() {
     const frequency = outgoing ? '' : `<div class="move-usage"><span>${row.percent === null ? 'Usage not reported' : `${row.percent}% usage`}</span>
       <span>${row.topDamage ? 'Most damaging' : ''}${row.topDamage && row.topCommon ? ' · ' : ''}${row.topCommon ? 'Top 5 damaging by usage' : ''}</span></div>`;
     return `<div class="move-row" data-move="${escapeHtml(moveName)}"><div class="move-row-top"><div class="move-name">${escapeHtml(moveName)}</div>
-      <div class="move-ranges"><span class="range-pill">${meta ? `${meta.type} · ${meta.category}${meta.multihit ? ' · one hit' : ''}${meta.spread && state.format === 'Doubles' ? ' · spread' : ''}` : 'Unknown move'}</span></div></div>
+      <div class="move-ranges"><span class="range-pill">${meta ? `${meta.type} · ${meta.category}${meta.multihit ? ` · full attack${row.range.hitModel ? ` · ${Number(row.range.hitModel.expected.toFixed(2))} hits avg` : ''}` : ''}${meta.spread && state.format === 'Doubles' ? ' · spread' : ''}` : 'Unknown move'}</span></div></div>
       ${frequency}<div class="investment-stack">${values}</div></div>`;
   }).join('') || '<div class="empty-state">No damaging moves available in this movepool.</div>';
 }

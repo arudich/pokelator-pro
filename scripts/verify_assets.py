@@ -33,6 +33,8 @@ def main():
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 response = page.goto(f'http://127.0.0.1:{server.server_port}', wait_until='domcontentloaded')
                 assert response.status == 200
+                page.wait_for_selector('.move-row')
+                page.evaluate('window.PokelatorTutorial?.close()')
                 results = page.evaluate('''async names => Promise.all([
                   ...names.map(name=>({name,src:getPokemonImage(name)})),
                   ...Object.values(ITEM_HINTS).map(item=>({name:item.name,src:item.image}))

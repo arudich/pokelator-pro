@@ -367,6 +367,22 @@ class DefenseTests(unittest.TestCase):
         self.page.locator('#builderDefenseTrial').uncheck()
         self.assertEqual(self.page.locator('.tier-changed').count(),0)
 
+    def test_equal_point_tier_changes_use_tier_direction_for_border_colors(self):
+        self.load()
+        self.evaluate("""() => {
+          const before=[{species:getPokemonByName('Froslass'),kind:'might-ohko',coverage:100,detail:'Fixture'},
+            {species:getPokemonByName('Alakazam'),kind:'probable-2hko',coverage:100,detail:'Fixture'}];
+          window.colorPreview=highlightTierChanges(before.map((row,index)=>({...row,
+            kind:index===0 ? 'probable-2hko' : 'might-ohko'})),before);
+          state.builderPanel='defense';renderOffenseRows(colorPreview,'defense-colors','',Defense.groups);
+        }""")
+        self.assertEqual(self.evaluate("Offense.points({kind:'might-ohko'})"),self.evaluate("Offense.points({kind:'probable-2hko'})"))
+        self.assertIn('tier-improved',self.page.locator('[data-defense-species="Froslass"]').get_attribute('class'))
+        self.assertIn('tier-worsened',self.page.locator('[data-defense-species="Alakazam"]').get_attribute('class'))
+        self.evaluate("state.builderPanel='offense';renderOffenseRows(colorPreview,'offense-colors')")
+        self.assertIn('tier-worsened',self.page.locator('[data-offense-species="Froslass"]').get_attribute('class'))
+        self.assertIn('tier-improved',self.page.locator('[data-offense-species="Alakazam"]').get_attribute('class'))
+
     def test_defense_worker_keeps_ui_responsive_cancels_and_rejects_stale_results(self):
         worker=(app_tests.ROOT/'defense-worker.js').read_text()
         # Hold the worker CPU-busy, making thread isolation measurable independently

@@ -69,11 +69,16 @@
     if (!meta) return {error: 'Unknown move'};
     try {
       const calculate = defense => {
+        if(meta.multihit && options.hits===undefined) {
+          return MultiHit.range(attackerSpecies,attacker,defenderSpecies,defense,meta.name,options,
+            (hits,target=defense)=>range(attackerSpecies,attacker,defenderSpecies,target,meta.name,{...options,defenseInvestment:null,hits}));
+        }
         const a = pokemon(attackerSpecies, {...withStages(attacker,options.attackerStages),alliesFainted:options.attackerAlliesFainted ?? attacker.alliesFainted ?? 0});
         const d = pokemon(defenderSpecies, withStages(defense,options.defenderStages));
         const field = new calc.Field({gameType: options.format || 'Singles',
           weather: options.weather || undefined, terrain: options.terrain || undefined});
-        // Show one hit for variable multi-hit moves; the UI states this explicitly.
+        // Explicit counts request raw engine rolls; default multi-hit requests
+        // are combined into a complete attack distribution above.
         const moveOptions = meta.multihit ? {hits:options.hits || 1} : {};
         // The pinned engine has no Last Respects scaling; supply its actual power.
         if (meta.name === 'Last Respects') moveOptions.overrides = {basePower:50*(1+a.alliesFainted)};
@@ -115,6 +120,8 @@
   function speed(species, entry, options = {}) {
     ({species,entry}=window.Battle.resolveCombatant(species,entry));
     let value = effectiveStat(species, entry, 'spe');
+    const stage=Math.max(-6,Math.min(6,entry.speedStage ?? entry.boosts?.spe ?? 0));
+    value=Math.floor(value*(stage>=0 ? (2+stage)/2 : 2/(2-stage)));
     const ability=entry.ability;
     if ((['Rain','Heavy Rain'].includes(options.weather) && ability==='Swift Swim')
       || (['Sun','Harsh Sunshine'].includes(options.weather) && ability==='Chlorophyll')
@@ -183,6 +190,25 @@
     if (at(32, true) > targetSpeed) return {label: 'Faster only with speed-boosted nature', kind:'nature'};
     return {label: 'Always Slower', kind:'always-slower'};
   }
+  function speedUsageChance(species,entry,targetSpeed,usage,options = {}) {
+    const spreads=(usage?.spreads || []).filter(row=>Number.isFinite(row.percent) && row.percent>0
+      && Number.isInteger(row.investment?.spe) && row.investment.spe>=0 && row.investment.spe<=32);
+    const natures=(usage?.natures || []).flatMap(row=>{
+      const nature=generation.natures.get(calc.toID(row.name));
+      return nature && Number.isFinite(row.percent) && row.percent>0 ? [{...row,nature}] : [];
+    });
+    if(!spreads.length || !natures.length) return null;
+    const spreadCoverage=spreads.reduce((sum,row)=>sum+row.percent,0);
+    const natureCoverage=natures.reduce((sum,row)=>sum+row.percent,0);
+    let chance=0,tieChance=0;
+    for(const spread of spreads) for(const row of natures) {
+      const value=speed(species,{...entry,investment:spread.investment,nature:row.nature},options);
+      const weight=spread.percent/spreadCoverage*row.percent/natureCoverage;
+      if(value>targetSpeed) chance+=weight;
+      else if(value===targetSpeed) tieChance+=weight;
+    }
+    return {chance:Math.min(1,Math.max(0,chance)),tieChance:Math.min(1,Math.max(0,tieChance)),spreadCoverage,natureCoverage};
+  }
   function builderSpeedGroups(roster, selected, entry, options = {}) {
     const target = speed(selected,entry,speedField(options,entry.ability));
     const groups = [
@@ -196,12 +222,13 @@
     for (const species of ordered) {
       const ability=options.opponentAbility?.(species) || '';
       const field=speedField(options,entry.ability,ability),ourSpeed=speed(selected,entry,field);
-      const tier = speedTier(species,{item:'',ability,investment:{}},ourSpeed,field);
+      const speedStage=options.opponentSpeedStage ?? 0;
+      const tier = speedTier(species,{item:'',ability,speedStage,investment:{}},ourSpeed,field);
       // The shared boundary 16 belongs to the 16–32 group; each form appears once.
       const kind = tier.kind === 'investment' ? (tier.points < 16 ? 'low-investment' : 'high-investment') : tier.kind;
       let outspeedPoints=null,outspeedNaturePoints=null;
       if(species.stats.spe<selected.stats.spe) {
-        const ceiling=speed(species,{item:'',ability,investment:{spe:32},nature:{plus:'spe',minus:'spa'}},field);
+        const ceiling=speed(species,{item:'',ability,speedStage,investment:{spe:32},nature:{plus:'spe',minus:'spa'}},field);
         const at=(points,boosted=false)=>speed(selected,{...entry,nature:boosted ? {plus:'spe',minus:'spa'} : null,
           investment:{...entry.investment,spe:points}},field);
         const minimum=(limit,test)=>{
@@ -218,7 +245,9 @@
           if(outspeedPoints>32) outspeedNaturePoints=minimum(32,points=>at(points,true)>ceiling);
         }
       }
-      groups.find(group => group.kind === kind).members.push({species,tier,ability,ourSpeed,outspeedPoints,outspeedNaturePoints,weather:field.weather || '',terrain:field.terrain || '',baseSpeed:species.stats.spe-20,
+      const speedEstimate=kind==='nature' || species.stats.spe===selected.stats.spe
+        ? speedUsageChance(species,{item:'',ability,speedStage},ourSpeed,species.usage?.[options.format],field) : null;
+      groups.find(group => group.kind === kind).members.push({species,tier,ability,ourSpeed,outspeedPoints,outspeedNaturePoints,speedEstimate,weather:field.weather || '',terrain:field.terrain || '',baseSpeed:species.stats.spe-20,
         tie:species.stats.spe === selected.stats.spe});
     }
     return {target,baseSpeed:selected.stats.spe-20,groups};
@@ -240,7 +269,7 @@
         scenario:{active,field,value,ability:setter,...fields}};
     });
   }
-  window.Battle = {generation, natureOptions, natureStats, effectiveStat, moveMeta, range, withStages, speed, speedTier,speedField,fieldScenarios,
+  window.Battle = {generation, natureOptions, natureStats, effectiveStat, moveMeta, range, withStages, speed, speedTier,speedUsageChance,speedField,fieldScenarios,
     incomingRange, incomingScenarios, selectThreats, isDamageAbility, requiredMegaItem, builderSpeedGroups,
     resolveCombatant:(species,entry)=>({species,entry})};
 })();

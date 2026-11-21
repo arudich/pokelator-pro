@@ -61,6 +61,7 @@
   }
   function meanDamage(rolls) {
     if (typeof rolls === 'number') return Number.isFinite(rolls) && rolls >= 0 ? rolls : null;
+    if(rolls?.weighted) return rolls.weighted.reduce((sum,[damage,p])=>sum+damage*p,0);
     if (!Array.isArray(rolls) || !rolls.length) return null;
     const means = rolls.map(meanDamage);
     if (means.some(value => value === null)) return null;
@@ -77,7 +78,7 @@
   const tierHits=kind=>({'guaranteed-ohko':1,'probable-ohko':1,'might-ohko':1,'probable-2hko':2,'probable-3hko':3,rest:Infinity})[kind];
   function koModel(samples,multiplier) {
     return {multiplier,samples:samples.filter(sample=>sample.percent>0).map(sample=>({weight:sample.percent,hp:sample.range.hp,
-      turns:sample.range.defenderAbility==='Disguise' ? [0,sample.range.rolls]
+      turns:sample.range.defenderAbility==='Disguise' && !sample.range.multiHit ? [0,sample.range.rolls]
         : [sample.range.rolls,(sample.followupRange || sample.range).rolls]}))};
   }
   function convolve(left,right,cap=Infinity) {
@@ -89,6 +90,7 @@
   }
   function damageDistribution(rolls) {
     if(typeof rolls==='number') return new Map([[rolls,1]]);
+    if(rolls?.weighted) return new Map(rolls.weighted);
     if(!Array.isArray(rolls) || !rolls.length) return new Map();
     if(Array.isArray(rolls[0])) return rolls.reduce((sum,hit)=>convolve(sum,damageDistribution(hit)),new Map([[0,1]]));
     const result=new Map();
@@ -103,7 +105,7 @@
     let chance=0;
     for(const {range,percent} of weighted) {
       if(range.error || !(range.hp>0)) return null;
-      if(range.defenderAbility==='Disguise' || Math.floor(range.maxDamage*multiplier)<range.hp) continue;
+      if((range.defenderAbility==='Disguise' && !range.multiHit) || Math.floor(range.maxDamage*multiplier)<range.hp) continue;
       if(Math.floor(range.minDamage*multiplier)>=range.hp) {chance+=percent;continue;}
       const rolls=range.rolls;
       let distribution=Array.isArray(rolls) ? firstHitDistributions.get(rolls) : null;
@@ -223,15 +225,15 @@
         const followupRange = ['Multiscale','Shadow Shield'].includes(range.defenderAbility) && !range.error
           ? Battle.range(attackerSpecies,ours,defenderSpecies,{...defender,ability:'No Ability'},meta.name,options) : null;
         // The pinned engine's raw damage rolls do not simulate these survival states.
-        const survival = range.defenderAbility === 'Sturdy'
+      const survival = !range.multiHit && (range.defenderAbility === 'Sturdy'
           || (range.defenderAbility === 'Ice Face' && meta.category === 'Physical')
-          || ['Focus Sash','Focus Band'].includes(range.defenderItem);
+          || ['Focus Sash','Focus Band'].includes(range.defenderItem));
         return {...spread,defender,followupRange,range:survival ? {...range,error:`${range.defenderAbility || range.defenderItem} requires survival/turn context.`} : range};
       });
       const result = summarize(samples,options.multiplier ?? 1,options.keepProbability!==false);
       if (result.error) { unavailable.push(result.error); continue; }
       if (samples.some(sample => sample.followupRange)) result.firstHitAbility = samples.find(sample=>sample.followupRange).range.defenderAbility;
-      const disguise=samples.some(sample => sample.range.defenderAbility === 'Disguise');
+      const disguise=samples.some(sample => sample.range.defenderAbility === 'Disguise' && !sample.range.multiHit);
       const ohkoProbability=firstHitProbability(samples,options.multiplier ?? 1);
       if (dropsOffense(meta) && !(ohkoProbability>0) && (result.score<1 || disguise)) {
         const repeated=repeatedUse(attackerSpecies,ours,defenderSpecies,samples,meta,options);
@@ -252,11 +254,12 @@
       if(ohkoProbability>0) {
         if(!result.guaranteed) {
           result.kind=ohkoProbability>=0.5 ? 'probable-ohko' : 'might-ohko';
-          result.score=1/(2-ohkoProbability);
+          if(!meta.multihit) result.score=1/(2-ohkoProbability);
         }
-        result.assumeTwoHit=true;
+        result.assumeTwoHit=!meta.multihit;
       }
-      candidates.push({...result,move:meta.name,meta});
+      candidates.push({...result,move:meta.name,meta,accuracyMode:meta.multihit ? 'multi-hit' : undefined,
+        hitModel:samples[0]?.range.hitModel});
     }
     candidates.sort(compareResults);
     return candidates[0] || {kind:'rest',error:unavailable[0] || 'No calculable damaging move in this set.',

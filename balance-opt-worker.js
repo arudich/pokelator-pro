@@ -1,7 +1,7 @@
 'use strict';self.window=self;
 importScripts('vendor/smogon-data.min.js','vendor/smogon-calc.min.js',
-  'data/move-types.js?v=20261120-champions-types','battle.js?v=20261118-speed-nature','offense.js?v=20261118-equal-two-hit-points','data/balance-moves.js?v=20261118-mega-toggle',
-  'balance.js?v=20261118-mega-toggle','balance-optimize.js?v=20261118-mega-toggle');
+  'data/move-types.js?v=20261120-champions-types','data/balance-moves.js?v=20261121-multi-hit','multi-hit.js?v=20261121-full-attacks','battle.js?v=20261121-full-attacks','offense.js?v=20261121-full-attacks',
+  'balance.js?v=20261121-full-attacks','balance-optimize.js?v=20261118-mega-toggle');
 self.onmessage=async ({data:{job,baselineRows,starts=[]}})=>{
   try {
     // The job contains precisely the current Top-N roster, including field variants.

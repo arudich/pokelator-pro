@@ -85,15 +85,11 @@ button:active {
 }
 
 .brand-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: white;
-  font-weight: 800;
-  font-size: 1.2rem;
+  width:40px;
+  height:40px;
+  flex-shrink:0;
+  border-radius:10px;
+  object-fit:contain;
 }
 
 .brand-title {
@@ -810,7 +806,7 @@ button:disabled:hover { transform: none; }
 .speed-summary { margin: 0; gap: 6px; }
 .speed-scenario { display: grid; grid-template-columns: 85px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 0.74rem; }
 .speed-scenario dt { color: var(--muted); }
-.speed-scenario dd { margin: 0; }
+.speed-scenario dd { margin: 0; display: grid; grid-template-columns: minmax(0,1fr) max-content; gap: 10px; align-items: baseline; }
 .active-card-row { flex: 0 0 auto; }
 .opponent-row.expanded { display: flex; flex-direction: column; }
 .team-main { min-width: 0; }
@@ -899,6 +895,31 @@ a { color: var(--accent); }
 #teamShareLink { margin-top: 9px; font-size: 0.68rem; }
 .layout[data-view="builder"] { grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.6fr); }
 .builder-panel { display: flex; flex-direction: column; overflow: hidden; }
+.builder-heading { display: grid; grid-template-columns: minmax(65px,1fr) minmax(150px,1.5fr) auto; }
+.builder-heading h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.builder-reference-toolbar { display: flex; align-items: center; gap: 4px; height: 28px; min-width: 0; }
+.builder-reference-toolbar input { min-width: 0; width: 100%; height: 28px; padding: 4px 7px; font-size: 0.72rem; color: var(--text); background: var(--control-bg); border: 1px solid var(--soft-border); border-radius: 6px; }
+.builder-reference-toolbar .mini-button { flex: 0 0 auto; height: 28px; padding: 3px 6px; font-size: 0.7rem; white-space: nowrap; }
+#builderReferenceOnly.active { border-color: var(--accent); color: var(--accent); }
+.tier-pokemon.reference-highlighted { outline: 2px solid var(--accent); outline-offset: 1px; }
+.reference-sets-popup { position: fixed; inset: auto; margin: 0; width: 290px; max-width: calc(100vw - 16px); max-height: min(450px,80vh); overflow: auto; padding: 12px; border: 1px solid var(--soft-border); border-radius: 9px; background: var(--panel); color: var(--text); box-shadow: 0 8px 28px #0008; }
+.reference-sets-heading,.reference-set-actions { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.reference-sets-popup .field-label { display: block; margin: 9px 0; font-size: 0.7rem; color: var(--muted); }
+.reference-sets-popup input { width: 100%; height: 30px; margin-top: 4px; padding: 5px 7px; font: inherit; font-size: 0.75rem; color: var(--text); background: var(--control-bg); border: 1px solid var(--soft-border); border-radius: 6px; }
+.reference-set-actions { margin: 8px 0; }
+.reference-set-status { display: block; color: var(--muted); font-size: 0.65rem; }
+.reference-set-actions .mini-button { flex: 0 0 auto; padding: 4px 7px; font-size: 0.7rem; white-space: nowrap; }
+.reference-set-option { display: flex; width: 100%; justify-content: space-between; gap: 10px; text-align: left; padding: 7px; border: 0; border-top: 1px solid var(--divider); border-radius: 0; background: transparent; color: var(--text); font-size: 0.75rem; }
+.reference-set-option.active { color: var(--accent); background: color-mix(in srgb,var(--accent) 10%,transparent); }
+.reference-set-option small { color: var(--muted); }
+.reference-set-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choice-reference-check { margin-left: auto; color: var(--accent); }
+@media (max-width: 1100px) {
+  .builder-heading .builder-usage-filter span { display: none; }
+  .builder-heading { grid-template-columns: minmax(45px,1fr) minmax(150px,2fr) auto; }
+  .builder-heading .builder-usage-filter { gap: 4px; }
+  .builder-heading .builder-usage-filter input { width: 40px; }
+}
 .builder-analysis-tabs .active { background: var(--accent-strong); }
 .builder-assumptions { color: var(--muted); font-size: 0.7rem; margin-bottom: 12px; }
 .builder-assumptions summary { cursor: pointer; color: var(--accent); }
@@ -1038,7 +1059,9 @@ a { color: var(--accent); }
 .fainted-option { position: relative; width: 20px; height: 26px; }
 .fainted-option svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; }
 .fainted-option span { position: absolute; right: -1px; bottom: 0; padding: 0 1px; border-radius: 2px; background: var(--panel); font-size: 9px; font-weight: 700; line-height: 1; }
-.speed-investment-badge { position: absolute; right: 4px; bottom: 4px; padding: 2px 4px; border-radius: 4px; background: rgba(13,22,34,0.9); color: #d7e2ec; font-size: 0.66rem; line-height: 1.3; }
+.speed-investment-badge,.speed-chance-badge { position: absolute; right: 4px; bottom: 4px; padding: 2px 4px; border-radius: 4px; background: rgba(13,22,34,0.9); color: #d7e2ec; font-size: 0.66rem; line-height: 1.3; }
+.speed-chance-badge { left: 4px; right: auto; }
+.speed-chance { padding: 1px 5px; border-radius: 4px; background: rgba(13,22,34,0.9); color: #d7e2ec; font-size: 0.66rem; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .field-controls > .fainted-control { border-left: 2px solid var(--divider); padding-left: 9px; }
 
@@ -1051,3 +1074,38 @@ a { color: var(--accent); }
 
 .format-toggle .mini-button { font-size: calc(0.72rem + 1px); }
 .search-results[popover]:not(:popover-open) { display: none; }
+
+/* Compact stages share the damage controls without adding a toolbar row. */
+.compact-stages { display:flex; align-items:center; gap:12px; margin-left:auto; }
+.compact-stage-control { display:grid; grid-template-columns:max-content 150px; align-items:center; gap:7px; }
+.compact-stage-control legend { float:left; padding:0; font-size:0.68rem; white-space:nowrap; }
+.compact-stage-options { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.compact-stage-options .stat-stage-option span { padding:3px 0; }
+.speed-card-content { display:grid; grid-template-columns:minmax(0,1fr) max-content; gap:16px; align-items:center; }
+.battle-speed-stages { display:grid; gap:7px; }
+.battle-speed-stages .compact-stage-control { grid-template-columns:80px 150px; }
+.builder-selected-summary .compact-stages { align-self:center; }
+@media (max-width:1100px) {
+  .speed-card-content { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .battle-speed-stages { display:flex; flex-wrap:wrap; gap:10px; }
+  .compact-stages { flex-wrap:wrap; }
+}
+
+/* Screenshot-led first-visit tour. */
+.tutorial-dialog { width:calc(100vw - 24px); height:calc(100dvh - 24px); max-width:none; max-height:none; overflow:auto; padding:16px 22px 12px; color:var(--text); background:var(--panel); border:1px solid var(--soft-border); border-radius:18px; box-shadow:0 24px 100px #0008; }
+.tutorial-dialog[open] { display:flex; flex-direction:column; }
+.tutorial-dialog::backdrop { background:rgba(5,12,23,.76); backdrop-filter:blur(5px); }
+.tutorial-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.tutorial-eyebrow { color:var(--accent); font-size:12px; letter-spacing:.12em; font-weight:700; }
+.tutorial-close { font-size:22px; padding:0 9px; line-height:1.3; }
+.tutorial-dialog h2 { margin:6px 0 10px; font-size:clamp(20px,2.2vw,29px); letter-spacing:-.025em; }
+.tutorial-picture { flex:1; min-height:0; border:1px solid var(--soft-border); background:#101827; border-radius:10px; overflow:hidden; }
+.tutorial-picture img { display:block; width:100%; height:100%; object-fit:contain; }
+#tutorialCaption { color:var(--text); font-size:clamp(15px,1.2vw,19px); font-weight:600; line-height:1.4; margin:10px 0; }
+.tutorial-footer { display:flex; align-items:center; gap:12px; }
+.tutorial-arrow { font-size:20px; padding:1px 12px; }
+.tutorial-dots { display:flex; gap:7px; }
+.tutorial-dots button { padding:0; width:8px; height:8px; border-radius:50%; background:var(--muted); opacity:.35; border:0; }
+.tutorial-dots button[aria-current=true] { opacity:1; background:var(--accent); }
+#tutorialProgress { margin-left:auto; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+@media(max-width:600px) { .tutorial-dialog { width:calc(100vw - 12px); height:calc(100dvh - 12px); padding:12px; } .tutorial-dialog h2 { margin-top:12px; } #tutorialCaption { font-size:13px; } }

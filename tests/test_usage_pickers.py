@@ -10,6 +10,103 @@ class UsagePickerTests(unittest.TestCase):
     load = app_tests.AppTests.load
     evaluate = app_tests.AppTests.evaluate
 
+    def test_set_editor_stays_open_through_card_clicks_and_rerenders_until_collapsed(self):
+        self.load()
+        summary=self.page.locator('.expanded-team .set-editor summary')
+        summary.click()
+        self.assertTrue(self.page.locator('.expanded-team .set-editor').evaluate('(el)=>el.open'))
+        self.page.locator('.expanded-team .pokemon-name').click()
+        self.assertTrue(self.page.locator('.expanded-team .set-editor').evaluate('(el)=>el.open'))
+        self.page.locator('.opponent-row .pokemon-name').last.click()
+        self.assertTrue(self.page.locator('.expanded-team .set-editor').evaluate('(el)=>el.open'))
+        self.page.locator('.team-row.compact-team .pokemon-name').first.click()
+        self.assertTrue(self.page.locator('.expanded-team .set-editor').evaluate('(el)=>el.open'))
+        self.page.locator('#teamBuilderButton').click()
+        self.assertTrue(self.page.locator('.expanded-team .set-editor').evaluate('(el)=>el.open'))
+        self.page.locator('.expanded-team .set-editor summary').click()
+        self.evaluate('render()')
+        self.assertFalse(self.page.locator('.expanded-team .set-editor').evaluate('(el)=>el.open'))
+
+    def test_ability_picker_shows_usage_effects_filters_and_persists_in_both_views(self):
+        self.load()
+        self.evaluate("state.ourTeam=[sanitizeTeamEntry({name:'Kingambit'})];state.activeOurIndex=0;render()")
+        self.page.locator('.set-editor summary').click()
+        ability=self.page.locator('[data-set-field="ability"]')
+        self.assertEqual(ability.evaluate('(input)=>input.tagName'),'INPUT')
+        ability.focus()
+        expected=self.evaluate("buildAbilityChoices(getPokemonByName('Kingambit')).map(row=>row.name)")
+        self.assertEqual(self.page.locator('#searchResults .choice-heading strong').all_text_contents(),expected)
+        self.assertIn('%',self.page.locator('#searchResults .ability-choice').first.inner_text())
+        self.assertTrue(self.page.locator('#searchResults .ability-choice .search-item-sub').first.inner_text())
+        ability.fill('Supreme');ability.press('Enter')
+        self.assertEqual(self.evaluate('state.ourTeam[0].ability'),'Supreme Overlord')
+        self.page.reload()
+        self.assertEqual(self.evaluate('state.ourTeam[0].ability'),'Supreme Overlord')
+        self.page.locator('#teamBuilderButton').click()
+        self.page.locator('.set-editor summary').click()
+        ability=self.page.locator('[data-set-field="ability"]')
+        ability.focus()
+        self.assertEqual(self.page.locator('#searchResults .ability-choice').count(),len(expected))
+        self.page.locator('#searchResults .ability-choice').filter(has_text='Defiant').click()
+        self.assertEqual(self.evaluate('state.ourTeam[0].ability'),'Defiant')
+        ability=self.page.locator('[data-set-field="ability"]')
+        ability.fill('not an ability');ability.press('Tab')
+        self.assertEqual(ability.input_value(),'Defiant')
+
+    def test_move_choices_show_champions_accuracy_and_secondary_chances(self):
+        self.load()
+        result=self.evaluate("""() => Object.fromEntries(['Rock Slide','Dire Claw','Air Slash','Protect','Earthquake','Dual Wingbeat','Rock Blast'].map(name=>
+          [name,moveChoiceMarkup({...Battle.moveMeta(name),name,percent:null})]))""")
+        self.assertIn('90% acc',result['Rock Slide'])
+        self.assertIn('30% flinch',result['Rock Slide'])
+        self.assertIn('100% acc',result['Dire Claw'])
+        self.assertIn('30% status (poison/paralysis/sleep)',result['Dire Claw'])
+        self.assertIn('95% acc',result['Air Slash'])
+        self.assertIn('30% flinch',result['Air Slash'])
+        self.assertIn('Acc —',result['Protect'])
+        self.assertNotIn('flinch',result['Earthquake'])
+        self.assertIn('2 hits',result['Dual Wingbeat'])
+        self.assertIn('2–5 hits',result['Rock Blast'])
+        self.assertIn('power/hit',result['Rock Blast'])
+
+    def test_move_archetypes_summarize_primary_effects_and_preserve_special_rules(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const names=['Charm','Swords Dance','Close Combat','Growth','Roost','Rest','Protect','Tailwind',
+            'Trick Room','Rain Dance','Psychic Terrain','Stealth Rock','Knock Off','Expanding Force',
+            'Solar Beam','Hyper Beam','Baton Pass','Whirlwind','Foul Play','Body Press','Stored Power',
+            'Helping Hand','Haze','Beat Up','Last Respects','Scale Shot','Triple Axel','Fickle Beam',
+            'Double-Edge','Drain Punch','Belly Drum','Memento','Toxic','Thunder Wave','Substitute','Wish',
+            'Reflect','Light Screen','Spikes','Rapid Spin','Encore','Taunt','Trick','Skill Swap',
+            'Seismic Toss','Endeavor','Destiny Bond','Counter'];
+          const summaries=Object.fromEntries(names.map(name=>[name,MoveSummary.describe(BALANCE_MOVES.moves[calc.toID(name)])]));
+          const moves=[...new Set(pokerData.flatMap(p=>p.learnset))].filter(name=>Battle.moveMeta(name));
+          const missingStatus=moves.filter(name=>Battle.moveMeta(name).category==='Status'
+            && !MoveSummary.describe(BALANCE_MOVES.moves[calc.toID(name)]));
+          return {summaries,missingStatus,
+            primaryChance:MoveSummary.describe({shortDesc:'30% chance to double power.'}),
+            correctedChance:MoveSummary.describe({shortDesc:'50% chance to paralyze. Removes item.',secondary:{chance:30,status:'par'}}),
+            triple:moveChoiceMarkup({...Battle.moveMeta('Triple Axel'),percent:null})};
+        }""")
+        self.assertEqual(result['missingStatus'],[])
+        self.assertTrue(all(result['summaries'].values()),result['summaries'])
+        self.assertEqual(result['summaries']['Charm'],'Target: −2 Atk')
+        self.assertEqual(result['summaries']['Swords Dance'],'Self: +2 Atk')
+        self.assertEqual(result['summaries']['Close Combat'],'Self: −1 Def/SpD')
+        self.assertIn('Sun',result['summaries']['Growth'])
+        self.assertIn('Psychic Terrain',result['summaries']['Expanding Force'])
+        self.assertIn('30%',result['primaryChance'])
+        self.assertIn('double power',result['primaryChance'])
+        self.assertIn('30% paralysis',result['correctedChance'])
+        self.assertIn('Removes item',result['correctedChance'])
+        self.assertNotIn('50%',result['correctedChance'])
+        self.assertIn('1–3 hits',result['triple'])
+        self.assertIn('starting power',result['triple'])
+        self.evaluate("state.ourTeam=[sanitizeTeamEntry({name:'Sylveon'})];state.activeOurIndex=0;render()")
+        self.page.locator('.set-editor summary').click()
+        self.page.locator('[data-set-field="move-0"]').fill('Charm')
+        self.assertIn('Target: −2 Atk',self.page.locator('#searchResults .move-choice').inner_text())
+
     def test_picker_only_offers_moves_that_survive_saving_and_have_engine_metadata(self):
         self.load()
         result=self.evaluate("""() => {

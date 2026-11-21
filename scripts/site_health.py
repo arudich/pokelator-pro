@@ -95,6 +95,8 @@ def audit_browser(url,output):
             response=page.goto(url,wait_until='domcontentloaded',timeout=60000)
             if not response or response.status!=200:raise ValueError('Production homepage did not return HTTP 200')
             page.wait_for_selector('.move-row')
+            # The first-visit tour is verified separately; dismiss it before navigation.
+            page.evaluate('window.PokelatorTutorial?.close()')
             snapshot=page.evaluate("""async () => {
               const roster=window.CHAMPIONS_ROSTER.pokemon,coverage={species:roster.length,
                 learnsetMoves:roster.reduce((n,p)=>n+p.learnset.length,0)};

@@ -24,24 +24,34 @@ const ABILITY_USAGE_THRESHOLD = 50;
 const NATURE_USAGE_THRESHOLD = 50;
 const rosterSnapshot = window.CHAMPIONS_ROSTER;
 const pokerData = rosterSnapshot.pokemon;
-const builderReferences=new ReferenceSets(pokerData.map(species=>species.id));
+const cosmeticPokemon=(rosterSnapshot.cosmeticForms || []).flatMap(form=>{
+  const base=pokerData.find(species=>species.id===form.baseId);
+  return base ? [{...base,...form,calcId:base.calcId || base.id,cosmeticBaseId:base.id}] : [];
+});
+const pokemonCatalog=[...pokerData,...cosmeticPokemon];
+const builderReferences=new ReferenceSets(pokemonCatalog.map(species=>species.id));
 const ordinaryForms=new Map();
 const natureOptions = Battle.natureOptions;
 const itemOptions = [...Battle.generation.items].map(item => item.name);
 const statOrder = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 const statLabels = { hp: 'HP', atk: 'ATK', def: 'DEF', spa: 'SPA', spd: 'SPD', spe: 'SPE' };
 
+function pokemonDisplayName(entry) { return entry?.nickname || entry?.name || ''; }
+function canonicalItem(value) {
+  const key=calc.toID(String(value || ''));
+  return key ? itemOptions.find(name=>calc.toID(name)===key) ?? null : '';
+}
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
 }
-function getPokemonRoster() { return pokerData; }
+function getPokemonRoster() { return pokemonCatalog; }
 function getPokemonByName(name) {
   const key = String(name || '').trim().toLowerCase();
-  return pokerData.find(p => p.name.toLowerCase() === key || p.id.toLowerCase() === key) || null;
+  return pokemonCatalog.find(p => p.name.toLowerCase() === key || p.id.toLowerCase() === key) || null;
 }
 function savedSpecies(entry) {
   if(entry?.stats) return entry;
-  return pokerData.find(species=>species.id===entry?.id) || getPokemonByName(entry?.name);
+  return pokemonCatalog.find(species=>species.id===entry?.id) || getPokemonByName(entry?.name);
 }
 function battleSpecies(entry,side='opponent') {
   const species=savedSpecies(entry);
@@ -237,7 +247,7 @@ function builderRankLimit() {
 }
 
 function builderRoster(selected, includeBaseMatches = true) {
-  return pokerData.map(species=>battleSpecies(species,'opponent')).filter(species => builderReferences.only ? builderReferences.has(species.id)
+  return [...pokerData,...cosmeticPokemon.filter(species=>builderReferences.has(species.id))].map(species=>battleSpecies(species,'opponent')).filter(species => builderReferences.only ? builderReferences.has(species.id)
     : builderReferences.has(species.id) || (includeBaseMatches && species.stats.spe === selected.stats.spe) ||
     (Number.isInteger(species.usage?.[state.format]?.rank) && species.usage[state.format].rank <= state.builderTopN));
 }
@@ -462,25 +472,6 @@ function natureFlagState(opponent, role) {
   return {checked: enabled.some(Boolean), mixed: enabled.some(Boolean) && !enabled.every(Boolean),
     stats, choice: getPreferences(opponent, 'opponent')[`${role}NatureChoice`]};
 }
-function renderNatureFlags(opponent) {
-  for (const [role, id] of [['defense','boostNatureToggle'], ['offense','boostOffenseNatureToggle']]) {
-    const flag = natureFlagState(opponent, role);
-    const input = document.getElementById(id);
-    input.checked = flag.checked;
-    input.indeterminate = flag.mixed;
-    const usage = flag.stats.map(stat => {
-      const percent = natureUsage(opponent, stat);
-      return `${statLabels[stat]} ${percent === null ? 'not reported' : `${percent}%`}`;
-    }).join(' · ');
-    const mode = flag.choice === 'auto' ? `Auto ≥${NATURE_USAGE_THRESHOLD}%` : `Manual ${flag.choice ? 'on' : 'off'}`;
-    const basis = document.getElementById(`${role}NatureUsage`);
-    basis.textContent = `${mode} · ${usage}`;
-    input.title = `${mode}. Reported nature boost shares: ${usage}.${flag.mixed ? ' Boost applies only to matching stats that reach the threshold.' : ''}`;
-  }
-  const prefs = getPreferences(opponent, 'opponent');
-  document.getElementById('natureUsageDefaultsButton').hidden = !opponent ||
-    (prefs.defenseNatureChoice === 'auto' && prefs.offenseNatureChoice === 'auto');
-}
 function getOpponentAbilityAssumption(opponent = state.opponentList[state.activeOpponentIndex]) {
   if (!opponent) return null;
   const species = battleSpecies(opponent,'opponent');
@@ -600,7 +591,7 @@ function getNatureDefinition(name, plusKey = null, minusKey = null) {
 }
 
 function getNatureSelectOptions(selectedValue) {
-  const options = [`<option value="" ${!selectedValue ? 'selected' : ''}>—</option>`];
+  const options = [`<option value="" ${!selectedValue ? 'selected' : ''}>None</option>`];
   for (const key of Battle.natureStats) {
     const label = statLabels[key];
     options.push(`<option value="${key}" ${selectedValue === key ? 'selected' : ''}>${label}</option>`);
@@ -633,7 +624,9 @@ function updateNature(entry, value, mode = null) {
 function updateItem(entry, value) {
   if (!entry) return;
   const species = getPokemonByName(entry.name);
-  entry.item = species.isMega ? Battle.requiredMegaItem(species) : String(value).trim();
+  const item=canonicalItem(value);
+  if(item===null) {renderTeam();return;}
+  entry.item = species.isMega ? Battle.requiredMegaItem(species) : item;
   saveTeamToStorage();
   render();
 }
@@ -662,8 +655,8 @@ function sanitizeTeamEntry(rawEntry) {
     nature.plus = Battle.natureStats.includes(rawEntry.nature.plus) ? rawEntry.nature.plus : null;
     nature.minus = Battle.natureStats.includes(rawEntry.nature.minus) ? rawEntry.nature.minus : null;
   }
-  return {name: pokemon.name, id: pokemon.id, types: pokemon.types, form: pokemon.form,
-    item: pokemon.isMega ? Battle.requiredMegaItem(pokemon) : typeof rawEntry.item === 'string' ? rawEntry.item : '',
+  return {name: pokemon.name, nickname:typeof rawEntry.nickname==='string' ? rawEntry.nickname.trim().slice(0,40) : '', id: pokemon.id, types: pokemon.types, form: pokemon.form,
+    item: pokemon.isMega ? Battle.requiredMegaItem(pokemon) : typeof rawEntry.item === 'string' ? canonicalItem(rawEntry.item) ?? '' : '',
     ability: pokemon.abilities.includes(rawEntry.ability) ? rawEntry.ability : pokemon.abilities[0],
     nature, moveSet: moveSet.length ? moveSet : pokemon.moves.slice(0, 4), investment,
     damageMultiplier: 1};
@@ -878,15 +871,23 @@ function createDefaultOpponents() {
 function popularTeamBuild(species) {
   const usage=getUsage(species);
   const byPopularity=(a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || (a.rank ?? Infinity)-(b.rank ?? Infinity);
-  const spread=[...(usage?.spreads || [])].filter(row=>row.investment
+  const spreads=[...(usage?.spreads || [])].filter(row=>row.investment
     && statOrder.every(stat=>Number.isInteger(row.investment[stat]) && row.investment[stat]>=0 && row.investment[stat]<=MAX_STAT_POINTS)
-    && statOrder.reduce((sum,stat)=>sum+row.investment[stat],0)<=MAX_TEAM_POINTS).sort(byPopularity)[0];
+    && statOrder.reduce((sum,stat)=>sum+row.investment[stat],0)<=MAX_TEAM_POINTS).sort(byPopularity);
+  const spread=spreads.find(row=>statOrder.reduce((sum,stat)=>sum+row.investment[stat],0)===MAX_TEAM_POINTS) || spreads[0];
   const nature=[...(usage?.natures || [])].filter(row=>Battle.generation.natures.get(calc.toID(row.name))).sort(byPopularity)[0];
   const offense=species.stats.atk>=species.stats.spa ? 'atk' : 'spa';
   const fallback=defaultInvestment();fallback[offense]=32;
   if(species.stats.spe<=80) {fallback.hp=32;fallback[offense==='atk' ? 'spd' : 'def']=2;}
   else {fallback.spe=32;fallback.hp=2;}
-  return {investment:spread ? {...spread.investment} : fallback,
+  const investment=spread ? {...spread.investment} : {...fallback};
+  let remaining=MAX_TEAM_POINTS-statOrder.reduce((sum,stat)=>sum+investment[stat],0);
+  // Complete partial-only reports without taking points away from their allocation.
+  for(const stat of [...statOrder].sort((a,b)=>fallback[b]-fallback[a] || statOrder.indexOf(a)-statOrder.indexOf(b))) {
+    const extra=Math.min(remaining,MAX_STAT_POINTS-investment[stat]);
+    investment[stat]+=extra;remaining-=extra;
+  }
+  return {investment,
     nature:nature?.name || (offense==='atk' ? 'Adamant' : 'Modest')};
 }
 
@@ -953,7 +954,7 @@ function pokemonUsageReference(species) {
 function buildSearchResults(query,includeAll=false) {
   const clean=query.trim().toLowerCase();
   if(!clean && !includeAll) return [];
-  return pokerData.filter(p=>p.name.toLowerCase().includes(clean) || p.id.toLowerCase().includes(clean))
+  return pokemonCatalog.filter(p=>p.name.toLowerCase().includes(clean) || p.id.toLowerCase().includes(clean))
     .sort((a,b)=>(pokemonUsageReference(b)?.percent ?? -1)-(pokemonUsageReference(a)?.percent ?? -1)
       || (getUsage(a)?.rank ?? Infinity)-(getUsage(b)?.rank ?? Infinity) || a.name.localeCompare(b.name));
 }
@@ -980,7 +981,7 @@ function pokemonChoiceMarkup(species) {
   const shared=usage && calc.toID(usage.name)!==calc.toID(species.id);
   return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" />
     <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${usage ? `${usage.percent.toFixed(2)}%${shared ? ' shared' : ''}` : 'Usage unavailable'}</small></div>
-    <div class="search-item-sub">${species.types.join(' / ')}</div>${baseStatsMarkup(species)}</div>`;
+    <div class="search-item-sub">${species.types.join(' / ')}${species.cosmeticBaseId ? ' · Cosmetic form · shared stats and usage' : ''}</div>${baseStatsMarkup(species)}</div>`;
 }
 function buildMoveChoices(species,query='') {
   const clean=query.trim().toLowerCase();
@@ -998,10 +999,25 @@ function moveChoiceMarkup(move) {
   const hits=Array.isArray(multihit) ? `${multihit[0]}–${multihit[1]} hits`
     : Number.isInteger(multihit) && multihit>1 ? `${effect?.multiaccuracy ? '1–' : ''}${multihit} hits` : '';
   const powerLabel=hits && /power rises/i.test(effect?.shortDesc || '') ? 'starting power' : hits ? 'power/hit' : 'power';
-  const accuracy=effect?.accuracy===true ? 'Acc —' : Number.isFinite(effect?.accuracy) ? `${effect.accuracy}% acc` : '';
+  const accuracy=effect?.accuracy===true ? 'No accuracy check' : Number.isFinite(effect?.accuracy) ? `${effect.accuracy}% acc` : '';
   const summary=MoveSummary.describe(effect);
   return `<div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(move.name)}</strong><small>${move.percent===null ? 'Usage unavailable' : `${move.percent}%`}</small></div>
     <div class="search-item-sub">${escapeHtml(move.type || 'Unknown')} · ${escapeHtml(move.category || '')}${move.power ? ` · ${move.power} ${powerLabel}` : ''}${hits ? ` · ${escapeHtml(hits)}` : ''}${accuracy ? ` · ${accuracy}` : ''}</div>${summary ? `<div class="search-item-sub move-effect-summary">${escapeHtml(summary)}</div>` : ''}</div>`;
+}
+function buildItemChoices(species,query='') {
+  const clean=query.trim().toLowerCase();
+  const usage=new Map((getUsage(species)?.items || []).map(row=>[calc.toID(row.name),row.percent]));
+  return [{name:'No Item',value:'',percent:null,description:'No held item.'},...itemOptions.map(name=>{
+    const item=Battle.generation.items.get(calc.toID(name));
+    const mega=item.megaStone && Object.values(item.megaStone);
+    const description=window.ITEM_DESCRIPTIONS?.[calc.toID(name)] || window.ITEM_HINTS[calc.toID(name)]?.description
+      || (mega?.length ? `Required to Mega Evolve ${Object.keys(item.megaStone).join(' / ')} into ${mega.join(' / ')}.` : 'Held item; its supported effects apply to calculations.');
+    return {name,value:name,percent:usage.get(calc.toID(name)) ?? null,description,image:window.ITEM_SPRITES[name]};
+  }).sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || a.name.localeCompare(b.name))]
+    .filter(item=>!clean || item.name.toLowerCase().includes(clean) || item.description.toLowerCase().includes(clean));
+}
+function itemChoiceMarkup(item) {
+  return `${item.image ? `<img class="item-choice-image" src="${escapeHtml(item.image)}" alt="" />` : ''}<div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(item.name)}</strong><small>${item.percent===null ? '' : `${item.percent}%`}</small></div><div class="search-item-sub">${escapeHtml(item.description)}</div></div>`;
 }
 function buildAbilityChoices(species,query='') {
   const clean=query.trim().toLowerCase();
@@ -1032,7 +1048,7 @@ function bindUsagePicker(input,{choices,markup,choose,kind='pokemon',hint=''}) {
     activeUsagePicker={input,popup,items,cursor:Math.max(0,exact),query,markup,choose,kind,hint};
     updateUsagePicker();
   };
-  input.addEventListener('focus',()=>open(kind==='move' || kind==='ability' ? '' : input.value));
+  input.addEventListener('focus',()=>open(kind==='move' || kind==='ability' || kind==='item' ? '' : input.value));
   input.addEventListener('input',()=>open(input.value));
   input.addEventListener('blur',()=>{if(activeUsagePicker?.input===input) closeUsagePicker();});
   input.addEventListener('keydown',event=>{
@@ -1058,7 +1074,7 @@ function updateUsagePicker() {
   if(input.id==='pokemonSearchInput') {state.searchQuery=picker.query;state.searchResults=items;state.searchCursor=cursor;}
   const snapshot=window.META_USAGE?.formats[state.format];
   popup.innerHTML=`<div class="choice-source">${escapeHtml(picker.hint || `${state.format} · ${snapshot?.month || ''} Showdown usage`)}</div>`
-    +(items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="usage-choice-${index}" data-choice-index="${index}" class="${kind==='pokemon' ? 'search-item' : kind==='ability' ? 'ability-choice' : 'move-choice'} usage-choice ${index===cursor ? 'active' : ''}">${picker.markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>');
+    +(items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="usage-choice-${index}" data-choice-index="${index}" class="${kind==='pokemon' ? 'search-item' : kind==='ability' ? 'ability-choice' : kind==='item' ? 'item-choice' : 'move-choice'} usage-choice ${index===cursor ? 'active' : ''}">${picker.markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>');
   for(const row of popup.querySelectorAll('[data-choice-index]')) {
     row.addEventListener('pointerdown',event=>event.preventDefault());
     row.addEventListener('click',()=>{const item=items[Number(row.dataset.choiceIndex)];closeUsagePicker();picker.choose(item);});
@@ -1101,6 +1117,8 @@ function commitTeamInvestment(entry, stat, rawValue) {
   if (row) {
     row.querySelector(`input[data-stat="${stat}"]`).value = next[stat];
     row.querySelector('.points-readout strong').textContent = getTotalInvestment(entry);
+    for(const output of row.querySelectorAll('[data-stat-total]')) output.textContent=getEffectiveStat(entry,output.dataset.statTotal);
+    row.querySelector('[data-clear-investments]').disabled=!getTotalInvestment(entry);
   }
   renderActiveSummary();
   renderSpeedSummary();
@@ -1123,6 +1141,7 @@ function buildSetEditor(entry, index, side) {
   const attr = `data-set-side="${side}" data-set-index="${index}"`;
   return `<details class="set-editor"${side==='our' && teamSetEditorExpanded ? ' open' : ''}><summary>Edit ${side === 'our' ? 'Pokémon & moves' : 'opponent set'}</summary>
     <label class="field-label">Pokémon<input type="text" list="speciesList" value="${escapeHtml(entry.name)}" ${attr} data-set-field="name" /></label>
+    ${side==='our' ? `<label class="field-label">Nickname<input type="text" maxlength="40" placeholder="${escapeHtml(entry.name)}" value="${escapeHtml(entry.nickname || '')}" ${attr} data-set-field="nickname" /></label>` : ''}
     <label class="field-label">Ability<input type="text" value="${escapeHtml(activeAbility || '')}" ${attr} data-set-field="ability" /></label>
 
     ${Array.from({length: 4}, (_, i) => `<label class="field-label">Move ${i + 1}<input type="text" value="${escapeHtml(entry.moveSet[i] || '')}" ${attr} data-set-field="move-${i}" /></label>`).join('')}
@@ -1164,9 +1183,11 @@ function bindSetEditors(container) {
       if (field === 'name') {
         const species = getPokemonByName(input.value);
         if (!species) { input.value = entry.name; return; }
-        team[index] = sanitizeTeamEntry({...entry, name: species.name, ability: species.abilities[0],
+        const previous=getPokemonByName(entry.name);
+        const cosmeticChange=(previous.cosmeticBaseId || previous.id)===(species.cosmeticBaseId || species.id);
+        team[index] = sanitizeTeamEntry({...entry, name: species.name, ability:cosmeticChange ? entry.ability : species.abilities[0],
           item: getPokemonByName(entry.name).isMega && !species.isMega ? '' : entry.item,
-          moveSet: species.moves, damageMultiplier: 1});
+          moveSet:cosmeticChange ? entry.moveSet : species.moves, damageMultiplier: 1});
         if(side==='our' && state.teamOffenseExcluded.has(entry)) state.teamOffenseExcluded.add(team[index]);
       } else if(field==='ability' && side==='our' && battleSpecies(entry,'our').megaStoneName) {
         getPreferences(entry,'our').baseAbilityChoice=input.value;savePreferences();
@@ -1230,7 +1251,7 @@ function renderTeam() {
       const minusValue = entry.nature?.minus || '';
       const statFields = statOrder.map((stat) => `
         <div class="input-block">
-          <label for="team-${actualIndex}-${stat}">${statLabels[stat]}</label>
+          <label class="stat-investment-label" for="team-${actualIndex}-${stat}">${statLabels[stat]} <output data-stat-total="${stat}" title="${stat==='spe' ? 'Actual Speed after investment, nature, held item and active weather/terrain abilities; before temporary stages' : `Actual ${statLabels[stat]} after investment and nature, before temporary stages or item and ability modifiers`}">${getEffectiveStat(entry,stat)}</output></label>
           <input
             id="team-${actualIndex}-${stat}"
             type="text"
@@ -1254,7 +1275,7 @@ function renderTeam() {
           <div class="team-main">
             <div class="team-top-row">
               <div>
-                <div class="pokemon-name">${entry.name}</div>
+                <div class="pokemon-name" title="${escapeHtml(entry.name)}">${escapeHtml(pokemonDisplayName(entry))}</div>
                 <div class="pokemon-type">${entry.types.join(' / ')}</div>
               </div>
               <div class="team-member-actions">${knownItemMarkup(entry)}<span class="column-tag">${actualIndex + 1}</span>
@@ -1262,6 +1283,7 @@ function renderTeam() {
                 <button type="button" class="control-btn delete" data-remove-team-index="${actualIndex}"
                   aria-label="Remove ${escapeHtml(entry.name)} from team">×</button></div>
             </div>
+            <div class="investment-heading"><span>Stat Investments</span><button type="button" class="mini-button clear-investments" data-clear-investments="${actualIndex}" ${!total ? 'disabled' : ''} title="Clear all six investments; keep the nature, item, ability and moves">Clear Investments</button></div>
             <div class="stat-grid">${statFields}</div>
             <div class="team-bottom-row">
               <div class="input-block">
@@ -1281,14 +1303,10 @@ function renderTeam() {
                 <label>Item</label>
                 <input
                   class="searchable-input"
-                  list="itemList-${actualIndex}"
                   value="${escapeHtml(entry.item)}"
                   data-team-index="${actualIndex}"
                   data-field="item"
                 />
-                <datalist id="itemList-${actualIndex}">
-                  ${itemOptions.map((item) => `<option value="${item}"></option>`).join('')}
-                </datalist>
               </div>`}
             </div>
                 <div class="nature-toggle-row">
@@ -1332,7 +1350,18 @@ function renderTeam() {
     });
   });
 
+  container.querySelectorAll('[data-clear-investments]').forEach(button=>button.addEventListener('click',()=>{
+    const entry=state.ourTeam[Number(button.dataset.clearInvestments)];
+    entry.investment=defaultInvestment();saveTeamToStorage();render();
+  }));
   container.querySelectorAll('input[data-stat]').forEach((input) => {
+    input.addEventListener('focus',()=>input.select());
+    input.addEventListener('input',()=>{
+      const entry=state.ourTeam[Number(input.dataset.teamIndex)],stat=input.dataset.stat;
+      const other=statOrder.filter(key=>key!==stat).reduce((sum,key)=>sum+entry.investment[key],0);
+      const investment={...entry.investment,[stat]:Math.min(sanitizeNumericDraft(input.value),MAX_TEAM_POINTS-other)};
+      input.closest('.input-block').querySelector('[data-stat-total]').textContent=getEffectiveStat({...entry,investment},stat);
+    });
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
@@ -1366,6 +1395,12 @@ function renderTeam() {
     button.addEventListener('click', () => removeTeamPokemon(Number(button.dataset.removeTeamIndex)));
   });
 
+  container.querySelectorAll('input[data-field="item"]').forEach(input=>{
+    const entry=state.ourTeam[Number(input.dataset.teamIndex)];
+    bindUsagePicker(input,{kind:'item',choices:query=>buildItemChoices(battleSpecies(entry,'our'),query),markup:itemChoiceMarkup,
+      hint:`${state.format} item usage · ${getUsage(getPokemonByName(entry.name))?.name || entry.name}`,
+      choose:item=>updateItem(entry,item.value)});
+  });
   container.querySelectorAll('input[data-field]').forEach((input) => {
     input.addEventListener('change', (event) => {
       const teamIndex = Number.parseInt(event.target.getAttribute('data-team-index'), 10);
@@ -1416,8 +1451,8 @@ function resetBattle() {
 function knownItemMarkup(entry) {
   if(savedSpecies(entry)?.isMega) return megaStoneMarkup(entry,'our');
   if(!entry.item) return '';
-  const image=window.ITEM_SPRITES?.[entry.item],hint=window.ITEM_HINTS[calc.toID(entry.item)];
-  const label=`${entry.item}${hint ? `. ${hint.description}` : ''}`;
+  const image=window.ITEM_SPRITES?.[entry.item],hint=window.ITEM_HINTS[calc.toID(entry.item)] || {description:window.ITEM_DESCRIPTIONS?.[calc.toID(entry.item)]};
+  const label=`${entry.item}${hint?.description ? `. ${hint.description}` : ''}`;
   return `<span class="item-hint known-item" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(entry.item)}" />` : `<small>${escapeHtml(entry.item)}</small>`}</span>`;
 }
 function megaStoneMarkup(entry,side) {
@@ -1428,7 +1463,7 @@ function megaStoneMarkup(entry,side) {
 }
 function pokemonListHeading(entry,index,remove=false,ours=false) {
   return `<div class="opponent-name-block"><div class="opponent-name-line">
-    <div class="pokemon-identity"><div class="pokemon-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</div><div class="pokemon-type">${entry.types.join(' / ')}</div></div>
+    <div class="pokemon-identity"><div class="pokemon-name" title="${escapeHtml(entry.name)}">${escapeHtml(pokemonDisplayName(entry))}</div><div class="pokemon-type">${entry.types.join(' / ')}</div></div>
     ${ours ? knownItemMarkup(entry) : buildItemHints(entry)}<span class="column-tag">${index+1}</span>${ours ? teamOrderControls(entry,index) : ''}
     ${remove ? `<button type="button" class="control-btn" data-opponent-action="up" data-opponent-index="${index}" ${index===0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(entry.name)} earlier">↑</button><button type="button" class="control-btn" data-opponent-action="down" data-opponent-index="${index}" ${index===state.opponentList.length-1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(entry.name)} later">↓</button><button type="button" class="control-btn delete" data-opponent-action="delete" data-opponent-index="${index}" title="Remove ${escapeHtml(entry.name)}" aria-label="Remove ${escapeHtml(entry.name)} from opposition">✕</button>` : ''}
     </div></div>`;
@@ -1521,7 +1556,7 @@ function buildActiveSummaryMarkup(entry) {
   return `
     <img src="${getPokemonImage(entry.name)}" alt="${entry.name}" />
     <div class="summary-meta">
-      <div class="summary-name">${entry.name}</div>
+      <div class="summary-name" title="${escapeHtml(entry.name)}">${escapeHtml(pokemonDisplayName(entry))}</div>
       <div class="summary-types">${entry.types.join(' / ')}</div>
       <div class="summary-item">${entry.kind === 'opponent' ? (opponentItem ? `${escapeHtml(opponentItem)} selected` : 'No assumed moves, investment or item') : `${escapeHtml(entry.item)} • ${escapeHtml(entry.nature.name)}`}</div>
     </div>
@@ -1541,7 +1576,7 @@ function renderActiveSummary() {
 }
 
 function speedEstimateText(estimate) {
-  return !estimate ? '—' : estimate.chance>0 && estimate.chance<0.001 ? '<0.1%'
+  return !estimate ? '' : estimate.chance>0 && estimate.chance<0.001 ? '<0.1%'
     : `${Number((estimate.chance*100).toFixed(1))}%`;
 }
 function speedEstimateDescription(estimate) {
@@ -1581,8 +1616,8 @@ function renderSpeedSummary() {
     const showEstimate=tier.kind==='nature' || species.stats.spe===battleSpecies(ourEntry,'our').stats.spe;
     const estimate=showEstimate ? Battle.speedUsageChance(species,{...opponentEntry,speedStage:getPreferences(opponentEntry,'opponent').speedStage,ability,item:scenario.item},targetSpeed,
       getUsage(species),{...field,tailwind:!!scenario.tailwind}) : null;
-    const percent=showEstimate ? `<span class="speed-chance" title="${escapeHtml(speedEstimateDescription(estimate))}">${speedEstimateText(estimate)}</span>` : '';
-    const detail=`Opponent relative to our exact build (Speed ${targetSpeed}). Weather: ${field.weather || 'None'}; Terrain: ${field.terrain || 'None'}. Opponent ability: ${ability || 'not assumed'}.`;
+    const percent=showEstimate && estimate ? `<span class="speed-chance" title="${escapeHtml(speedEstimateDescription(estimate))}">${speedEstimateText(estimate)}</span>` : '';
+    const detail=`Opponent relative to our exact build (Speed ${targetSpeed}). Weather: ${field.weather || 'None'}; Terrain: ${field.terrain || 'None'}. Opponent ability: ${ability || 'not assumed'}.${showEstimate ? ` ${speedEstimateDescription(estimate)}` : ''}`;
     return `<div class="speed-scenario" title="${escapeHtml(detail)}"><dt>${scenario.label}</dt><dd><strong class="speed-tier">${tier.label}</strong>${percent}</dd></div>`;
   }).join('');
 }
@@ -1761,7 +1796,7 @@ function renderBuilderOffense(selected) {
   renderBuilderScore(baseline,rows);
   if ((moveTrial.enabled && moveTrial.best) || removingInvestment) rows=highlightTierChanges(rows,baseline);
   rows=annotateOffenseThresholds(preview,thresholdStats,rows);
-  document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>ATK ${getEffectiveStat(preview,'atk')} · SPA ${getEffectiveStat(preview,'spa')}</span>`;
+  document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>ATK ${getEffectiveStat(preview,'atk')} · SPA ${getEffectiveStat(preview,'spa')}</span>`;
   renderOffenseRows(rows,`${state.activeTeamId}:${state.activeOurIndex}:${selected.id}:${state.format}:${state.builderTopN}`,
     '');
 }
@@ -1797,24 +1832,24 @@ function renderOffenseRows(rows,key,context = '',groups = Offense.groups) {
       const thresholds=(member.statThresholds || []).map(threshold=>{
         const label={atk:'Atk',spa:'SpA',defense:'Def SP'}[threshold.stat];
         const delta=threshold.low===threshold.high ? `${threshold.high}` : `${threshold.low}–${threshold.high}`;
-        const text=threshold.pending ? `${label} …` : threshold.error ? `${label} ?` : threshold.high ? `−${delta} ${label}` : `${label} —`;
+        const text=threshold.pending ? `${label} …` : threshold.error ? `${label} ?` : threshold.high ? `−${delta} ${label}` : '';
         const explanation=threshold.pending ? `${label}: calculating a shared stat-removal path.` : threshold.error ? `${label}: threshold unavailable.`
           : threshold.high ? `${label}: ${threshold.low===threshold.high ? threshold.high : `${threshold.low}–${threshold.high}`} additional points removed changes this tier to ${names[threshold.kind]}. ${threshold.stat==='defense' ? 'Along a shared locally optimal HP/Def/SpD removal path.' : 'Approximate six-point bracket, holding the other preview stats and moves fixed.'}`
           : `${label}: no tier change within ${threshold.limit} remaining removable points on the shared path.`;
         return {text,explanation,stat:threshold.stat};
       });
       const showChance=state.builderPanel!=='balance',chance=showChance ? Offense.tierProbability(member) : null;
-      const chanceText=chance===null ? '—' : chance>0 && chance<0.001 ? '<0.1%' : `${(100*chance).toFixed(1).replace(/\.0$/,'')}%`;
+      const chanceText=chance===null ? '' : chance>0 && chance<0.001 ? '<0.1%' : `${(100*chance).toFixed(1).replace(/\.0$/,'')}%`;
       const hits=Offense.tierHits(member.kind),koTarget=state.builderPanel==='defense' ? 'opponent KOing us' : 'KOing the opponent';
       const chanceDetail=showChance ? chance===null ? 'KO probability unavailable for this matchup.'
         : `${chanceText} chance of ${koTarget} ${hits===Infinity ? 'eventually (4+ tier or better)' : `within ${hits} attack${hits===1 ? '' : 's'}`}, weighted by reported builds and damage rolls${state.builderPanel==='defense' ? ' and estimated strongest-move availability' : ''}. ${member.accuracyMode==='multi-hit' ? 'Includes multi-hit accuracy and hit-count probabilities; a complete attack counts as one KO attempt.' : 'Excludes accuracy.'} Excludes healing.` : '';
       const description = `${assumption}${member.species.name} · ${state.format} usage #${member.rank} · ${names[member.kind]}${showChance ? ` · ${chanceDetail}` : ''}${changed ? ` · Preview: ${names[changed]} → ${names[member.kind]}` : ''}${thresholds.length ? ` · ${thresholds.map(t=>t.explanation).join(' ')}` : ''} · ${detail}`;
       const hasModeled=member.samples>(member.unknown || 0);
-      const winText=hasModeled ? `${(100*member.wins/member.samples).toFixed(1).replace(/\.0$/,'')}%` : '—';
-      const winBadge=state.builderPanel==='balance' ? `<span class="balance-win-badge" aria-label="Estimated win percentage">${winText}</span>` : '';
-      const chanceBadge=showChance ? `<span class="ko-chance-badge" title="${escapeHtml(chanceDetail)}" aria-label="${escapeHtml(chanceDetail)}">${chanceText}</span>` : '';
-      return `<span class="tier-pokemon${builderReferences.has(member.species.id) ? ' reference-highlighted' : ''}${showChance ? ' has-ko-chance' : ''}${scenario?.active ? ` field-assumed field-${scenario.value.toLowerCase()}` : ''}${changed ? ` tier-changed ${better ? 'tier-improved' : 'tier-worsened'}` : ''}" ${referenceAttributes(member.species.id)} data-scenario-id="${escapeHtml(member.scenarioId || member.species.id)}" data-scenario-weight="${member.weight ?? 1}" ${scenario ? `data-field-active="${scenario.active}"` : ''} ${changed ? `data-baseline-tier="${changed}"` : ''} data-offense-species="${escapeHtml(member.species.id)}" ${state.builderPanel === 'defense' ? `data-defense-species="${escapeHtml(member.species.id)}"` : state.builderPanel === 'balance' ? `data-balance-species="${escapeHtml(member.species.id)}"` : ''} title="${escapeHtml(description)}">
-        <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${winBadge}${chanceBadge}${thresholds.length ? `<span class="stat-thresholds">${thresholds.map(t=>`<span class="stat-threshold-badge" data-stat-threshold="${t.stat}">${escapeHtml(t.text)}</span>`).join('')}</span>` : ''}</span>`;
+      const winText=hasModeled ? `${(100*member.wins/member.samples).toFixed(1).replace(/\.0$/,'')}%` : '';
+      const winBadge=state.builderPanel==='balance' && hasModeled ? `<span class="balance-win-badge" aria-label="Estimated win percentage">${winText}</span>` : '';
+      const chanceBadge=showChance && chance!==null ? `<span class="ko-chance-badge" title="${escapeHtml(chanceDetail)}" aria-label="${escapeHtml(chanceDetail)}">${chanceText}</span>` : '';
+      return `<span class="tier-pokemon${builderReferences.has(member.species.id) ? ' reference-highlighted' : ''}${showChance && chance!==null ? ' has-ko-chance' : ''}${scenario?.active ? ` field-assumed field-${scenario.value.toLowerCase()}` : ''}${changed ? ` tier-changed ${better ? 'tier-improved' : 'tier-worsened'}` : ''}" ${referenceAttributes(member.species.id)} data-scenario-id="${escapeHtml(member.scenarioId || member.species.id)}" data-scenario-weight="${member.weight ?? 1}" ${scenario ? `data-field-active="${scenario.active}"` : ''} ${changed ? `data-baseline-tier="${changed}"` : ''} data-offense-species="${escapeHtml(member.species.id)}" ${state.builderPanel === 'defense' ? `data-defense-species="${escapeHtml(member.species.id)}"` : state.builderPanel === 'balance' ? `data-balance-species="${escapeHtml(member.species.id)}"` : ''} title="${escapeHtml(description)}">
+        <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${winBadge}${chanceBadge}${thresholds.some(t=>t.text) ? `<span class="stat-thresholds">${thresholds.filter(t=>t.text).map(t=>`<span class="stat-threshold-badge" data-stat-threshold="${t.stat}">${escapeHtml(t.text)}</span>`).join('')}</span>` : ''}</span>`;
     }).join('');
     return `<section class="builder-tier-group" data-offense-group="${group.kind}"><h3>${group.kind === 'guaranteed-ohko' ? 'Nearly Guaranteed OHKO<sup class="ko-caveat" tabindex="0" title="Based on reported statistical usage spreads, not the maximum possible bulk. Unreported builds may survive." aria-label="Based on usage spreads, not maximum possible bulk">?</sup>' : group.label}${state.builderPanel==='balance' ? '' : `<small class="tier-point-value">${Offense.points(group)} points</small>`}<span class="offense-tier-count">${members.length}</span></h3><div class="tier-icon-cloud">${icons}</div></section>`;
   }).join('');
@@ -1835,7 +1870,7 @@ function teamOffenseRows(profiles,preview = true) {
     const results = selected.map(({entry,index}) => {
       const moves = [...entry.moveSet],trial = teamMoveTrials.get(index);
       if (preview && trial?.enabled && trial.best) moves[trial.best.slot] = trial.best.to;
-      return {...Offense.best(moves.map(name => profiles[index][targetIndex].evaluate(name))),attacker:entry.name};
+      return {...Offense.best(moves.map(name => profiles[index][targetIndex].evaluate(name))),attacker:pokemonDisplayName(entry)};
     });
     return {scenarioId:profile.scenarioId,scenario:profile.scenario,weight:profile.weight,species:profile.species,reference:profile.reference,rank:profile.rank,...Offense.best(results)};
   });
@@ -1846,7 +1881,7 @@ function renderTeamMoveTrials() {
     const text = trial?.best ? `Try <b>${escapeHtml(trial.best.to)}</b> <span class="swap-over">over ${escapeHtml(trial.best.from)}</span>`
       : trial?.finished ? 'No move swap improves team coverage.' : 'Finding best move swap…';
     return `<label class="team-move-trial ${trial?.enabled ? 'preview-active' : ''}"><input type="checkbox" data-team-move-trial="${index}" ${trial?.enabled ? 'checked' : ''} ${trial?.best && trial.finished ? '' : 'disabled'} />
-      <strong>${escapeHtml(entry.name)}</strong><span class="swap-description">${text}</span>${trial?.best ? `<small>+${trial.best.gain.toFixed(1)} points</small>` : ''}</label>`;
+      <strong>${escapeHtml(pokemonDisplayName(entry))}</strong><span class="swap-description">${text}</span>${trial?.best ? `<small>+${trial.best.gain.toFixed(1)} points</small>` : ''}</label>`;
   }).join('');
 }
 function prepareTeamMoveTrials(profiles) {
@@ -1888,7 +1923,7 @@ function renderTeamOffense() {
     Number(state.teamOffenseExcluded.has(a.entry))-Number(state.teamOffenseExcluded.has(b.entry)));
   document.getElementById('teamOffenseMembers').innerHTML = ordered.map(({entry,index}) =>
     `<button type="button" class="mini-button team-offense-member" data-team-offense-member="${index}" aria-pressed="${!state.teamOffenseExcluded.has(entry)}">
-      <img src="${getPokemonImage(battleSpecies(entry,'our').name)}" alt="" />${escapeHtml(battleSpecies(entry,'our').name)}</button>`).join('');
+      <img src="${getPokemonImage(battleSpecies(entry,'our').name)}" alt="" />${escapeHtml(entry.nickname || battleSpecies(entry,'our').name)}</button>`).join('');
   const key = JSON.stringify([state.activeTeamId,state.format,state.builderTopN,members.map(m=>m.index)]);
   const preview=teamOffenseRows(profiles),baseline=teamOffenseRows(profiles,false);
   renderBuilderScore(baseline,preview);
@@ -1986,7 +2021,7 @@ function renderBuilderDefense(selected) {
     } catch(error) {fail(error.message);}
   }
   const investment=trial.enabled && trial.best ? trial.best.investment : selected.investment;
-  document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>HP ${getEffectiveStat({...selected,investment},'hp')} · Def ${getEffectiveStat({...selected,investment},'def')} · Sp. Def ${getEffectiveStat({...selected,investment},'spd')}</span>`;
+  document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>HP ${getEffectiveStat({...selected,investment},'hp')} · Def ${getEffectiveStat({...selected,investment},'def')} · Sp. Def ${getEffectiveStat({...selected,investment},'spd')}</span>`;
   if (trial.baselineRows) {
     let rows=trial.enabled && trial.best ? highlightTierChanges(trial.previewRows,trial.baselineRows) : trial.baselineRows;
     if (trial.enabled && trial.best) rows=rows.map(row=>({...row,statThresholds:[trial.thresholds?.[row.scenarioId || row.species.id] || {stat:'defense',pending:true}]}));
@@ -2069,7 +2104,7 @@ function renderBalanceResults() {
   const selected=state.ourTeam[state.activeOurIndex];
   if(selected) {
     const build=balanceOptimization.enabled && balanceOptimization.best ? {...selected,investment:balanceOptimization.best.investment} : selected;
-    document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>${statOrder.map(stat=>`${statLabels[stat]} ${getEffectiveStat(build,stat)}`).join(' · ')}</span>`;
+    document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>${statOrder.map(stat=>`${statLabels[stat]} ${getEffectiveStat(build,stat)}`).join(' · ')}</span>`;
   }
   renderOffenseRows(rows,`balance:${state.activeTeamId}:${state.activeOurIndex}:${state.format}:${state.builderTopN}`,'',Balance.groups);
   const status=document.getElementById('builderBalanceStatus');
@@ -2130,7 +2165,7 @@ function renderBuilderBalance(selected) {
       worker.postMessage(job);
     } catch(error) {fail(error.message);}
   }
-  document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>${statOrder.map(stat=>`${statLabels[stat]} ${getEffectiveStat(selected,stat)}`).join(' · ')}</span>`;
+  document.getElementById('builderSelectedSummary').innerHTML=`<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>${statOrder.map(stat=>`${statLabels[stat]} ${getEffectiveStat(selected,stat)}`).join(' · ')}</span>`;
   renderBalanceResults();
 }
 
@@ -2221,26 +2256,28 @@ function renderTeamBuilder() {
   if (balance) { renderBuilderBalance(selected);return; }
   if (defense) { renderBuilderDefense(selected);return; }
   if (offense) {
-    summary.innerHTML = `<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>ATK ${getEffectiveStat(selected,'atk')} · SPA ${getEffectiveStat(selected,'spa')}</span>`;
+    summary.innerHTML = `<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>ATK ${getEffectiveStat(selected,'atk')} · SPA ${getEffectiveStat(selected,'spa')}</span>`;
     renderBuilderOffense(selected);return;
   }
   const data = Battle.builderSpeedGroups(builderRoster(species),species,{...battleEntry(selected),speedStage:getPreferences(selected,'our').speedStage},{...state,opponentAbility:appliedOpponentAbility,opponentSpeedStage:getPreferences(selected,'our').builderOpponentSpeedStage});
-  summary.innerHTML = `<strong>${escapeHtml(battleSpecies(selected,'our').name)}</strong><span>Speed <b>${data.target}</b> · ${selected.investment.spe} SP · ${escapeHtml(selected.nature.name)}</span>`;
+  summary.innerHTML = `<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>Speed <b>${data.target}</b> · ${selected.investment.spe} SP · ${escapeHtml(selected.nature.name)}</span>`;
   summary.append(document.getElementById('builderStages'));
   const icon = member => {
     const rank = member.species.usage?.[state.format]?.rank;
     let description = `${member.species.name} · Base Speed ${member.baseSpeed} · ${member.tie ? 'Same base Speed. ' : ''}${member.tier.label}${rank ? ` · ${state.format} usage #${rank}` : ''} · Weather: ${member.weather || 'None'}; Terrain: ${member.terrain || 'None'} · Opponent ability: ${member.ability || 'not assumed'}`;
     const showEstimate=member.tier.kind==='nature' || member.tie;
-    const chanceBadge=showEstimate
+    const chanceBadge=showEstimate && member.speedEstimate
       ? `<span class="speed-chance-badge" title="${escapeHtml(speedEstimateDescription(member.speedEstimate))}">${speedEstimateText(member.speedEstimate)}</span>` : '';
     if(showEstimate) description+=` · ${speedEstimateDescription(member.speedEstimate)}`;
-    const showBadge=member.baseSpeed<data.baseSpeed && !(member.tier.kind==='always-slower' && member.outspeedPoints===0);
+    const investmentEligible=member.baseSpeed<data.baseSpeed && !(member.tier.kind==='always-slower' && member.outspeedPoints===0);
+    const showBadge=investmentEligible && member.outspeedPoints!==null;
     const investmentTip=showBadge && member.outspeedPoints!==null
       ? `${member.outspeedPoints>32 ? 'With a Speed-boosting nature · ' : ''}Invest ${member.outspeedPoints} or more to always be faster` : '';
     if(investmentTip) description+=` · ${investmentTip}`;
-    const speedRequirement=member.outspeedPoints===null ? 'Cannot always outspeed even with 32 Speed SP and a Speed-boosting nature'
+    const speedRequirement=member.outspeedPoints===null ? `Cannot guarantee outspeeding the opponent’s maximum-Speed build even with 32 Speed SP and a Speed-boosting nature${selected.item ? ` while holding ${selected.item}` : ''}. This does not mean every reported build is faster`
       : `${member.outspeedPoints} neutral-nature-equivalent Speed points to always outspeed${member.outspeedPoints>32 ? '; requires a Speed-boosting nature' : ''}`;
-    const badge=showBadge ? `<span class="speed-investment-badge" title="${escapeHtml(speedRequirement)}; our item and ability versus 32 Speed SP and a Speed-boosting nature, no opponent item, in this field.${investmentTip ? ` ${investmentTip}` : ''}">${member.outspeedPoints===null ? '—' : member.outspeedPoints}</span>` : '';
+    if(investmentEligible && member.outspeedPoints===null) description+=` · ${speedRequirement}.`;
+    const badge=showBadge ? `<span class="speed-investment-badge" title="${escapeHtml(speedRequirement)}; our item and ability versus 32 Speed SP and a Speed-boosting nature, no opponent item, in this field.${investmentTip ? ` ${investmentTip}` : ''}">${member.outspeedPoints}</span>` : '';
 
     return `<span class="tier-pokemon${builderReferences.has(member.species.id) ? ' reference-highlighted' : ''}" ${referenceAttributes(member.species.id)} data-tier-species="${escapeHtml(member.species.id)}" data-required-points="${member.tier.points ?? ''}" title="${escapeHtml(description)}">
       <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${badge}${chanceBadge}</span>`;
@@ -2550,19 +2587,7 @@ function bindStaticControls() {
       document.querySelector(`#${role}StageControl input:checked`)?.focus({preventScroll:true});
     });
   }
-  for (const [id, field] of [['boostNatureToggle', 'defenseNatureChoice'], ['boostOffenseNatureToggle', 'offenseNatureChoice']]) {
-    document.getElementById(id).addEventListener('change', event => {
-      getOpponentPreferences()[field] = event.target.checked;
-      savePreferences();
-      renderDamageRanges();
-    });
-  }
-  document.getElementById('natureUsageDefaultsButton').addEventListener('click', () => {
-    const prefs = getOpponentPreferences();
-    prefs.defenseNatureChoice = prefs.offenseNatureChoice = 'auto';
-    savePreferences();
-    renderDamageRanges();
-  });
+
 }
 
 function setupItemHighlightEditor() {
@@ -2750,7 +2775,7 @@ function calculateMoveRange(attacker, defender, moveName, defenseInvestment = nu
       attackerAlliesFainted:attacker.kind === 'opponent' ? state.opponentsFainted : state.alliesFainted,...options});
 }
 function formatPercent(value) { return `${Math.floor((value + Number.EPSILON) * 10) / 10}%`; }
-function incomingThreats(opponent, ours) {
+function incomingThreats(opponent, ours, boostNature = null) {
   const species = battleSpecies(opponent,'opponent');
   const usage = getUsage(species);
   const ourSpecies = battleSpecies(ours,'our');
@@ -2764,7 +2789,7 @@ function incomingThreats(opponent, ours) {
   const candidates = [...new Set(species.learnset)].map(name => {
     const meta = Battle.moveMeta(name);
     if (!meta) return null;
-    const moveOptions = {...options, boostOffenseNature: natureBoostForMove(opponent, 'offense', meta.offensiveStat)};
+    const moveOptions = {...options, boostOffenseNature: boostNature ?? natureBoostForMove(opponent, 'offense', meta.offensiveStat)};
     const conditional = ['Counter', 'Mirror Coat', 'Metal Burst', 'Comeuppance', 'Guillotine',
       'Fissure', 'Horn Drill', 'Sheer Cold', 'Bide'].includes(meta.name);
     const comparison = conditional ? {ceiling: {error: 'Requires turn context / OHKO rules', meta}}
@@ -2776,25 +2801,81 @@ function incomingThreats(opponent, ours) {
   const spreads = [...(usage?.spreads || [])].sort((a,b) => (b.percent ?? -1) - (a.percent ?? -1) || a.rank - b.rank);
   return Battle.selectThreats(candidates).map(row => row.range.error ? {...row, scenarios: []} : {
     ...row, ...Battle.incomingScenarios(species, ourSpecies, ours, row.name, spreads,
-      {...options, boostOffenseNature: natureBoostForMove(opponent, 'offense', row.range.meta.offensiveStat)})});
+      {...options, boostOffenseNature: boostNature ?? natureBoostForMove(opponent, 'offense', row.range.meta.offensiveStat)})});
 }
 function spreadLabel(investment) {
   return `SP (HP/Atk/Def/SpA/SpD/Spe): ${statOrder.map(stat => investment[stat]).join('/')}`;
 }
-function incomingScenarioMarkup(row) {
-  const damage = range => range.error ? escapeHtml(range.error)
-    : `${formatPercent(range.low)}–${formatPercent(range.high)}`;
-  if (row.range.error) return `<div class="defense-line"><strong>${damage(row.range)}</strong></div>`;
-  const spreadRow = scenario => `<div class="defense-line spread-scenario">
-    <span>${scenario.percent === null ? 'Spread usage not reported' : `${scenario.percent}% of sets`} · reported spread #${scenario.rank}</span>
-    <strong>${damage(scenario.range)}</strong><small>${spreadLabel(scenario.investment)}</small></div>`;
-  const first = row.scenarios[0];
-  const rest = row.scenarios.slice(1);
-  const ceiling = `<div class="defense-line offense-ceiling"><span>Maximum-offense ceiling</span>
-    <strong>${damage(row.ceiling)}</strong><small>${spreadLabel(row.ceilingInvestment)}</small></div>`;
+function natureFrequencyMarkup(opponent,stat) {
+  const percent=natureUsage(opponent,stat);
+  if(percent===null) return '';
+  const label=statLabels[stat] || stat;
+  const description=`${percent}% of reported ${state.format} nature usage boosts the opponent’s ${label}. Adds together all natures boosting this stat; separate from stat-spread usage.`;
+  return `<span class="nature-frequency" data-nature-stat="${escapeHtml(stat)}" title="${escapeHtml(description)}"><b>${percent}%</b></span>`;
+}
+function natureRangeMarkup(neutral,boosted,stat,role,opponent) {
+  const row=(range,isBoosted)=>{
+    const label=isBoosted ? `+${statLabels[stat] || stat}` : 'Neutral';
+    const split=range.allocation;
+    const description=`Opponent ${isBoosted ? `nature boosts ${statLabels[stat] || stat} by 10%` : 'has no nature boost to the relevant stat'}.${split ? ` Optimal split: HP ${split.hp} / ${statLabels[split.stat]} ${split.defense}.` : ''}${role==='defense' ? ' Other stats remain neutral; our build stays exact.' : ' Uses the same reported investment; our build stays exact.'}`;
+    return `<div class="nature-damage-row" data-nature="${isBoosted ? 'boosted' : 'neutral'}" title="${escapeHtml(description)}"><span class="nature-row-label"><span class="nature-stat-name">${label}</span>${isBoosted ? natureFrequencyMarkup(opponent,stat) : ''}</span><strong>${range.error ? escapeHtml(range.error) : `${formatPercent(range.low)}–${formatPercent(range.high)}`}</strong></div>`;
+  };
+  return `<div class="nature-damage-pair">${row(neutral,false)}${row(boosted,true)}</div>`;
+}
+function groupIncomingScenarios(scenarios) {
+  // Both displayed nature ranges must match; source spreads and weights stay intact.
+  const groups=new Map();
+  const rangeKey=range=>range?.error ? ['error',range.error] : range ? [formatPercent(range.low),formatPercent(range.high)] : null;
+  for(const scenario of scenarios) {
+    const key=JSON.stringify([rangeKey(scenario.range),rangeKey(scenario.boostedRange)]);
+    if(!groups.has(key)) groups.set(key,{...scenario,percent:null,spreads:[],unreported:0});
+    const group=groups.get(key);
+    group.spreads.push(scenario);
+    if(Number.isFinite(scenario.percent)) group.percent=(group.percent ?? 0)+scenario.percent;
+    else group.unreported++;
+  }
+  const ordered=[...groups.values()].sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || (a.rank ?? Infinity)-(b.rank ?? Infinity));
+  const total=ordered.reduce((sum,group)=>sum+(group.percent ?? 0),0);
+  const shares=ordered.map((group,index)=>{
+    const exact=total>0 ? (group.percent ?? 0)*1000/total : 0;
+    return {index,units:Math.floor(exact),remainder:exact-Math.floor(exact)};
+  });
+  // Largest-remainder rounding keeps the displayed tenths summing to 100%.
+  if(total>0) {
+    const remaining=1000-shares.reduce((sum,share)=>sum+share.units,0);
+    [...shares].sort((a,b)=>b.remainder-a.remainder || a.index-b.index).slice(0,remaining).forEach(share=>share.units++);
+  }
+  return ordered.map((group,index)=>({...group,reportedPercent:total>0 && group.percent!==null ? shares[index].units/10 : null,sourceCoverage:total}));
+}
+function incomingScenarioMarkup(row,opponent) {
+  if(row.range.error) return `<div class="defense-line"><strong>${escapeHtml(row.range.error)}</strong></div>`;
+  const stat=row.range.meta.offensiveStat;
+  const spreadRow=scenario=>{
+    const usage=scenario.reportedPercent===null ? 'Usage not reported' : `${scenario.reportedPercent}% of reported sets`;
+    const allocations=scenario.spreads.map(spread=>`${spread.percent===null ? 'Usage not reported' : `${spread.percent}% of source sets`} · ${spreadLabel(spread.investment)}`).join('\n');
+    const basis=`Normalized across reported spreads with known usage (covering ${Number(scenario.sourceCoverage.toFixed(2))}% of source sets).${scenario.unreported ? ' Spreads without usage weights are excluded from the percentage.' : ''}\n${allocations}`;
+    return `<div class="defense-line spread-scenario" title="${escapeHtml(basis)}"><span>${usage}</span>
+      ${natureRangeMarkup(scenario.range,scenario.boostedRange,stat,'offense',opponent)}</div>`;
+  };
+  const scenarios=groupIncomingScenarios(row.scenarios);
+  const first=scenarios[0],rest=scenarios.slice(1);
+  const ceiling=`<div class="defense-line offense-ceiling"><span>Maximum-offense ceiling</span>${natureRangeMarkup(row.ceiling,row.boostedCeiling,stat,'offense',opponent)}<small>${spreadLabel(row.ceilingInvestment)}</small></div>`;
   return `<div class="incoming-ranges">${first ? spreadRow(first) : '<p class="status-note">Stat-spread usage unavailable.</p>'}${ceiling}</div>
-    ${rest.length ? `<details class="spread-comparisons"><summary>Other reported spreads (${rest.length})</summary>
-      <div class="spread-list">${rest.map(spreadRow).join('')}</div></details>` : ''}`;
+    ${rest.length ? `<details class="spread-comparisons"><summary>Other Damage Ranges (${rest.length})</summary><div class="spread-list">${rest.map(spreadRow).join('')}</div></details>` : ''}`;
+}
+function incomingNatureComparisons(opponent,ours) {
+  const species=battleSpecies(opponent,'opponent'),ourSpecies=battleSpecies(ours,'our');
+  const spreads=[...(getUsage(species)?.spreads || [])].sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || a.rank-b.rank);
+  const options={format:state.format,weather:state.weather,terrain:state.terrain,attackerAlliesFainted:state.opponentsFainted,
+    opponentItem:appliedOpponentItem(opponent),opponentAbility:appliedOpponentAbility(opponent),
+    attackerStages:statStages(opponent,'opponent'),defenderStages:statStages(ours,'our'),boostOffenseNature:false};
+  // Select threats at their boosted ceiling, then compare the same moves/spreads.
+  return incomingThreats(opponent,ours,true).map(boosted=>{
+    if(boosted.range.error) return boosted;
+    const neutral=Battle.incomingScenarios(species,ourSpecies,ours,boosted.name,spreads,options);
+    return {...boosted,...neutral,range:neutral.ceiling,boostedCeiling:boosted.ceiling,
+      scenarios:neutral.scenarios.map((scenario,index)=>({...scenario,boostedRange:boosted.scenarios[index].range}))};
+  });
 }
 const fieldIcons={
   none:'<circle cx="12" cy="12" r="8"/><path d="m6 18 12-12"/>',
@@ -2844,9 +2925,6 @@ function renderDamageRanges() {
   const outgoing = state.damageDirection === 'outgoing';
   renderAbilityAssumption(theirs);
   renderStatStages(ours,theirs);
-  renderNatureFlags(theirs);
-  document.getElementById('boostNatureToggle').disabled = !outgoing || !theirs || !ours;
-  document.getElementById('boostOffenseNatureToggle').disabled = outgoing || !theirs || !ours;
   container.classList.toggle('incoming', !outgoing);
   if (!ours || !theirs) {
     container.innerHTML = '<div class="empty-state">No matchup selected.</div>';
@@ -2859,10 +2937,10 @@ function renderDamageRanges() {
   const moves = outgoing ? ours.moveSet.map(name => {
     const meta = Battle.moveMeta(name);
     const range = calculateMoveRange(ours, theirs, name, 0,
-      {boostDefenseNature: natureBoostForMove(theirs, 'defense', meta?.defensiveStat)});
+      {boostDefenseNature:false});
     return {name, range};
   }).sort((a, b) => (b.range.high ?? -1) - (a.range.high ?? -1)
-    || (b.range.low ?? -1) - (a.range.low ?? -1)) : incomingThreats(theirs, ours);
+    || (b.range.low ?? -1) - (a.range.low ?? -1)) : incomingNatureComparisons(theirs, ours);
   if(moves.some(row=>!row.range.error) && state.view==='battle') window.SiteUsage?.count('matchup',JSON.stringify([
     ours,theirs,state.damageDirection,state.format,state.weather,state.terrain,state.alliesFainted,state.opponentsFainted,
     getPreferences(ours,'our'),getPreferences(theirs,'opponent')
@@ -2873,14 +2951,11 @@ function renderDamageRanges() {
     const scenarios = getDefenseInvestmentLevels();
     const values = outgoing ? scenarios.map(({points,label}) => {
       const range = points === 0 ? row.range : calculateMoveRange(ours, theirs, moveName, points,
-        {boostDefenseNature: natureBoostForMove(theirs, 'defense', meta?.defensiveStat)});
+        {boostDefenseNature:false});
       if (range.meta) meta = range.meta;
-      const allocation = range.allocation;
-      const detail = allocation ? `HP ${allocation.hp} / ${statLabels[allocation.stat]} ${allocation.defense}` : '';
-      return `<div class="defense-line"><span title="${label}">${outgoing ? `${points} SP` : label}</span>
-        <strong>${range.error ? escapeHtml(range.error) : `${formatPercent(range.low)}–${formatPercent(range.high)}`}</strong>
-        ${detail ? `<small class="allocation">${detail}</small>` : ''}</div>`;
-    }).join('') : incomingScenarioMarkup(row);
+      const boosted=calculateMoveRange(ours,theirs,moveName,points,{boostDefenseNature:true});
+      return `<div class="defense-line outgoing-spread"><span title="${label}">${points} SP</span>${natureRangeMarkup(range,boosted,meta?.defensiveStat,'defense',theirs)}</div>`;
+    }).join('') : incomingScenarioMarkup(row,theirs);
     const frequency = outgoing ? '' : `<div class="move-usage"><span>${row.percent === null ? 'Usage not reported' : `${row.percent}% usage`}</span>
       <span>${row.topDamage ? 'Most damaging' : ''}${row.topDamage && row.topCommon ? ' · ' : ''}${row.topCommon ? 'Top 5 damaging by usage' : ''}</span></div>`;
     return `<div class="move-row" data-move="${escapeHtml(moveName)}"><div class="move-row-top"><div class="move-name">${escapeHtml(moveName)}</div>

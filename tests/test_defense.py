@@ -321,7 +321,10 @@ class DefenseTests(unittest.TestCase):
         self.assertEqual(self.evaluate('defenseTrial.searchMode'),'local')
         self.page.locator('#builderDefenseTrial').check()
         self.page.wait_for_function('defenseTrial.thresholds')
-        self.assertEqual(self.page.locator('[data-stat-threshold="defense"]').count(),self.page.locator('[data-defense-species]').count())
+        self.assertTrue(self.evaluate("""() => [...document.querySelectorAll('[data-defense-species]')].every(icon=>{
+          const threshold=defenseTrial.thresholds[icon.dataset.scenarioId];
+          return Boolean(icon.querySelector('[data-stat-threshold="defense"]'))===Boolean(threshold?.high);
+        })"""))
         self.assertTrue(self.evaluate('Object.values(defenseTrial.thresholds).every(t=>t.high ? t.high>=1 && t.high<=17 : t.limit===17)'))
         self.page.locator('#builderDefenseTrial').uncheck()
         self.assertEqual(self.page.locator('[data-stat-threshold]').count(),0)

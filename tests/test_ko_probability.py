@@ -71,12 +71,12 @@ class KOProbabilityTests(unittest.TestCase):
         self.assertEqual(self.page.locator('.ko-chance-badge').count(),icons.count())
         self.assertTrue(self.evaluate("""() => [...document.querySelectorAll('.ko-chance-badge')].every(b=>{
           const badge=b.getBoundingClientRect(),icon=b.parentElement.getBoundingClientRect();
-          return badge.left-icon.left<8 && icon.bottom-badge.bottom<8 && /^([0-9]+(\\.[0-9]+)?%|—)$/.test(b.textContent);
+          return badge.left-icon.left<8 && icon.bottom-badge.bottom<8 && /^([0-9]+(\\.[0-9]+)?%)$/.test(b.textContent);
         })"""))
         self.page.locator('#builderAttackTrial').check()
         self.page.wait_for_function('offenseThresholdTrial.finished',timeout=20000)
         self.assertTrue(self.evaluate("""() => [...document.querySelectorAll('.has-ko-chance')].every(icon=>
-          icon.querySelector('.ko-chance-badge').getBoundingClientRect().top>=icon.querySelector('.stat-thresholds').getBoundingClientRect().bottom)"""))
+          !icon.querySelector('.stat-thresholds') || icon.querySelector('.ko-chance-badge').getBoundingClientRect().top>=icon.querySelector('.stat-thresholds').getBoundingClientRect().bottom)"""))
         self.page.locator('[data-builder-panel="team-offense"]').click()
         self.assertEqual(self.page.locator('.ko-chance-badge').count(),icons.count())
         self.page.locator('[data-builder-panel="defense"]').click()

@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const type = 'pokelator-pro-teams';
-  const pokemon = entry => ({name: entry.name, item: entry.item, ability: entry.ability,
+  const pokemon = entry => ({name: entry.name, ...(entry.nickname ? {nickname:entry.nickname} : {}), item: entry.item, ability: entry.ability,
     nature: entry.nature, investment: entry.investment, moveSet: entry.moveSet});
   const pack = (teams,includeSaved=false) => ({type, version: 1, teams: teams.map(team => ({name: team.name,
     pokemon: team.pokemon.map(pokemon),...(includeSaved ? {savedPokemon:(team.savedPokemon || team.pokemon).map(pokemon)} : {})}))});

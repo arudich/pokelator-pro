@@ -63,7 +63,7 @@ class UsagePickerTests(unittest.TestCase):
         self.assertIn('30% status (poison/paralysis/sleep)',result['Dire Claw'])
         self.assertIn('95% acc',result['Air Slash'])
         self.assertIn('30% flinch',result['Air Slash'])
-        self.assertIn('Acc —',result['Protect'])
+        self.assertIn('No accuracy check',result['Protect'])
         self.assertNotIn('flinch',result['Earthquake'])
         self.assertIn('2 hits',result['Dual Wingbeat'])
         self.assertIn('2–5 hits',result['Rock Blast'])

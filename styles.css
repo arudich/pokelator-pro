@@ -496,7 +496,7 @@ button:active {
   margin-left: auto;
 }
 
-.stat-stage-controls { display: grid; gap: 8px; }
+.stat-stage-controls { display: grid; gap: 8px; margin-bottom: 10px; }
 .stat-stage-control { border: 0; padding: 0; margin: 0; min-width: 0; }
 .stat-stage-control legend { color: var(--muted); font-size: 0.72rem; padding: 0 0 5px; }
 .stat-stage-options { display: grid; grid-template-columns: repeat(13,minmax(0,1fr)); gap: 2px; }
@@ -842,7 +842,6 @@ button:disabled:hover { transform: none; }
   .active-card-row { grid-template-columns: 1fr; }
 }
 
-.nature-comparisons { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 12px; }
 .move-usage { display: flex; justify-content: space-between; gap: 8px; font-size: 0.68rem; color: var(--muted); }
 #usageReference { margin-bottom: 0; font-size: 0.62rem; }
 a { color: var(--accent); }
@@ -881,9 +880,6 @@ a { color: var(--accent); }
 }
 .damage-list { contain: size; flex: 1 1 auto; }
 .damage-card { min-height: min-content; }
-.nature-usage { display: block; font-size: 0.6rem; line-height: 1.4; max-width: 260px; }
-.nature-comparisons .boosting-check { align-items: flex-start; margin-bottom: 4px; }
-#natureUsageDefaultsButton { align-self: flex-start; margin-bottom: 8px; font-size: 0.65rem; }
 
 .team-library { border-bottom: 2px solid var(--divider); margin: 0 0 12px; padding-bottom: 10px; }
 .team-library summary { display: list-item; cursor: pointer; color: var(--accent); font-size: 0.75rem; }
@@ -1109,3 +1105,27 @@ a { color: var(--accent); }
 .tutorial-dots button[aria-current=true] { opacity:1; background:var(--accent); }
 #tutorialProgress { margin-left:auto; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
 @media(max-width:600px) { .tutorial-dialog { width:calc(100vw - 12px); height:calc(100dvh - 12px); padding:12px; } .tutorial-dialog h2 { margin-top:12px; } #tutorialCaption { font-size:13px; } }
+
+.investment-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:10px 0 6px; color:var(--muted); font-size:.65rem; }
+.clear-investments { padding:3px 7px; font-size:.6rem; }
+.input-block .stat-investment-label { color:var(--text); display:flex; align-items:baseline; justify-content:flex-start; gap:6px; }
+.stat-investment-label output { color:var(--muted); font:inherit; font-variant-numeric:tabular-nums; }
+.item-choice { display:flex; align-items:center; gap:10px; }
+.item-choice-image { width:28px; height:28px; object-fit:contain; flex-shrink:0; }
+
+/* Neutral and boosted opponent natures share each existing spread cell. */
+.damage-list:not(.incoming) .investment-stack { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.outgoing-spread { min-width:0; }
+.nature-damage-pair { width:100%; display:grid; gap:3px; }
+.nature-damage-row { display:flex; justify-content:space-between; align-items:baseline; gap:5px; font-variant-numeric:tabular-nums; }
+.nature-damage-row > span { color:var(--muted); font-size:.58rem; }
+.nature-damage-row > strong { font-size:.65rem; }
+.nature-damage-row[data-nature=boosted] > span { color:var(--accent); }
+@media(max-width:480px) {
+  .nature-damage-row { flex-wrap:wrap; justify-content:center; gap:2px 5px; }
+  .nature-damage-row > strong { font-size:.62rem; }
+}
+
+.nature-row-label { display:inline-flex; align-items:baseline; gap:5px; white-space:nowrap; }
+.nature-frequency { display:inline-flex; color:var(--muted); font-size:inherit; white-space:nowrap; }
+.nature-frequency b { color:var(--muted); font-weight:500; font-variant-numeric:tabular-nums; }

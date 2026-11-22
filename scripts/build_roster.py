@@ -7,7 +7,25 @@ The upstream 'baseStats' values are uninvested level-50 stats, not species bases
 import json
 import csv
 import sys
+import re
+import unicodedata
 from pathlib import Path
+
+
+def cosmetic_choices(pokemon):
+    families=json.loads((Path(__file__).resolve().parents[1]/'config/cosmetic-forms.json').read_text())
+    choices=[]
+    existing={entry['name'] for entry in pokemon}
+    for family in families:
+        base=next((entry for entry in pokemon if entry['name'].startswith(family['base'])),None)
+        if not base:continue
+        for form in family['forms']:
+            name=family['template'].replace('{form}',form)
+            if name in existing:continue
+            slug=re.sub(r'[^A-Za-z0-9]+','-',unicodedata.normalize('NFKD',form).encode('ascii','ignore').decode()).strip('-')
+            choices.append({'name':name,'id':family['base']+'-'+slug,'baseId':base['id'],'form':form,
+                'image':'pokemon_champions_assets/pokemon/'+name+'.png'})
+    return choices
 
 
 def build(index, usage_dir=None):
@@ -96,7 +114,8 @@ def build(index, usage_dir=None):
                                 usage=reference,expectedUsageFormats=sorted({source['format'] for source in record.get('battleDataCsvs',[]) if source['season']=='Current' and not source.get('daily')}))
     return {'source': 'https://championsbattledata.com/data/pokemon-index.json',
             'generatedAt': index['generatedAt'], 'statModel': 'Champions uninvested level 50',
-            'pokemon': sorted(roster.values(), key=lambda p: p['name'])}
+            'pokemon': sorted(roster.values(), key=lambda p: p['name']),
+            'cosmeticForms':cosmetic_choices(list(roster.values()))}
 
 
 if __name__ == '__main__':

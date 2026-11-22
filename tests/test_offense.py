@@ -26,7 +26,10 @@ class OffenseTests(unittest.TestCase):
         self.page.wait_for_function('offenseThresholdTrial.finished',timeout=20000)
         self.assertIsNone(self.evaluate('offenseThresholdTrial.error || null'))
         self.assertLessEqual(self.evaluate('offenseThresholdTrial.sweeps'),7)
-        self.assertEqual(self.page.locator('[data-stat-threshold="atk"]').count(),self.page.locator('[data-offense-species]').count())
+        self.assertTrue(self.evaluate("""() => [...document.querySelectorAll('[data-offense-species]')].every(icon=>{
+          const threshold=offenseThresholdTrial.thresholds[icon.dataset.scenarioId]?.atk;
+          return Boolean(icon.querySelector('[data-stat-threshold="atk"]'))===Boolean(threshold?.high);
+        })"""))
         self.assertTrue(self.evaluate('Object.values(offenseThresholdTrial.thresholds).every(row=>row.atk.high ? row.atk.low>=1 && row.atk.high<=31 && row.atk.high-row.atk.low<=5 : row.atk.limit===31)'))
         self.assertEqual(self.evaluate('JSON.stringify(state.ourTeam)'),before)
         self.page.locator('#builderAttackTrial').uncheck()

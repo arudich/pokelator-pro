@@ -65,10 +65,10 @@ class BuilderDetailTests(unittest.TestCase):
         }""")
         for row in results:
             badge=self.page.locator('[data-tier-species="'+row['name']+'"] .speed-investment-badge')
-            self.assertEqual(badge.count(),1 if row['lower'] and not row['hiddenZero'] else 0)
+            self.assertEqual(badge.count(),1 if row['lower'] and not row['hiddenZero'] and row['actual'] is not None else 0)
             if row['lower'] and not row['hiddenZero']:
                 self.assertEqual(row['actual'],row['expected'])
-                self.assertEqual(badge.inner_text(),'—' if row['actual'] is None else str(row['actual']))
+                if row['actual'] is not None:self.assertEqual(badge.inner_text(),str(row['actual']))
 
     def test_speed_badges_extend_with_nature_and_hide_always_slower_zero(self):
         self.load()

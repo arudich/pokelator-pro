@@ -1,0 +1,39 @@
+[
+  {
+    "base": "Vivillon",
+    "template": "Vivillon {form} Pattern",
+    "forms": [
+      "Archipelago",
+      "Continental",
+      "Elegant",
+      "Garden",
+      "High Plains",
+      "Icy Snow",
+      "Jungle",
+      "Marine",
+      "Meadow",
+      "Modern",
+      "Monsoon",
+      "Ocean",
+      "Polar",
+      "River",
+      "Sandstorm",
+      "Savanna",
+      "Sun",
+      "Tundra",
+      "Fancy",
+      "Pok\u00e9 Ball"
+    ]
+  },
+  {
+    "base": "Florges",
+    "template": "Florges {form} Flower",
+    "forms": [
+      "Red",
+      "Yellow",
+      "Orange",
+      "Blue",
+      "White"
+    ]
+  }
+]

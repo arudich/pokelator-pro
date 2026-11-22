@@ -64,6 +64,13 @@ class AppTests(unittest.TestCase):
     def evaluate(self, code, arg=None):
         return self.page.evaluate(code, arg)
 
+    def set_nature_preference(self, role, choice):
+        # Exercise persisted pre-comparison overrides used by builder calculations.
+        self.evaluate("args=>{getOpponentPreferences()[args.role+'NatureChoice']=args.choice;savePreferences();renderDamageRanges();}",{'role':role,'choice':choice})
+
+    def reset_nature_preferences(self):
+        self.evaluate("getOpponentPreferences().defenseNatureChoice=getOpponentPreferences().offenseNatureChoice='auto';savePreferences();renderDamageRanges()")
+
     def fixture(self):
         self.evaluate('''() => {
           window.sneasler = sanitizeTeamEntry({name:'Sneasler', nature:'Jolly',
@@ -283,16 +290,16 @@ class AppTests(unittest.TestCase):
         self.assertEqual(before,self.evaluate("JSON.stringify([sneasler,kingambit,state.ourTeam])"))
         result=self.evaluate("[false,true].map(boostDefenseNature=>calculateMoveRange(sneasler,kingambit,'Close Combat',null,{boostDefenseNature}).maxDamage)")
         self.assertEqual(result[0],result[1])
-        self.page.locator('#boostNatureToggle').check()
+        self.set_nature_preference('defense',True)
         self.assertTrue(self.evaluate('getOpponentPreferences().defenseNatureChoice'))
-        values=self.page.locator('[data-move="Close Combat"] .defense-line strong').all_text_contents()
-        self.page.locator('#boostNatureToggle').uncheck()
-        baseline=self.page.locator('[data-move="Close Combat"] .defense-line strong').all_text_contents()
+        values=self.page.locator('[data-move="Close Combat"] [data-nature="boosted"] strong').all_text_contents()
+        self.set_nature_preference('defense',False)
+        baseline=self.page.locator('[data-move="Close Combat"] [data-nature="neutral"] strong').all_text_contents()
         for boosted,normal in zip(values,baseline):
             self.assertLessEqual(float(boosted.split('–')[1].strip('%')),float(normal.split('–')[1].strip('%')))
-        self.page.locator('#boostNatureToggle').check()
+        self.set_nature_preference('defense',True)
         self.page.locator('[data-damage-direction="incoming"]').click()
-        self.assertTrue(self.page.locator('#boostNatureToggle').is_disabled())
+        self.assertEqual(self.page.locator('#boostNatureToggle').count(),0)
         self.assertEqual(self.page.locator('.move-row').first.locator('.offense-ceiling').count(),1)
 
     def test_defense_optimizer_matches_exhaustive_valid_spreads(self):
@@ -574,7 +581,7 @@ class AppTests(unittest.TestCase):
         }""")
         self.assertEqual(self.evaluate('getOpponentAbilityAssumption().name'),'Levitate')
         values=self.page.locator('.move-row .defense-line strong').all_text_contents()
-        self.assertEqual(values,['0%–0%']*3)
+        self.assertEqual(values,['0%–0%']*6)
         toggle=self.page.locator('#abilityAssumptionToggle')
         self.assertEqual(toggle.get_attribute('aria-pressed'),'true')
         self.assertIn('Damage ranges are assumed to be modified by Levitate',toggle.get_attribute('aria-label'))
@@ -586,7 +593,7 @@ class AppTests(unittest.TestCase):
         self.assertTrue(all(v!='0%–0%' for v in self.page.locator('.move-row .defense-line strong').all_text_contents()))
         self.assertEqual(opponent_before,self.evaluate('JSON.stringify(state.opponentList[0])'))
         toggle.press('Enter')
-        self.assertEqual(self.page.locator('.move-row .defense-line strong').all_text_contents(),['0%–0%']*3)
+        self.assertEqual(self.page.locator('.move-row .defense-line strong').all_text_contents(),['0%–0%']*6)
 
     def test_assumed_pixilate_affects_incoming_spreads_ceiling_and_type(self):
         self.load()
@@ -685,8 +692,8 @@ class AppTests(unittest.TestCase):
         self.evaluate("addOpponentFromSearch('Umbreon')")
         self.assertEqual(self.evaluate("natureUsage(state.opponentList[0],'def')"),84.5)
         self.assertEqual(self.evaluate("natureUsage(state.opponentList[0],'spd')"),14.5)
-        self.assertTrue(self.page.locator('#boostNatureToggle').is_checked())
-        self.assertIn('Auto ≥50%',self.page.locator('#defenseNatureUsage').inner_text())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'defense').checked"))
+        self.assertEqual(self.page.locator('#defenseNatureUsage').count(),0)
         self.assertTrue(self.evaluate("natureBoostForMove(state.opponentList[0],'defense','def')"))
         self.assertFalse(self.evaluate("natureBoostForMove(state.opponentList[0],'defense','spd')"))
 
@@ -700,8 +707,8 @@ class AppTests(unittest.TestCase):
         }""")
         original=self.evaluate('JSON.stringify(state.ourTeam)')
         self.page.locator('[data-damage-direction="incoming"]').click()
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').evaluate('(e)=>e.indeterminate'))
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').mixed"))
         automatic=self.evaluate("incomingThreats(state.opponentList[0],state.ourTeam[0])")
         expected=self.evaluate("""() => {
           const p=state.opponentList[0],ours=state.ourTeam[0];
@@ -710,8 +717,8 @@ class AppTests(unittest.TestCase):
         }""")
         for name,value in zip(['Close Combat','Aura Sphere'],expected):
             self.assertEqual(next(r for r in automatic if r['name']==name)['ceiling']['high'],value)
-        self.page.locator('#boostOffenseNatureToggle').uncheck()
-        self.page.locator('#boostOffenseNatureToggle').check()
+        self.set_nature_preference('offense',False)
+        self.set_nature_preference('offense',True)
         forced=self.evaluate("incomingThreats(state.opponentList[0],state.ourTeam[0]).find(r=>r.name==='Aura Sphere').ceiling.high")
         self.assertGreater(forced,expected[1])
         self.assertEqual(original,self.evaluate('JSON.stringify(state.ourTeam)'))
@@ -724,39 +731,39 @@ class AppTests(unittest.TestCase):
           getPokemonByName('Garchomp').usage.Singles.natures=[{name:'Bold',percent:27,rank:1},{name:'Impish',percent:23,rank:2}];
           addOpponentFromSearch('Garchomp');
         }""")
-        self.assertTrue(self.page.locator('#boostNatureToggle').evaluate('(e)=>e.indeterminate'))
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'defense').mixed"))
         rows=[v for move in ['Psyshock','Shadow Ball'] for v in self.page.locator(f'[data-move="{move}"] .defense-line strong').all_text_contents()]
-        expected=self.evaluate("""() => ['Psyshock','Shadow Ball'].flatMap(name=>[0,35,64].map(points=>{
-          const r=calculateMoveRange(state.ourTeam[0],state.opponentList[0],name,points,{boostDefenseNature:name==='Psyshock'});
+        expected=self.evaluate("""() => ['Psyshock','Shadow Ball'].flatMap(name=>[0,35,64].flatMap(points=>[false,true].map(boostDefenseNature=>{
+          const r=calculateMoveRange(state.ourTeam[0],state.opponentList[0],name,points,{boostDefenseNature});
           return `${formatPercent(r.low)}–${formatPercent(r.high)}`;
-        }))""")
+        })))""")
         self.assertEqual(rows,expected)
 
     def test_nature_defaults_change_with_format_and_overrides_persist(self):
         self.load("Singles",frozen_usage=True)
         self.evaluate("addOpponentFromSearch('Sylveon')")
         self.page.locator('[data-damage-direction="incoming"]').click()
-        self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.page.locator('[data-format="Doubles"]').click()
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.assertEqual(self.evaluate("natureUsage(state.opponentList[0],'spa')"),95)
-        self.page.locator('#boostOffenseNatureToggle').uncheck()
+        self.set_nature_preference('offense',False)
         self.assertIs(self.evaluate('getOpponentPreferences().offenseNatureChoice'),False)
-        self.assertIn('Manual off',self.page.locator('#offenseNatureUsage').inner_text())
+        self.assertEqual(self.page.locator('#offenseNatureUsage').count(),0)
         self.page.locator('[data-format="Singles"]').click()
         self.page.locator('[data-format="Doubles"]').click()
-        self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.page.reload()
         self.evaluate("addOpponentFromSearch('Sylveon')")
         self.page.locator('[data-damage-direction="incoming"]').click()
         self.page.locator('[data-format="Doubles"]').click()
-        self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
-        self.page.locator('#natureUsageDefaultsButton').click()
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
+        self.reset_nature_preferences()
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.assertEqual(self.evaluate('getOpponentPreferences().offenseNatureChoice'),'auto')
-        self.assertTrue(self.page.locator('#natureUsageDefaultsButton').is_hidden())
+        self.assertEqual(self.page.locator('#natureUsageDefaultsButton').count(),0)
         self.evaluate("addOpponentFromSearch('Lucario')")
-        self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
 
     def test_neutral_natures_missing_data_and_exact_threshold(self):
         self.load("Singles")
@@ -766,13 +773,13 @@ class AppTests(unittest.TestCase):
           renderDamageRanges();
         }""")
         self.assertEqual(self.evaluate("natureUsage(state.opponentList[0],'atk')"),10)
-        self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.evaluate("getPokemonByName('Kingambit').usage.Singles.natures=[{name:'Adamant',percent:49.9,rank:1},{name:'Brave',percent:0.1,rank:2}];renderDamageRanges()")
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.evaluate("getPokemonByName('Kingambit').usage.Singles.natures=[];renderDamageRanges()")
         self.assertIsNone(self.evaluate("natureUsage(state.opponentList[0],'atk')"))
-        self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
-        self.assertIn('not reported',self.page.locator('#offenseNatureUsage').inner_text())
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
+        self.assertEqual(self.page.locator('#offenseNatureUsage').count(),0)
 
     def test_saved_legacy_nature_flags_remain_explicit_overrides(self):
         self.load()
@@ -784,11 +791,11 @@ class AppTests(unittest.TestCase):
         }""")
         self.page.reload()
         self.evaluate("addOpponentFromSearch('Kingambit')")
-        self.assertTrue(self.page.locator('#boostNatureToggle').is_checked())
-        self.assertFalse(self.page.locator('#boostOffenseNatureToggle').is_checked())
-        self.page.locator('#natureUsageDefaultsButton').click()
-        self.assertFalse(self.page.locator('#boostNatureToggle').is_checked())
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'defense').checked"))
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
+        self.reset_nature_preferences()
+        self.assertFalse(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'defense').checked"))
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
 
     def test_weather_changes_damage(self):
         self.load()
@@ -952,11 +959,11 @@ class AppTests(unittest.TestCase):
         result=self.evaluate("""() => {
           const species=getPokemonByName('Sylveon');
           const usage=getUsage(species);
-          const row=incomingThreats(state.opponentList[0],state.ourTeam[0]).find(r=>r.name==='Hyper Voice');
+          const row=incomingNatureComparisons(state.opponentList[0],state.ourTeam[0]).find(r=>r.name==='Hyper Voice');
           const ours=state.ourTeam[0];
           const expected=Battle.range(species,{investment:usage.spreads[0].investment,nature:null,item:'',ability:appliedOpponentAbility(state.opponentList[0])},
             getPokemonByName(ours.name),ours,'Hyper Voice');
-          return {row,source:usage.spreads[0],expected};
+          return {row,groups:groupIncomingScenarios(row.scenarios),source:usage.spreads[0],expected};
         }""")
         scenario=result['row']['scenarios'][0]
         self.assertEqual(scenario['investment'],result['source']['investment'])
@@ -964,15 +971,16 @@ class AppTests(unittest.TestCase):
         self.assertEqual(scenario['range']['high'],result['expected']['high'])
         self.assertLess(scenario['range']['high'],result['row']['ceiling']['high'])
         move=self.page.locator('[data-move="Hyper Voice"]')
-        self.assertIn('16.6% of sets',move.locator('.incoming-ranges').inner_text())
+        self.assertIn(f"{result['groups'][0]['reportedPercent']:.2f}".rstrip('0').rstrip('.')+'% of reported sets',move.locator('.incoming-ranges').inner_text())
         self.assertIn('Maximum-offense ceiling',move.inner_text())
         move.locator('.spread-comparisons summary').click()
-        self.assertEqual(move.locator('.spread-scenario').count(),len(result['row']['scenarios']))
+        self.assertEqual(move.locator('.spread-scenario').count(),len(result['groups']))
         self.assertTrue(move.locator('.spread-list').is_visible())
         self.assertEqual(original,self.evaluate('JSON.stringify(state.ourTeam)'))
         self.assertNotIn('investment',self.evaluate('state.opponentList[0]'))
         self.page.locator('[data-format="Doubles"]').click()
-        self.assertIn('11.3% of sets',self.page.locator('[data-move="Hyper Voice"] .incoming-ranges').inner_text())
+        percent=self.evaluate("Number(groupIncomingScenarios(incomingNatureComparisons(state.opponentList[0],state.ourTeam[0]).find(row=>row.name==='Hyper Voice').scenarios)[0].reportedPercent.toFixed(2))")
+        self.assertIn(f'{percent:g}% of reported sets',self.page.locator('[data-move="Hyper Voice"] .incoming-ranges').inner_text())
 
     def test_mixed_attacker_scenarios_reuse_each_full_spread(self):
         self.load()
@@ -1009,10 +1017,10 @@ class AppTests(unittest.TestCase):
         for pair in result:
             self.assertGreater(pair[1]['high'],pair[0]['high'])
         self.assertEqual(original,self.evaluate('JSON.stringify(state.ourTeam)'))
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_disabled())
+        self.assertEqual(self.page.locator('#boostOffenseNatureToggle').count(),0)
         self.page.locator('[data-damage-direction="incoming"]').click()
-        self.page.locator('#boostOffenseNatureToggle').uncheck()
-        self.page.locator('#boostOffenseNatureToggle').check()
+        self.set_nature_preference('offense',False)
+        self.set_nature_preference('offense',True)
         self.assertIs(self.evaluate('getOpponentPreferences().offenseNatureChoice'),True)
         self.assertEqual(original,self.evaluate('JSON.stringify(state.ourTeam)'))
 
@@ -1024,7 +1032,7 @@ class AppTests(unittest.TestCase):
             return self.page.locator(f'#{role}StageControl input:checked').input_value()
         choose('attacker',1)
         choose('defender',-2)
-        self.page.locator('#boostNatureToggle').check()
+        self.set_nature_preference('defense',True)
         self.page.locator('.compact-team').first.click()
         self.assertEqual(selected('attacker'),'0')
         self.assertEqual(selected('defender'),'-2')
@@ -1033,23 +1041,23 @@ class AppTests(unittest.TestCase):
         self.page.locator('[data-damage-direction="incoming"]').click()
         choose('attacker',-1)
         choose('defender',2)
-        self.page.locator('#boostOffenseNatureToggle').check()
+        self.set_nature_preference('offense',True)
         self.evaluate("addOpponentFromSearch('Sylveon')")
         self.assertEqual(selected('attacker'),'0')
         self.assertEqual(selected('defender'),'2')
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.assertEqual(self.evaluate('getOpponentPreferences().offenseNatureChoice'),'auto')
         self.page.locator('.opponent-row[data-opponent-index="1"] .pokemon-name').click()
         self.assertEqual(selected('attacker'),'-1')
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
         self.page.reload()
         self.assertEqual(selected('attacker'),'1')
         self.assertEqual(selected('defender'),'-2')
-        self.assertTrue(self.page.locator('#boostNatureToggle').is_checked())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'defense').checked"))
         self.page.locator('[data-damage-direction="incoming"]').click()
         self.assertEqual(selected('attacker'),'-1')
         self.assertEqual(selected('defender'),'2')
-        self.assertTrue(self.page.locator('#boostOffenseNatureToggle').is_checked())
+        self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
 
     def test_item_hints_have_usage_description_and_do_not_change_damage(self):
         self.load()

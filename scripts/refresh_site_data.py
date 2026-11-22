@@ -19,7 +19,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 
 from build_ability_effects import build as build_abilities
-from build_item_hints import build as build_items
+from build_item_hints import build as build_items, build_descriptions
 from build_roster import build as build_roster
 from download_usage import download
 from refresh_meta_usage import snapshot
@@ -97,6 +97,7 @@ def main():
           'sprites':'https://championsbattledata.com/items/'}
         source_bytes={key:fetch(url) for key,url in urls.items()};sources={key:value.decode() for key,value in source_bytes.items()}
         abilities=build_abilities(sources['abilities']);write_js(stage/'data/ability-effects.js','ABILITY_EFFECTS',abilities,'Descriptions: Pokemon Showdown (MIT; vendor/SHOWDOWN-LICENSE).')
+        write_js(stage/'data/item-descriptions.js','ITEM_DESCRIPTIONS',build_descriptions(sources['itemText']),'Descriptions: Pokemon Showdown (MIT; vendor/SHOWDOWN-LICENSE).')
         hints=build_items(sources['items'],sources['itemText'],sources['sprites']);write_js(stage/'data/item-hints.js','ITEM_HINTS',hints,'Descriptions: Pokemon Showdown (MIT); sprites: Champions Battle Data.')
         sprites={html.unescape(name):'https://championsbattledata.com'+html.unescape(path) for path,name in re.findall(r'<img class="static-item-icon" src="([^"]+)"[^>]*\s*/><a [^>]+>([^<]+)</a>',sources['sprites'])}
         if len(sprites)<20 or 'Life Orb' not in sprites:raise ValueError('Incomplete item sprite index')

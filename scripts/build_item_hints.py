@@ -9,6 +9,16 @@ import sys
 from pathlib import Path
 
 
+def build_descriptions(text_ts):
+    result={}
+    for match in re.finditer(r'^\t([a-z0-9]+): \{(.*?)(?=^\t\},)',text_ts,re.M|re.S):
+        description=re.search(r'^\t\tshortDesc: ("(?:\\.|[^"\\])*"),',match[2],re.M)
+        if description:result[match[1]]=json.loads(description[1])
+    if 'ironball' not in result or 'choicescarf' not in result:
+        raise ValueError('Missing essential item descriptions')
+    return result
+
+
 def build(items_js, text_ts, index_html):
     entries=list(re.finditer(r'(?:^exports.BattleItems = \{|(?<=\}),)([a-z0-9]+):\{name:("(?:\\.|[^"\\])*")',items_js))
     descriptions={}

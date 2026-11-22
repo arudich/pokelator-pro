@@ -6,7 +6,7 @@
     <title>Pokelator Pro</title>
     <link rel="icon" type="image/png" sizes="64x64" href="assets/branding/favicon.png?v=20261121-math-icon" />
     <link rel="apple-touch-icon" sizes="180x180" href="assets/branding/apple-touch-icon.png?v=20261121-math-icon" />
-    <link rel="stylesheet" href="styles.css?v=20261121-math-icon" />
+    <link rel="stylesheet" href="styles.css?v=20261121-nature-range-frequency" />
   </head>
   <body>
     <div class="app-shell">
@@ -193,14 +193,6 @@
                 <fieldset id="defenderStageControl" class="stat-stage-control"><legend id="defenderStageLabel">Defender defense (Def / SpD)</legend><div class="stat-stage-options"></div></fieldset>
               </div>
 
-              <div class="nature-comparisons"><label class="checkbox-row boosting-check">
-                <input id="boostNatureToggle" type="checkbox" />
-                <span>Opponent defense-boosting nature<small id="defenseNatureUsage" class="nature-usage"></small></span>
-              </label><label class="checkbox-row boosting-check">
-                <input id="boostOffenseNatureToggle" type="checkbox" />
-                <span>Opponent offense-boosting nature<small id="offenseNatureUsage" class="nature-usage"></small></span>
-              </label><button id="natureUsageDefaultsButton" class="mini-button" type="button" hidden>Use usage defaults</button></div>
-
               <div id="damageRangeSummary" class="damage-list" tabindex="0" aria-label="Damage comparisons"></div>
               <p id="usageReference" class="status-note"></p>
             </article>
@@ -255,11 +247,12 @@
     <datalist id="speciesList"></datalist>
     <script src="vendor/smogon-data.min.js"></script>
     <script src="vendor/smogon-calc.min.js"></script>
-    <script src="data/champions-roster.js?v=20261118-mega-toggle"></script>
+    <script src="data/champions-roster.js?v=20261121-team-editing"></script>
     <script src="data/item-hints.js"></script>
+    <script src="data/item-descriptions.js?v=20261121-team-editing"></script>
     <script src="data/ability-effects.js?v=20261118-mega-toggle"></script>
     <script src="data/item-sprites.js?v=20261118-mega-toggle"></script>
-    <script src="team-files.js?v=20261118-mega-toggle"></script>
+    <script src="team-files.js?v=20261121-team-editing"></script>
     <script src="data/move-types.js?v=20261120-champions-types"></script>
     <script src="data/balance-moves.js?v=20261121-move-archetypes"></script>
     <script src="components/move-summary.js?v=20261121-move-archetypes"></script>
@@ -271,7 +264,7 @@
     <script src="balance.js?v=20261121-full-attacks"></script>
     <script src="data/meta-usage.js?v=20261118-mega-toggle"></script>
     <script src="analytics.js?v=20261120-health-reports"></script>
-    <script src="app.js?v=20261121-speed-stage-labels"></script>
-    <script src="components/tutorial.js?v=20261121-tour-title-case"></script>
+    <script src="app.js?v=20261121-nature-range-frequency"></script>
+    <script src="components/tutorial.js?v=20261121-team-battle-release"></script>
   </body>
 </html>

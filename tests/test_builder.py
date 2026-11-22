@@ -154,7 +154,7 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual([r['species']['stats']['spe'] for r in groups['always-faster']],[101])
         self.assertEqual([r['tier']['points'] for r in groups['high-investment']],[16,32])
         self.assertEqual([r['species']['stats']['spe'] for r in groups['nature']],[68])
-        self.assertEqual([r['species']['stats']['spe'] for r in groups['always-slower']],[59])
+        self.assertEqual([r['species']['stats']['spe'] for r in groups['max-speed-tie']],[59])
         self.assertTrue(next(r for r in groups['low-investment'] if r['species']['stats']['spe']==100)['tie'])
 
     def test_builder_lists_every_form_in_speed_order_and_centers_base_tie(self):
@@ -229,10 +229,10 @@ class BuilderTests(unittest.TestCase):
         middle=self.page.locator('.builder-tier-group:not([data-speed-group^="always-"])')
         self.assertGreater(middle.count(),0)
         for group in middle.all():
-            self.assertEqual(group.locator(':scope > .tier-icon-cloud').count(),1)
+            self.assertEqual(group.locator('.tier-icon-cloud').count(),1)
         icon=self.page.locator('[data-speed-group="high-investment"] .tier-pokemon').first
-        self.assertIn('Faster with',icon.get_attribute('title'))
-        self.assertIn('points invested',icon.get_attribute('title'))
+        self.assertIn('Needs',icon.get_attribute('title'))
+        self.assertIn('Speed SP to outspeed us',icon.get_attribute('title'))
         self.page.locator('#builderSpeedTiers').evaluate('(el)=>el.scrollTop=0')
         top_gap=self.evaluate("""() => {
           const list=document.getElementById('builderSpeedTiers');

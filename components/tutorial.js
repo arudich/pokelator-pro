@@ -4,8 +4,8 @@
   const seenKey='pokelator-pro-tutorial-seen-v1';
   const slides=[
     {title:'Battle Answers & Better Teams',image:'overview',alt:'Battle calculations beside team-building damage tiers, with callouts for fast battle queries, comparing builds, and saving teams.',caption:'Get battle answers in about 3 seconds with preloaded meta data, then compare builds and keep the teams that work.'},
-    {title:'Fast Matchup Answers',image:'battle',alt:'Actual Battle View with highlighted opponent selection, damage ranges, weather, terrain, abilities, items, stat stages and Speed comparisons.',caption:'Pick an opponent to see damage and Speed, then test weather, terrain, items, abilities, boosts and fainted allies.'},
-    {title:'Smarter Stat Investments',image:'builder',alt:'Speed, Offense, Defense and Balance panels showing investment thresholds, move previews, defensive spread suggestions and one-on-one matchups.',caption:'Compare Speed, Offense, Team Offense, Defense and Balance to preview move swaps and find stronger stat spreads.'},
+    {title:'Fast Matchup Answers',image:'battle',alt:'Actual Battle View with highlighted opponent selection, damage ranges, weather, terrain, abilities, items, stat stages and Speed comparisons, plus a real item tooltip labeled Hover When Confused!.',caption:'Pick an opponent, then test battle conditions and modifiers. Hover When Confused!'},
+    {title:'Smarter Stat Investments',image:'builder',alt:'Speed, Offense, Defense and Balance panels showing investment thresholds, move previews, defensive spread suggestions and one-on-one matchups.',caption:'Compare Speed, Offense, Team Offense, Defense and Balance, then lock in stronger moves and stat spreads.'},
     {title:'Your Matchup Shortlists',image:'highlights',alt:'Highlighted opponent borders, Pokémon search, the highlighted-only filter and named highlight sets in Team Builder.',caption:'Click or search to highlight Pokémon across views, focus calculations on them, and save named sets to revisit.'}
   ];
   const dialog=document.createElement('dialog');
@@ -23,7 +23,7 @@
   function render() {
     const slide=slides[current];
     title.textContent=slide.title;caption.textContent=slide.caption;
-    picture.src=`assets/tutorial/${slide.image}.png?v=20261122-scarf-speed-thresholds`;picture.alt=slide.alt;
+    picture.src=`assets/tutorial/${slide.image}.png?v=20261122-builder-batch-release`;picture.alt=slide.alt;
     previous.disabled=current===0;next.hidden=current===slides.length-1;done.hidden=current!==slides.length-1;
     dialog.querySelector('#tutorialProgress').textContent=`${current+1} / ${slides.length}`;
     dots.querySelectorAll('button').forEach((button,index)=>button.setAttribute('aria-current',String(index===current)));

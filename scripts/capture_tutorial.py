@@ -53,6 +53,19 @@ def capture():
                 data=page.screenshot(clip=box,animations='disabled')
                 return 'data:image/png;base64,'+base64.b64encode(data).decode()
             battle=image('.battle-panel');speed_card=image('.speed-card');opponents=image('.opponent-panel')
+            # Capture the app's actual item popover, which screenshots can retain.
+            item=page.locator('.opponent-panel [data-opponent-item="Life Orb"]').first
+            item.hover()
+            tooltip=page.locator('.item-tooltip:popover-open')
+            tooltip.wait_for(state='visible')
+            row=item.locator('xpath=ancestor::*[contains(concat(" ",normalize-space(@class)," ")," opponent-row ")]').first
+            boxes=[row.bounding_box(),tooltip.bounding_box()]
+            left=min(box['x'] for box in boxes);top=min(box['y'] for box in boxes)
+            clip={'x':left,'y':top,'width':max(box['x']+box['width'] for box in boxes)-left,
+                  'height':max(box['y']+box['height'] for box in boxes)-top+4}
+            hover_example='data:image/png;base64,'+base64.b64encode(page.screenshot(clip=clip,animations='disabled')).decode()
+            page.mouse.move(0,0)
+            page.evaluate('hideItemTooltip()')
             page.evaluate("state.weather='';state.alliesFainted=0;state.builderPanel='offense';setView('builder')")
             page.wait_for_selector('#builderOffenseTiers .tier-pokemon')
             page.wait_for_function('moveTrial.finished')
@@ -97,7 +110,7 @@ def capture():
                 art.screenshot(path=str(OUTPUT/(name+'.png')),type='png',animations='disabled')
                 print('Captured',name,flush=True)
             export('overview','Your Team, the Meta, and the Answer',f'''<div class="columns"><div><div class="tag">Battle Answers in Seconds</div><div class="stack frame overview-shot"><img src="{battle}"><div class="note"><h2>Pick the Opponent</h2><p>Preloaded moves, builds and usage</p></div></div></div><div><div class="tag">Build a Meta Relevant Team</div><div class="stack frame overview-shot"><img src="{offense}"><div class="small-team"><img src="{overview_team}"></div><div class="note"><h2>Build, Preview, Save</h2><p>Moves · stat spreads · matchups</p></div></div></div></div><div class="legend"><span><b>Battle View</b> · decide during a match</span><span><b>Team Builder</b> · improve between matches</span><span><b>Your Teams</b> · saved in this browser</span></div>''')
-            export('battle','A Matchup, with Every Assumption in Reach',f'''<div class="battle-grid"><div><div class="callout"><b>Battle Conditions</b><span>Weather · terrain<br>Fainted allies · stat stages</span></div><div class="callout"><b>Damage, Both Ways</b><span>Our exact build against meta-informed opponents</span></div><div class="callout"><b>Speed Scenarios</b><span>Normal · Scarf · Tailwind<br>Both sides’ Speed stages</span></div></div><div class="frame battle-center"><img src="{battle}"><div class="speed-inset"><img src="{speed_card}"></div></div><div><div class="tag">Opponents · Items · Abilities</div><div class="frame" style="height:610px;margin-top:14px"><img src="{opponents}"></div></div></div>''')
+            export('battle','A Matchup, with Every Assumption in Reach',f'''<div class="battle-grid"><div><div class="callout"><b>Battle Conditions</b><span>Weather · terrain<br>Fainted allies · stat stages</span></div><div class="callout"><b>Damage, Both Ways</b><span>Our exact build against meta-informed opponents</span></div><div class="callout"><b>Speed Scenarios</b><span>Normal · Scarf · Tailwind<br>Both sides’ Speed stages</span></div></div><div class="frame battle-center"><img src="{battle}"><div class="speed-inset"><img src="{speed_card}"></div></div><div><div class="tag">Opponents · Items · Abilities</div><div class="frame" style="height:300px;margin-top:14px"><img src="{opponents}"></div><div class="tag" style="margin-top:18px;font-size:27px">Hover When Confused!</div><div class="frame" style="margin-top:12px;height:245px"><img src="{hover_example}" style="height:auto;object-fit:contain"></div></div></div>''')
             tiles=[('speed','Speed','Find Investment Thresholds'),('offense','Offense + Team Offense','Try Move Swaps · Compare Coverage'),('defense','Defense','Invest Free Points into Bulk'),('balance','Balance','Compare 1v1s · Optimize All Stats')]
             export('builder','Investments That Change the Matchup','<div class="quad">'+''.join(f'<div class="tile"><div class="tile-head"><h2>{label}</h2><span>{detail}</span></div><div class="crop"><img src="{panels[key]}"></div></div>' for key,label,detail in tiles)+'</div>')
             export('highlights','A Shortlist Across Every View',f'''<div class="focus"><div class="frame focus-main"><img src="{highlighted}"></div><div class="focus-label">Search + Click → Highlight</div><div class="focus-side"><div class="tag">Named Highlight Sets</div><p style="margin-top:14px">Shortlists for specific teams, matchups and threats</p><div class="frame"><img src="{saved}"></div><div class="callout"><b>★ Focus the Calculations</b><span>Show only highlighted Pokémon<br>Score and optimize over that set</span></div><div class="callout"><b>Keep Your References</b><span>Shared across views<br>Remembered after reload</span></div></div></div>''')

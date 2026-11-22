@@ -46,7 +46,7 @@ class OffenseTests(unittest.TestCase):
         self.assertEqual(self.page.locator('[data-offense-species]').count(),8)
         self.assertEqual(self.page.locator('.field-assumed').count(),4)
         sun=self.page.locator('[data-offense-species="Torkoal"].field-assumed')
-        self.assertTrue(sun.get_attribute('title').startswith('Sun assumed active (Drought)'))
+        self.assertTrue(sun.get_attribute('title').startswith('Sun: active (Drought)'))
         self.assertIn('field-sun',sun.get_attribute('class'))
         result=self.evaluate("""() => {
           const rows=builderOffenseRows(state.ourTeam[0]);
@@ -72,7 +72,7 @@ class OffenseTests(unittest.TestCase):
         self.assertEqual(self.page.locator('[data-defense-species]').count(),8)
         self.assertEqual(self.page.locator('.field-assumed').count(),4)
         rain=self.page.locator('[data-defense-species="Pelipper"].field-assumed')
-        self.assertTrue(rain.get_attribute('title').startswith('Rain assumed active (Drizzle)'))
+        self.assertTrue(rain.get_attribute('title').startswith('Rain: active (Drizzle)'))
         self.assertTrue(self.evaluate("""() => {
           const rows=defenseTrial.baselineRows.filter(row=>row.species.name==='Pelipper');
           return rows[1].score>rows[0].score;
@@ -522,7 +522,7 @@ class OffenseTests(unittest.TestCase):
         for score in ['1.23456789','1.87654321','1.45678912']:
             self.assertNotIn(score,markup)
         self.assertIn('Ice Beam',self.page.locator('[data-offense-species]').first.get_attribute('title'))
-        self.assertIn('42.4% of sets',self.page.locator('[data-offense-species]').first.get_attribute('title'))
+        self.assertNotIn('42.4% of sets',self.page.locator('[data-offense-species]').first.get_attribute('title'))
 
     def test_offense_updates_for_investment_and_handles_missing_spreads(self):
         self.load();self.open_offense()

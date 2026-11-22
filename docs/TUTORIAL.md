@@ -3,8 +3,8 @@
 Four screens introduce the app, with one caption per picture:
 
 1. **Overview** — approximately three-second battle queries using preloaded meta data; team-building previews and browser-saved teams.
-2. **Battle** — opponent selection, damage in both directions, weather/terrain, fainted allies, abilities/items, stat stages and Speed scenarios.
-3. **Team building** — Speed thresholds, Offense/Team Offense coverage and move previews, Defense spread previews, Balance matchups and optimization.
+2. **Battle** — opponent selection, damage in both directions, weather/terrain, fainted allies, abilities/items, stat stages and Speed scenarios, plus “Hover When Confused!” with a real item tooltip.
+3. **Team building** — Speed thresholds, Offense/Team Offense coverage and move previews, Defense spread previews, Balance matchups and optimization, with independent move and stat Lock In buttons.
 4. **References** — highlights shared across views/reloads, searching outside Top N, highlighted-only calculations and named sets.
 
 `Huh?` beside the brand opens the tour; the first visit opens it automatically. Close with ×, Escape or the backdrop. Navigate with arrows, arrow keys or dots. The seen flag is stored under `pokelator-pro-tutorial-seen-v1`; removing only that key lets you preview first-visit behavior without deleting teams.

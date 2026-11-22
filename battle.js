@@ -188,6 +188,7 @@
       if (at(points) > targetSpeed) return {label: `Faster with ${points} points invested`, points, kind:'investment'};
     }
     if (at(32, true) > targetSpeed) return {label: 'Faster only with speed-boosted nature', kind:'nature'};
+    if (at(32, true) === targetSpeed) return {label: 'Can tie with speed-boosted nature', kind:'max-speed-tie'};
     return {label: 'Always Slower', kind:'always-slower'};
   }
   function speedUsageChance(species,entry,targetSpeed,usage,options = {}) {
@@ -216,6 +217,7 @@
       {kind:'low-investment',label:'Faster with 1–16 Speed investment'},
       {kind:'high-investment',label:'Faster with 16–32 Speed investment'},
       {kind:'nature',label:'Faster with speed boosted nature'},
+      {kind:'max-speed-tie',label:'Can Tie with Speed-Boosted Nature'},
       {kind:'always-slower',label:'Always slower'}
     ].map(group => ({...group,members:[]}));
     const ordered = [...roster].sort((a,b) => b.stats.spe-a.stats.spe || a.name.localeCompare(b.name));
@@ -247,7 +249,7 @@
           if(outspeedPoints>32) outspeedNaturePoints=minimum(32,points=>at(points,true)>ceiling);
         }
       }
-      const speedEstimate=kind==='nature' || species.stats.spe===selected.stats.spe
+      const speedEstimate=!['always-faster','always-slower'].includes(kind)
         ? speedUsageChance(species,{item:'',ability,speedStage},ourSpeed,species.usage?.[options.format],field) : null;
       groups.find(group => group.kind === kind).members.push({species,tier,ability,ourSpeed,outspeedPoints,outspeedNaturePoints,speedEstimate,weather:field.weather || '',terrain:field.terrain || '',baseSpeed:species.stats.spe-20,
         tie:species.stats.spe === selected.stats.spe});

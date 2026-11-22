@@ -422,19 +422,20 @@ class AppTests(unittest.TestCase):
         }""")
         self.assertEqual(result,['def','spd'])
 
-    def test_speed_tiers_have_exact_four_outputs_and_strict_thresholds(self):
+    def test_speed_tiers_distinguish_maximum_speed_ties_and_strict_thresholds(self):
         self.load()
         # Synthetic uninvested Speed 100 makes all boundaries explicit.
         cases=[(99,'Always faster'),(100,'Faster with 1 points invested'),
                (131,'Faster with 32 points invested'),
                (132,'Faster only with speed-boosted nature'),
-               (144,'Faster only with speed-boosted nature'),(145,'Always Slower')]
+               (144,'Faster only with speed-boosted nature'),
+               (145,'Can tie with speed-boosted nature'),(146,'Always Slower')]
         for target,expected in cases:
             result=self.evaluate("""target => Battle.speedTier({stats:{spe:100}},
                 {investment:{spe:17},nature:{plus:'spe',minus:'spa'},item:''},target).label""",target)
             self.assertEqual(result,expected)
         self.assertEqual(self.evaluate("Battle.speedTier({stats:{spe:100}},{investment:{},item:'Choice Scarf'},149).label"),'Always faster')
-        self.assertEqual(self.evaluate("Battle.speedTier({stats:{spe:100}},{investment:{},item:'Iron Ball'},72).label"),'Always Slower')
+        self.assertEqual(self.evaluate("Battle.speedTier({stats:{spe:100}},{investment:{},item:'Iron Ball'},72).label"),'Can tie with speed-boosted nature')
 
     def test_speed_display_varies_opponent_and_keeps_our_build_fixed(self):
         self.load()
@@ -467,10 +468,10 @@ class AppTests(unittest.TestCase):
         scenarios=[
             ('Choice Scarf',False,[(149,'Always faster'),(150,'Faster with 1 points invested'),
                 (197,'Faster with 32 points invested'),(198,'Faster only with speed-boosted nature'),
-                (216,'Faster only with speed-boosted nature'),(217,'Always Slower')]),
+                (216,'Faster only with speed-boosted nature'),(217,'Can tie with speed-boosted nature'),(218,'Always Slower')]),
             ('',True,[(199,'Always faster'),(200,'Faster with 1 points invested'),
                 (263,'Faster with 32 points invested'),(264,'Faster only with speed-boosted nature'),
-                (289,'Faster only with speed-boosted nature'),(290,'Always Slower')])]
+                (289,'Faster only with speed-boosted nature'),(290,'Can tie with speed-boosted nature'),(291,'Always Slower')])]
         for item,tailwind,cases in scenarios:
             for target,expected in cases:
                 with self.subTest(item=item,tailwind=tailwind,target=target):

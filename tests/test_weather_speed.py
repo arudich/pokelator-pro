@@ -26,7 +26,7 @@ class WeatherSpeedTests(unittest.TestCase):
         }""")
         normal=self.page.locator('#speedSummary .speed-scenario').first
         self.assertEqual(normal.locator('.speed-chance').inner_text(),'90%')
-        self.assertIn('10% chance of an actual Speed tie',normal.locator('.speed-chance').get_attribute('title'))
+        self.assertIn('Reported builds: 90% faster · 10% tied',normal.locator('.speed-chance').get_attribute('title'))
         for width in [1440,390]:
             self.page.set_viewport_size({'width':width,'height':900})
             self.assertTrue(normal.evaluate("row=>{const label=row.querySelector('.speed-tier').getBoundingClientRect(),badge=row.querySelector('.speed-chance').getBoundingClientRect();return badge.left>=label.right+8 && badge.right<=row.getBoundingClientRect().right+1}"))
@@ -36,6 +36,11 @@ class WeatherSpeedTests(unittest.TestCase):
         self.assertEqual(icon.locator('.speed-chance-badge').inner_text(),'90%')
         self.assertTrue(icon.evaluate("icon=>{const box=icon.getBoundingClientRect(),badge=icon.querySelector('.speed-chance-badge').getBoundingClientRect();return badge.left>=box.left && badge.right<=box.right && badge.bottom<=box.bottom && badge.width<box.width/2 && badge.height<box.height/3}"))
         self.assertEqual(stale_styles,[])
+        self.assertEqual(self.page.locator('[data-speed-group="always-faster"] .speed-chance-badge').count(),0)
+        self.assertEqual(self.page.locator('[data-speed-group="always-slower"] .speed-chance-badge').count(),0)
+        tooltip=icon.get_attribute('title')
+        self.assertIn('\nReported builds:',tooltip)
+        self.assertNotIn('spread coverage',tooltip)
 
     def test_rapid_opponent_switches_bypass_pre_percentage_cached_adapter(self):
         stale=re.sub(r'speedTier,speedUsageChance,speedField','speedTier,speedField',
@@ -88,7 +93,7 @@ class WeatherSpeedTests(unittest.TestCase):
         normal=self.page.locator('#speedSummary .speed-scenario').first
         self.assertIn('speed-boosted nature',normal.inner_text())
         self.assertEqual(normal.locator('.speed-chance').inner_text(),'45%')
-        self.assertIn('independently',normal.locator('.speed-chance').get_attribute('title'))
+        self.assertIn('Speed spreads × natures',normal.locator('.speed-chance').get_attribute('title'))
         self.evaluate("state.builderPanel='speed';state.builderTopN=347;setView('builder')")
         icon=self.page.locator('[data-speed-group="nature"] [data-tier-species="Kingambit"]')
         self.assertEqual(icon.locator('.speed-chance-badge').inner_text(),'45%')

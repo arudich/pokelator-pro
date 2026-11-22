@@ -951,27 +951,31 @@ function pokemonUsageReference(species) {
     || (exact.startsWith('vivillon') ? 'vivillon' : null);
   return data[exact] || (shared && data[shared]) || (!species.isMega && data[reference]) || null;
 }
-function buildSearchResults(query,includeAll=false) {
+let teamPokemonFilters,opponentPokemonFilters;
+function buildSearchResults(query,includeAll=false,filters=null) {
   const clean=query.trim().toLowerCase();
-  if(!clean && !includeAll) return [];
-  return pokemonCatalog.filter(p=>p.name.toLowerCase().includes(clean) || p.id.toLowerCase().includes(clean))
+  if(!clean && !includeAll && !filters?.active && !filters?.showAll) return [];
+  const matches=pokemonCatalog.filter(p=>p.name.toLowerCase().includes(clean) || p.id.toLowerCase().includes(clean));
+  if(filters) return filters.apply(matches);
+  return matches
     .sort((a,b)=>(pokemonUsageReference(b)?.percent ?? -1)-(pokemonUsageReference(a)?.percent ?? -1)
       || (getUsage(a)?.rank ?? Infinity)-(getUsage(b)?.rank ?? Infinity) || a.name.localeCompare(b.name));
 }
 function buildTeamSearchResults(query) {
-  const regular=buildSearchResults(query),matches=new Set(regular.map(species=>species.id));
+  const regular=buildSearchResults(query,false,teamPokemonFilters),matches=new Set(regular.map(species=>species.id));
   if(!matches.size) return regular;
   const saved=state.teamLibrary.flatMap(team=>(team.savedPokemon || team.pokemon).filter(entry=>matches.has(entry.id)).map(entry=>({
-    ...getPokemonByName(entry.name),savedBuild:structuredClone(entry),sourceTeamId:team.id,sourceTeamName:team.name
+    ...regular.find(species=>species.id===entry.id),savedBuild:structuredClone(entry),sourceTeamId:team.id,sourceTeamName:team.name
   }))).sort((a,b)=>(b.sourceTeamId===state.activeTeamId)-(a.sourceTeamId===state.activeTeamId)
     || a.sourceTeamName.localeCompare(b.sourceTeamName) || a.name.localeCompare(b.name));
   return [...regular,...saved];
 }
 function pokemonChoiceMarkup(species) {
+  const sortValue=species.pickerSort && species.pickerSort!=='usage' ? `${statLabels[species.pickerSort]} ${species.pickerSortValue}` : '';
   if(species.savedBuild) {
     const build=species.savedBuild;
     return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" />
-      <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>Saved build</small></div>
+      <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${sortValue || 'Saved build'}</small></div>
       <div class="saved-build-team">${escapeHtml(species.sourceTeamName)}</div>
       <div class="search-item-sub">${escapeHtml(build.nature.name)}${build.item ? ` · ${escapeHtml(build.item)}` : ''} · ${escapeHtml(build.ability)}</div>
       <div class="search-item-sub">${statOrder.filter(stat=>build.investment[stat]).map(stat=>`${statLabels[stat]} ${build.investment[stat]}`).join(' · ') || 'No stat investment'}</div>
@@ -980,7 +984,7 @@ function pokemonChoiceMarkup(species) {
   const usage=pokemonUsageReference(species);
   const shared=usage && calc.toID(usage.name)!==calc.toID(species.id);
   return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" />
-    <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${usage ? `${usage.percent.toFixed(2)}%${shared ? ' shared' : ''}` : 'Usage unavailable'}</small></div>
+    <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${sortValue || (usage ? `${species.pickerSort==='usage' && usage.rank ? '#'+usage.rank+' · ' : ''}${usage.percent.toFixed(2)}%${shared ? ' shared' : ''}` : 'Usage unavailable')}</small></div>
     <div class="search-item-sub">${species.types.join(' / ')}${species.cosmeticBaseId ? ' · Cosmetic form · shared stats and usage' : ''}</div>${baseStatsMarkup(species)}</div>`;
 }
 function buildMoveChoices(species,query='') {
@@ -1117,7 +1121,7 @@ function commitTeamInvestment(entry, stat, rawValue) {
   if (row) {
     row.querySelector(`input[data-stat="${stat}"]`).value = next[stat];
     row.querySelector('.points-readout strong').textContent = getTotalInvestment(entry);
-    for(const output of row.querySelectorAll('[data-stat-total]')) output.textContent=getEffectiveStat(entry,output.dataset.statTotal);
+    updateStatInvestmentLabels(row,entry);
     row.querySelector('[data-clear-investments]').disabled=!getTotalInvestment(entry);
   }
   renderActiveSummary();
@@ -1251,7 +1255,7 @@ function renderTeam() {
       const minusValue = entry.nature?.minus || '';
       const statFields = statOrder.map((stat) => `
         <div class="input-block">
-          <label class="stat-investment-label" for="team-${actualIndex}-${stat}">${statLabels[stat]} <output data-stat-total="${stat}" title="${stat==='spe' ? 'Actual Speed after investment, nature, held item and active weather/terrain abilities; before temporary stages' : `Actual ${statLabels[stat]} after investment and nature, before temporary stages or item and ability modifiers`}">${getEffectiveStat(entry,stat)}</output></label>
+          <label class="stat-investment-label" for="team-${actualIndex}-${stat}">${statLabels[stat]}: <output data-stat-total="${stat}" title="${stat==='spe' ? 'Actual Speed after investment, nature, held item and active weather/terrain abilities; before temporary stages' : `Actual ${statLabels[stat]} after investment and nature, before temporary stages or item and ability modifiers`}">${getEffectiveStat(entry,stat)}</output><span class="stat-investment-breakdown" title="Base + invested points + nature change; any extra term is from item or field effects" data-stat-breakdown="${stat}">${statInvestmentBreakdown(entry,stat)}</span></label>
           <input
             id="team-${actualIndex}-${stat}"
             type="text"
@@ -1283,7 +1287,7 @@ function renderTeam() {
                 <button type="button" class="control-btn delete" data-remove-team-index="${actualIndex}"
                   aria-label="Remove ${escapeHtml(entry.name)} from team">×</button></div>
             </div>
-            <div class="investment-heading"><span>Stat Investments</span><button type="button" class="mini-button clear-investments" data-clear-investments="${actualIndex}" ${!total ? 'disabled' : ''} title="Clear all six investments; keep the nature, item, ability and moves">Clear Investments</button></div>
+            <div class="investment-heading"><span>Stat Investments <small class="stat-breakdown-key" title="Breakdowns show uninvested stat + invested points + nature change. Any final extra term is from item or field effects.">Base + Invested + Nature</small></span><button type="button" class="mini-button clear-investments" data-clear-investments="${actualIndex}" ${!total ? 'disabled' : ''} title="Clear all six investments; keep the nature, item, ability and moves">Clear Investments</button></div>
             <div class="stat-grid">${statFields}</div>
             <div class="team-bottom-row">
               <div class="input-block">
@@ -1360,7 +1364,7 @@ function renderTeam() {
       const entry=state.ourTeam[Number(input.dataset.teamIndex)],stat=input.dataset.stat;
       const other=statOrder.filter(key=>key!==stat).reduce((sum,key)=>sum+entry.investment[key],0);
       const investment={...entry.investment,[stat]:Math.min(sanitizeNumericDraft(input.value),MAX_TEAM_POINTS-other)};
-      input.closest('.input-block').querySelector('[data-stat-total]').textContent=getEffectiveStat({...entry,investment},stat);
+      updateStatInvestmentLabels(input.closest('.input-block'),{...entry,investment});
     });
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -1580,8 +1584,15 @@ function speedEstimateText(estimate) {
     : `${Number((estimate.chance*100).toFixed(1))}%`;
 }
 function speedEstimateDescription(estimate) {
-  return !estimate ? 'Outspeed estimate unavailable: reported Speed spreads or natures are missing.'
-    : `Estimated ${speedEstimateText(estimate)} chance the opponent is strictly faster than our exact build; ${Number((estimate.tieChance*100).toFixed(1))}% chance of an actual Speed tie. Combines reported Speed spreads and nature frequencies independently, normalized over reported data (${estimate.spreadCoverage.toFixed(1)}% spread coverage; ${estimate.natureCoverage.toFixed(1)}% nature coverage). Uses this scenario’s item, ability and field; other item frequencies are not included.`;
+  return !estimate ? 'Usage estimate unavailable.'
+    : `Reported builds: ${speedEstimateText(estimate)} faster · ${Number((estimate.tieChance*100).toFixed(1))}% tied\nEstimated from Speed spreads × natures; excludes item usage.`;
+}
+function speedMatchupDescription(tier) {
+  return tier.kind==='always-slower' ? 'Even at maximum Speed: slower than us'
+    : tier.kind==='always-faster' ? 'Faster than us even with no Speed investment'
+    : tier.kind==='max-speed-tie' ? 'Maximum Speed: ties us'
+    : tier.kind==='nature' ? 'Needs a Speed-boosting nature to outspeed us'
+    : `Needs ${tier.points} Speed SP to outspeed us (neutral nature)`;
 }
 function renderSpeedSummary() {
   const container = document.getElementById('speedSummary');
@@ -1613,11 +1624,11 @@ function renderSpeedSummary() {
     }
     const tier = Battle.speedTier(species, {...opponentEntry,speedStage:getPreferences(opponentEntry,'opponent').speedStage,ability,item: scenario.item}, targetSpeed,
       {...field,tailwind: !!scenario.tailwind});
-    const showEstimate=tier.kind==='nature' || species.stats.spe===battleSpecies(ourEntry,'our').stats.spe;
+    const showEstimate=!['always-faster','always-slower'].includes(tier.kind);
     const estimate=showEstimate ? Battle.speedUsageChance(species,{...opponentEntry,speedStage:getPreferences(opponentEntry,'opponent').speedStage,ability,item:scenario.item},targetSpeed,
       getUsage(species),{...field,tailwind:!!scenario.tailwind}) : null;
     const percent=showEstimate && estimate ? `<span class="speed-chance" title="${escapeHtml(speedEstimateDescription(estimate))}">${speedEstimateText(estimate)}</span>` : '';
-    const detail=`Opponent relative to our exact build (Speed ${targetSpeed}). Weather: ${field.weather || 'None'}; Terrain: ${field.terrain || 'None'}. Opponent ability: ${ability || 'not assumed'}.${showEstimate ? ` ${speedEstimateDescription(estimate)}` : ''}`;
+    const detail=[speedMatchupDescription(tier),showEstimate ? speedEstimateDescription(estimate) : '',[field.weather,field.terrain,ability].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
     return `<div class="speed-scenario" title="${escapeHtml(detail)}"><dt>${scenario.label}</dt><dd><strong class="speed-tier">${tier.label}</strong>${percent}</dd></div>`;
   }).join('');
 }
@@ -1729,9 +1740,13 @@ function updateMoveTrialControl() {
   const input = document.getElementById('builderMoveTrial');
   input.disabled = !moveTrial.finished || !moveTrial.best;
   input.checked = moveTrial.enabled;
-  document.getElementById('builderMoveTrialText').textContent = moveTrial.best
-    ? `Try ${moveTrial.best.to} over ${moveTrial.best.from}`
+  document.getElementById('builderMoveTrialRow').classList.toggle('preview-active',moveTrial.enabled);
+  document.getElementById('builderMoveLock').disabled=!moveTrial.finished || !moveTrial.best;
+  document.getElementById('builderMoveTrialText').innerHTML = moveTrial.best
+    ? `Try <b>${escapeHtml(moveTrial.best.to)}</b> <span class="swap-over">over ${escapeHtml(moveTrial.best.from)}</span>`
     : moveTrial.finished ? 'No move swap improves this offense score.' : 'Finding best move swap…';
+  document.getElementById('builderMoveTrialText').classList.add('swap-description');
+  input.setAttribute('aria-label',document.getElementById('builderMoveTrialText').textContent);
   document.getElementById('builderMoveTrialGain').textContent = moveTrial.best ? `+${moveTrial.best.gain.toFixed(1)} points` : '';
 }
 function moveSuggestionRanker(ours) {
@@ -1782,8 +1797,10 @@ function renderBuilderOffense(selected) {
     const trial=getAttackTrial(selected,stat),input=document.getElementById(`${prefix}Reduction`);
     const relevant=categories.has(category);
     document.getElementById(`${prefix}TrialRow`).hidden=!relevant;
+    document.getElementById(`${prefix}TrialRow`).classList.toggle('preview-active',trial.enabled);
     input.max=String(selected.investment[stat]);input.value=String(trial.points);
     input.disabled=!selected.investment[stat];
+    document.getElementById(`${prefix}Lock`).disabled=!trial.points || !selected.investment[stat];
     document.getElementById(`${prefix}Trial`).checked=trial.enabled;
     document.getElementById(`${prefix}Trial`).disabled=!selected.investment[stat];
     if(relevant && trial.enabled) thresholdStats.push(stat);
@@ -1819,8 +1836,23 @@ function renderOffenseRows(rows,key,context = '',groups = Offense.groups) {
       || (a.rank ?? Infinity)-(b.rank ?? Infinity) || a.species.name.localeCompare(b.species.name));
     if (!members.length) return '';
     const icons = members.map(member => {
-      const coverage = Math.min(100,member.coverage).toFixed(1);
-      const detail = member.error || member.detail || `${member.attacker ? `${member.attacker} · ` : ''}${member.move}${member.hitModel ? ` · Full attack; ${member.hitModel.expected.toFixed(2)} hits on average, including misses` : ''}${member.extraTurns ? ' · +1 turn to break Disguise' : ''}${member.firstHitAbility ? ` · ${member.firstHitAbility} halves the first hit; follow-up hits use normal damage` : ''}${member.repeatedUse ? ' · Repeated use includes cumulative offensive stat changes' : ''} · ${member.count} reported spreads cover ${coverage}% of sets (${member.reference}).`;
+      const defense=state.builderPanel==='defense',balance=state.builderPanel==='balance';
+      const detail=member.error || (balance
+        ? [`Estimated wins: ${(100*member.wins/member.samples).toFixed(1)}%`,
+           `We act first: ${member.samples>member.unknown ? (100*member.first/(member.samples-member.unknown)).toFixed(1) : 0}% of modeled duels`,
+           `Core: ${(member.coreModel?.core || []).map(move=>move.name).join(' + ') || 'unavailable'}; 2 sampled coverage moves`,
+           `${member.samples-member.unknown}/${member.samples} modeled · ${member.unknown} unmodeled · ${member.draws} draws`,
+           ...(member.coreModel?.warnings || []),
+           'Estimated builds + items; direct attacks only.'].join('\n')
+        : defense
+          ? [`Best attacks: ${(member.bestAttacks || []).slice(0,4).map(move=>`${move.name} ${move.percent.toFixed(1)}%`).join(' · ') || 'none'}`,
+             member.bestAttacks?.length>4 ? `+${member.bestAttacks.length-4} other attacks` : '',
+             'Attack shares are estimated per set, not move usage.'].filter(Boolean).join('\n')
+          : [`${member.attacker ? member.attacker+' · ' : ''}${member.move || 'No effective attack'}`,
+             member.hitModel ? `${member.hitModel.expected.toFixed(1)} hits on average, including misses` : '',
+             member.extraTurns ? '+1 turn for Disguise' : '',
+             member.firstHitAbility ? `${member.firstHitAbility}: first hit halved` : '',
+             member.repeatedUse ? 'Includes repeated-use stat drops' : ''].filter(Boolean).join('\n'));
       const changed=member.baselineKind;
       // Tier direction and optimization points differ: Might OHKO and 2HKO
       // intentionally score equally, but losing the OHKO chance improves defense.
@@ -1828,22 +1860,25 @@ function renderOffenseRows(rows,key,context = '',groups = Offense.groups) {
       const previousTier=groups.findIndex(group=>group.kind===changed);
       const better=changed && (state.builderPanel==='defense' ? currentTier>previousTier : currentTier<previousTier);
       const scenario=member.scenario;
-      const assumption=scenario ? `${scenario.value}${scenario.field==='terrain' ? ' Terrain' : ''} ${scenario.active ? `assumed active (${scenario.ability})` : `not assumed (${scenario.ability})`} · Weather: ${scenario.weather || 'None'} · Terrain: ${scenario.terrain || 'None'} · ` : '';
+      const assumption=scenario ? `${scenario.value}${scenario.field==='terrain' ? ' Terrain' : ''}: ${scenario.active ? 'active' : 'inactive'} (${scenario.ability})` : '';
       const thresholds=(member.statThresholds || []).map(threshold=>{
         const label={atk:'Atk',spa:'SpA',defense:'Def SP'}[threshold.stat];
         const delta=threshold.low===threshold.high ? `${threshold.high}` : `${threshold.low}–${threshold.high}`;
         const text=threshold.pending ? `${label} …` : threshold.error ? `${label} ?` : threshold.high ? `−${delta} ${label}` : '';
-        const explanation=threshold.pending ? `${label}: calculating a shared stat-removal path.` : threshold.error ? `${label}: threshold unavailable.`
-          : threshold.high ? `${label}: ${threshold.low===threshold.high ? threshold.high : `${threshold.low}–${threshold.high}`} additional points removed changes this tier to ${names[threshold.kind]}. ${threshold.stat==='defense' ? 'Along a shared locally optimal HP/Def/SpD removal path.' : 'Approximate six-point bracket, holding the other preview stats and moves fixed.'}`
-          : `${label}: no tier change within ${threshold.limit} remaining removable points on the shared path.`;
+        const explanation=threshold.pending ? `${label}: calculating…` : threshold.error ? `${label}: unavailable`
+          : threshold.high ? `Remove ${delta} ${label} → ${names[threshold.kind]} (${threshold.stat==='defense' ? 'approximate bulk-removal path' : 'approximate threshold'})`
+          : `${label}: no tier change within ${threshold.limit} removable points`;
         return {text,explanation,stat:threshold.stat};
       });
       const showChance=state.builderPanel!=='balance',chance=showChance ? Offense.tierProbability(member) : null;
       const chanceText=chance===null ? '' : chance>0 && chance<0.001 ? '<0.1%' : `${(100*chance).toFixed(1).replace(/\.0$/,'')}%`;
       const hits=Offense.tierHits(member.kind),koTarget=state.builderPanel==='defense' ? 'opponent KOing us' : 'KOing the opponent';
-      const chanceDetail=showChance ? chance===null ? 'KO probability unavailable for this matchup.'
-        : `${chanceText} chance of ${koTarget} ${hits===Infinity ? 'eventually (4+ tier or better)' : `within ${hits} attack${hits===1 ? '' : 's'}`}, weighted by reported builds and damage rolls${state.builderPanel==='defense' ? ' and estimated strongest-move availability' : ''}. ${member.accuracyMode==='multi-hit' ? 'Includes multi-hit accuracy and hit-count probabilities; a complete attack counts as one KO attempt.' : 'Excludes accuracy.'} Excludes healing.` : '';
-      const description = `${assumption}${member.species.name} · ${state.format} usage #${member.rank} · ${names[member.kind]}${showChance ? ` · ${chanceDetail}` : ''}${changed ? ` · Preview: ${names[changed]} → ${names[member.kind]}` : ''}${thresholds.length ? ` · ${thresholds.map(t=>t.explanation).join(' ')}` : ''} · ${detail}`;
+      const chanceDetail=showChance ? chance===null ? 'KO estimate unavailable.'
+        : `${chanceText} chance of ${koTarget} ${hits===Infinity ? 'over the modeled attack sequence' : `within ${hits} attack${hits===1 ? '' : 's'}`}\nUsage-weighted; ${member.accuracyMode==='multi-hit' ? 'includes hit accuracy/count' : 'excludes accuracy'}; no healing.` : '';
+      const description = [assumption,member.species.name,
+        showChance ? chanceDetail : '',names[member.kind],detail,
+        changed ? `Preview: ${names[changed]} → ${names[member.kind]}` : '',
+        ...thresholds.map(t=>t.explanation)].filter(Boolean).join('\n');
       const hasModeled=member.samples>(member.unknown || 0);
       const winText=hasModeled ? `${(100*member.wins/member.samples).toFixed(1).replace(/\.0$/,'')}%` : '';
       const winBadge=state.builderPanel==='balance' && hasModeled ? `<span class="balance-win-badge" aria-label="Estimated win percentage">${winText}</span>` : '';
@@ -1880,8 +1915,8 @@ function renderTeamMoveTrials() {
     const trial = teamMoveTrials.get(index);
     const text = trial?.best ? `Try <b>${escapeHtml(trial.best.to)}</b> <span class="swap-over">over ${escapeHtml(trial.best.from)}</span>`
       : trial?.finished ? 'No move swap improves team coverage.' : 'Finding best move swap…';
-    return `<label class="team-move-trial ${trial?.enabled ? 'preview-active' : ''}"><input type="checkbox" data-team-move-trial="${index}" ${trial?.enabled ? 'checked' : ''} ${trial?.best && trial.finished ? '' : 'disabled'} />
-      <strong>${escapeHtml(pokemonDisplayName(entry))}</strong><span class="swap-description">${text}</span>${trial?.best ? `<small>+${trial.best.gain.toFixed(1)} points</small>` : ''}</label>`;
+    return `<div class="team-move-trial ${trial?.enabled ? 'preview-active' : ''}"><input type="checkbox" aria-label="Preview move swap for ${escapeHtml(pokemonDisplayName(entry))}" data-team-move-trial="${index}" ${trial?.enabled ? 'checked' : ''} ${trial?.best && trial.finished ? '' : 'disabled'} />
+      <strong>${escapeHtml(pokemonDisplayName(entry))}</strong><span class="swap-description">${text}</span>${trial?.best ? `<small>+${trial.best.gain.toFixed(1)} points</small>` : ''}<button type="button" class="mini-button" data-team-move-lock="${index}" title="Save only this Pokémon’s move swap" ${trial?.best && trial.finished ? '' : 'disabled'}>Lock In Move</button></div>`;
   }).join('');
 }
 function prepareTeamMoveTrials(profiles) {
@@ -1951,6 +1986,8 @@ function updateDefenseTrialControl(selected) {
   budgetInput.hidden=!free;budgetInput.disabled=!free;
   document.getElementById('builderDefenseTrialSuffix').hidden=!free;
   input.checked=trial.enabled;input.disabled=!points || !trial.finished || !trial.best;
+  document.getElementById('builderDefenseTrialRow').classList.toggle('preview-active',trial.enabled);
+  document.getElementById('builderDefenseLock').disabled=!points || !trial.finished || !trial.best || trial.running;
   document.getElementById('builderDefenseTrialText').textContent=free
     ? 'Invest my'
     : 'Free up some stat points for defense and we will help you invest them :)';
@@ -2057,6 +2094,27 @@ function renderBalanceOptimization() {
   document.getElementById('balanceOptimizeProgress').textContent=opt.best
     ? `${opt.running ? opt.message || 'Searching' : opt.message || 'Search complete'} · ${opt.evaluations} spreads evaluated (limit 160) · Best confirmed: ${opt.best.score.toFixed(2)} / ${total.toFixed(0)}${spread}`
     : opt.message || '';
+}
+function lockSuggestedMove(index=state.activeOurIndex,team=false) {
+  const entry=state.ourTeam[index],trial=team ? teamMoveTrials.get(index) : moveTrial;
+  if(!entry || !trial?.finished || !trial.best || entry.moveSet[trial.best.slot]!==trial.best.from) return;
+  entry.moveSet[trial.best.slot]=trial.best.to;
+  trial.enabled=false;
+  saveTeamToStorage();render();
+}
+function lockAttackReduction(stat) {
+  const entry=state.ourTeam[state.activeOurIndex];if(!entry) return;
+  const trial=getAttackTrial(entry,stat),points=clamp(trial.points,0,entry.investment[stat]);
+  if(!points) return;
+  entry.investment[stat]-=points;trial.enabled=false;trial.points=0;
+  saveTeamToStorage();render();
+}
+function lockDefenseSpread() {
+  const entry=state.ourTeam[state.activeOurIndex],trial=defenseTrial;
+  if(!entry || !trial.finished || trial.running || !trial.best || !getDefenseBudget(entry)) return;
+  entry.investment={...trial.best.investment};trial.enabled=false;
+  defenseBudgets.set(entry,0);cancelDefenseSearch();
+  saveTeamToStorage();render();
 }
 function lockBalanceSpread() {
   const opt=balanceOptimization,selected=state.ourTeam[state.activeOurIndex];
@@ -2263,21 +2321,22 @@ function renderTeamBuilder() {
   summary.innerHTML = `<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>Speed <b>${data.target}</b> · ${selected.investment.spe} SP · ${escapeHtml(selected.nature.name)}</span>`;
   summary.append(document.getElementById('builderStages'));
   const icon = member => {
-    const rank = member.species.usage?.[state.format]?.rank;
-    let description = `${member.species.name} · Base Speed ${member.baseSpeed} · ${member.tie ? 'Same base Speed. ' : ''}${member.tier.label}${rank ? ` · ${state.format} usage #${rank}` : ''} · Weather: ${member.weather || 'None'}; Terrain: ${member.terrain || 'None'} · Opponent ability: ${member.ability || 'not assumed'}`;
-    const showEstimate=member.tier.kind==='nature' || member.tie;
+    let description = member.species.name;
+    const showEstimate=!['always-faster','always-slower'].includes(member.tier.kind);
     const chanceBadge=showEstimate && member.speedEstimate
       ? `<span class="speed-chance-badge" title="${escapeHtml(speedEstimateDescription(member.speedEstimate))}">${speedEstimateText(member.speedEstimate)}</span>` : '';
-    if(showEstimate) description+=` · ${speedEstimateDescription(member.speedEstimate)}`;
+    if(showEstimate) description+=`\n${speedEstimateDescription(member.speedEstimate)}`;
+    description+=`\n${speedMatchupDescription(member.tier)}`;
+    description+=`\n${member.tie ? 'Same base Speed: ' : 'Base Speed: '}${member.baseSpeed}`;
+    const conditions=[member.weather,member.terrain,member.ability,selected.item ? `Our item: ${selected.item}` : ''].filter(Boolean);
+    if(conditions.length) description+=`\n${conditions.join(' · ')}`;
     const investmentEligible=!(member.tier.kind==='always-slower' && member.outspeedPoints===0);
     const showBadge=investmentEligible && member.outspeedPoints!==null;
     const investmentTip=showBadge && member.outspeedPoints!==null
       ? `${member.outspeedPoints>32 ? 'With a Speed-boosting nature · ' : ''}Invest ${member.outspeedPoints} or more to always be faster` : '';
-    if(investmentTip) description+=` · ${investmentTip}`;
-    const speedRequirement=member.outspeedPoints===null ? `Cannot guarantee outspeeding the opponent’s maximum-Speed build even with 32 Speed SP and a Speed-boosting nature${selected.item ? ` while holding ${selected.item}` : ''}. This does not mean every reported build is faster`
-      : `${member.outspeedPoints} neutral-nature-equivalent Speed points to always outspeed${member.outspeedPoints>32 ? '; requires a Speed-boosting nature' : ''}`;
-    if(investmentEligible && member.outspeedPoints===null) description+=` · ${speedRequirement}.`;
-    const badge=showBadge ? `<span class="speed-investment-badge" title="${escapeHtml(speedRequirement)}; our item and ability versus 32 Speed SP and a Speed-boosting nature, no opponent item, in this field.${investmentTip ? ` ${investmentTip}` : ''}">${member.outspeedPoints}</span>` : '';
+    if(investmentTip) description+=`\n${investmentTip}`;
+    if(investmentEligible && member.outspeedPoints===null) description+='\nCannot guarantee outspeeding, even with max Speed + nature.';
+    const badge=showBadge ? `<span class="speed-investment-badge" title="${escapeHtml(investmentTip)}&#10;Against max Speed + nature; current field, no opponent item.">${member.outspeedPoints}</span>` : '';
 
     return `<span class="tier-pokemon${builderReferences.has(member.species.id) ? ' reference-highlighted' : ''}" ${referenceAttributes(member.species.id)} data-tier-species="${escapeHtml(member.species.id)}" data-required-points="${member.tier.points ?? ''}" title="${escapeHtml(description)}">
       <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${badge}${chanceBadge}</span>`;
@@ -2326,6 +2385,25 @@ function showItemTooltip(button) {
   tooltip.style.top=`${Math.max(8,Math.min(top,innerHeight-box.height-8))}px`;
 }
 function bindStaticControls() {
+  const iconSize=document.getElementById('builderIconSize');
+  const applyIconSize=value=>{
+    const size=clamp(Number(value) || 94.5,54,160);
+    iconSize.value=String(size);iconSize.title=`${size}px`;
+    document.getElementById('teamBuilderPanel').style.setProperty('--builder-icon-size',`${size}px`);
+  };
+  try {applyIconSize(localStorage.getItem('pokelator-builder-icon-size'));} catch {applyIconSize(94.5);}
+  iconSize.addEventListener('input',()=>{
+    applyIconSize(iconSize.value);
+    try {localStorage.setItem('pokelator-builder-icon-size',iconSize.value);} catch { /* Works for this session. */ }
+  });
+  document.getElementById('builderMoveLock').addEventListener('click',()=>lockSuggestedMove());
+  document.getElementById('builderDefenseLock').addEventListener('click',lockDefenseSpread);
+  document.getElementById('builderAttackLock').addEventListener('click',()=>lockAttackReduction('atk'));
+  document.getElementById('builderSpecialAttackLock').addEventListener('click',()=>lockAttackReduction('spa'));
+  document.getElementById('teamOffenseTrials').addEventListener('click',event=>{
+    const button=event.target.closest('[data-team-move-lock]');
+    if(button) lockSuggestedMove(Number(button.dataset.teamMoveLock),true);
+  });
   document.addEventListener('change',event=>{
     const input=event.target.closest('input[data-compact-stage]');
     if(!input) return;
@@ -2557,7 +2635,14 @@ function bindStaticControls() {
       renderDamageRanges();
     });
   });
-  bindUsagePicker(document.getElementById('pokemonSearchInput'),{choices:buildSearchResults,markup:pokemonChoiceMarkup,choose:item=>addOpponentFromSearch(item.name)});
+  const createFilters=input=>new PokemonFilters({catalog:pokemonCatalog,generation:Battle.generation,usage:pokemonUsageReference,
+    moveMeta:Battle.moveMeta,bindPicker:bindUsagePicker,moveMarkup:moveChoiceMarkup,abilityMarkup:abilityChoiceMarkup,
+    onApply:()=>{input.value='';}});
+  teamPokemonFilters=createFilters(document.getElementById('teamPokemonInput'));
+  opponentPokemonFilters=createFilters(document.getElementById('pokemonSearchInput'));
+  teamPokemonFilters.mount(document.getElementById('teamPokemonInput'));
+  opponentPokemonFilters.mount(document.getElementById('pokemonSearchInput'));
+  bindUsagePicker(document.getElementById('pokemonSearchInput'),{choices:query=>buildSearchResults(query,false,opponentPokemonFilters),markup:pokemonChoiceMarkup,choose:item=>addOpponentFromSearch(item.name)});
   bindUsagePicker(document.getElementById('teamPokemonInput'),{choices:buildTeamSearchResults,markup:pokemonChoiceMarkup,choose:item=>addTeamPokemon(item.name,item.savedBuild)});
   document.addEventListener('pointerdown',event=>{
     if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target) && event.target!==activeUsagePicker.input) closeUsagePicker();
@@ -2761,6 +2846,20 @@ function getEffectiveStat(entry, stat) {
   const species = battleSpecies(entry,'our');
   entry=battleEntry(entry);
   return stat === 'spe' ? Battle.speed(species, entry,state) : Battle.effectiveStat(species, entry, stat);
+}
+function statInvestmentBreakdown(entry,stat) {
+  const invested=Number(entry.investment?.[stat] || 0);
+  if(!invested) return '';
+  const species=battleSpecies(entry,'our'),combatant=battleEntry(entry);
+  const base=species.stats[stat];
+  const nature=Battle.effectiveStat(species,combatant,stat)-base-invested;
+  const modifiers=getEffectiveStat(entry,stat)-base-invested-nature;
+  const delta=value=>`${value<0 ? '−' : '+'} ${Math.abs(value)}`;
+  return `(${base} + ${invested}${nature ? ` ${delta(nature)}` : ''}${modifiers ? ` ${delta(modifiers)}` : ''})`;
+}
+function updateStatInvestmentLabels(container,entry) {
+  for(const output of container.querySelectorAll('[data-stat-total]')) output.textContent=getEffectiveStat(entry,output.dataset.statTotal);
+  for(const breakdown of container.querySelectorAll('[data-stat-breakdown]')) breakdown.textContent=statInvestmentBreakdown(entry,breakdown.dataset.statBreakdown);
 }
 function getDefenseInvestmentLevels() {
   return [0, 35, 64].map(points => ({points, label: `${points} SP: optimal HP / relevant defense`}));

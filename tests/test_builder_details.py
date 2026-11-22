@@ -112,6 +112,21 @@ class BuilderDetailTests(unittest.TestCase):
                 self.assertEqual(badge.inner_text(),str(row['expected']))
         self.assertTrue(any(row['actual'] is not None for row in results))
 
+    def test_plus_two_speed_floette_tie_matches_investment_threshold(self):
+        self.load()
+        result=self.evaluate("""() => {
+          state.ourTeam=[sanitizeTeamEntry({name:'Kingambit',nature:'Adamant',investment:{spe:9}})];state.activeOurIndex=0;
+          getPreferences(state.ourTeam[0],'our').speedStage=2;
+          builderRoster=()=>['Floette'].map(getPokemonByName);state.builderPanel='speed';setView('builder');
+          const selector='[data-tier-species="'+getPokemonByName('Floette').id+'"]';
+          const atNine=document.querySelector(selector);
+          const result={group:atNine.closest('[data-speed-group]').dataset.speedGroup,badge:atNine.querySelector('.speed-investment-badge').textContent};
+          state.ourTeam[0].investment.spe=10;renderTeamBuilder();
+          result.atTen=document.querySelector(selector).closest('[data-speed-group]').dataset.speedGroup;
+          return result;
+        }""")
+        self.assertEqual(result,{'group':'max-speed-tie','badge':'10','atTen':'always-slower'})
+
     def test_battle_skulls_share_allies_count_and_reset(self):
         self.load()
         self.assertEqual(self.page.locator('#battleFaintedInput button').count(),4)

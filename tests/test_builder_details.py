@@ -88,6 +88,30 @@ class BuilderDetailTests(unittest.TestCase):
         self.assertEqual(self.evaluate('state.ourTeam[0].investment.spe'),32)
         self.assertEqual(self.evaluate('state.ourTeam[0].nature.name'),'Adamant')
 
+    def test_scarf_speed_badges_include_faster_base_speed_opponents(self):
+        self.load()
+        self.evaluate("""() => {
+          state.ourTeam=[sanitizeTeamEntry({name:'Basculegion Male',item:'Choice Scarf',ability:'Adaptability',nature:'Modest',investment:{spe:0}})];state.activeOurIndex=0;
+          builderRoster=()=>['Garchomp','Sneasler','Dragapult'].map(getPokemonByName);render();
+        }""")
+        self.page.locator('#teamBuilderButton').click()
+        results=self.evaluate("""() => {
+          const entry=state.ourTeam[0],selected=getPokemonByName(entry.name);
+          return Battle.builderSpeedGroups(builderRoster(),selected,entry).groups.flatMap(g=>g.members).map(member=>{
+            const target=Battle.speed(member.species,{investment:{spe:32},nature:{plus:'spe',minus:'spa'}});
+            const limit=Math.floor((selected.stats.spe+32)*1.1)-selected.stats.spe;
+            const expected=Array.from({length:limit+1},(_,spe)=>spe).find(spe=>Battle.speed(selected,{...entry,nature:null,investment:{spe}})>target);
+            return {id:member.species.id,actual:member.outspeedPoints,expected:expected ?? null};
+          });
+        }""")
+        for row in results:
+            self.assertEqual(row['actual'],row['expected'])
+            badge=self.page.locator('[data-tier-species="'+row['id']+'"] .speed-investment-badge')
+            self.assertEqual(badge.count(),int(row['expected'] is not None))
+            if row['expected'] is not None:
+                self.assertEqual(badge.inner_text(),str(row['expected']))
+        self.assertTrue(any(row['actual'] is not None for row in results))
+
     def test_battle_skulls_share_allies_count_and_reset(self):
         self.load()
         self.assertEqual(self.page.locator('#battleFaintedInput button').count(),4)

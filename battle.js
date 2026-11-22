@@ -227,7 +227,9 @@
       // The shared boundary 16 belongs to the 16–32 group; each form appears once.
       const kind = tier.kind === 'investment' ? (tier.points < 16 ? 'low-investment' : 'high-investment') : tier.kind;
       let outspeedPoints=null,outspeedNaturePoints=null;
-      if(species.stats.spe<selected.stats.spe) {
+      // Items, abilities and stages can let a slower species beat a faster one.
+      // Calculate the requirement for every opponent, regardless of base Speed.
+      {
         const ceiling=speed(species,{item:'',ability,speedStage,investment:{spe:32},nature:{plus:'spe',minus:'spa'}},field);
         const at=(points,boosted=false)=>speed(selected,{...entry,nature:boosted ? {plus:'spe',minus:'spa'} : null,
           investment:{...entry.investment,spe:points}},field);

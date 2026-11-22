@@ -2269,7 +2269,7 @@ function renderTeamBuilder() {
     const chanceBadge=showEstimate && member.speedEstimate
       ? `<span class="speed-chance-badge" title="${escapeHtml(speedEstimateDescription(member.speedEstimate))}">${speedEstimateText(member.speedEstimate)}</span>` : '';
     if(showEstimate) description+=` · ${speedEstimateDescription(member.speedEstimate)}`;
-    const investmentEligible=member.baseSpeed<data.baseSpeed && !(member.tier.kind==='always-slower' && member.outspeedPoints===0);
+    const investmentEligible=!(member.tier.kind==='always-slower' && member.outspeedPoints===0);
     const showBadge=investmentEligible && member.outspeedPoints!==null;
     const investmentTip=showBadge && member.outspeedPoints!==null
       ? `${member.outspeedPoints>32 ? 'With a Speed-boosting nature · ' : ''}Invest ${member.outspeedPoints} or more to always be faster` : '';

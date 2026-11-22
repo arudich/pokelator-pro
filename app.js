@@ -2849,13 +2849,13 @@ function getEffectiveStat(entry, stat) {
 }
 function statInvestmentBreakdown(entry,stat) {
   const invested=Number(entry.investment?.[stat] || 0);
-  if(!invested) return '';
   const species=battleSpecies(entry,'our'),combatant=battleEntry(entry);
   const base=species.stats[stat];
   const nature=Battle.effectiveStat(species,combatant,stat)-base-invested;
+  if(!invested && !nature) return '';
   const modifiers=getEffectiveStat(entry,stat)-base-invested-nature;
   const delta=value=>`${value<0 ? '−' : '+'} ${Math.abs(value)}`;
-  return `(${base} + ${invested}${nature ? ` ${delta(nature)}` : ''}${modifiers ? ` ${delta(modifiers)}` : ''})`;
+  return `(${base}${invested ? ` + ${invested}` : ''}${nature ? ` ${delta(nature)}` : ''}${modifiers ? ` ${delta(modifiers)}` : ''})`;
 }
 function updateStatInvestmentLabels(container,entry) {
   for(const output of container.querySelectorAll('[data-stat-total]')) output.textContent=getEffectiveStat(entry,output.dataset.statTotal);

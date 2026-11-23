@@ -10,6 +10,27 @@ class MultiHitTests(unittest.TestCase):
     load=app_tests.AppTests.load
     evaluate=app_tests.AppTests.evaluate
 
+    def test_battle_ranges_assume_hits_but_keep_immunities_and_hit_count_variation(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const ours=sanitizeTeamEntry({name:'Aerodactyl',nature:'Jolly',investment:{atk:32},moveSet:['Dual Wingbeat']});
+          const target=sanitizeOpponentEntry({name:'Overqwil'});
+          const raw=Battle.range(getPokemonByName(ours.name),ours,getPokemonByName(target.name),target,'Dual Wingbeat');
+          const shown=calculateMoveRange(ours,target,'Dual Wingbeat');
+          const mouse=sanitizeTeamEntry({name:'Maushold',moveSet:['Population Bomb']});
+          const immune=calculateMoveRange(mouse,sanitizeOpponentEntry({name:'Gengar'}),'Population Bomb');
+          const rock=MultiHit.plan({...Battle.moveMeta('Rock Blast'),...BALANCE_MOVES.moves.rockblast},{},{},{assumeHits:true});
+          state.ourTeam=[ours];state.activeOurIndex=0;state.opponentList=[target];state.activeOpponentIndex=0;render();
+          return {rawLow:raw.low,shownLow:shown.low,hits:shown.hitModel.expected,immune:immune.high,
+            counts:rock.counts.map(([n])=>n),damage:document.querySelector('[data-move="Dual Wingbeat"]').textContent};
+        }""")
+        self.assertEqual(result['rawLow'],0)
+        self.assertGreater(result['shownLow'],0)
+        self.assertEqual(result['hits'],2)
+        self.assertEqual(result['immune'],0)
+        self.assertEqual(result['counts'],[2,3,4,5])
+        self.assertIn('2 hits avg',result['damage'])
+
     def test_hit_distributions_include_misses_items_and_abilities(self):
         self.load()
         result=self.evaluate("""() => {
@@ -126,7 +147,7 @@ class MultiHitTests(unittest.TestCase):
           state.opponentList=[sanitizeOpponentEntry({name:'Snorlax'})];state.activeOurIndex=state.activeOpponentIndex=0;render();
         }""")
         self.assertIn('full attack',self.page.locator('[data-move="Population Bomb"]').inner_text())
-        self.assertIn('9.47 hits avg',self.page.locator('[data-move="Population Bomb"]').inner_text())
+        self.assertIn('10 hits avg',self.page.locator('[data-move="Population Bomb"]').inner_text())
         self.evaluate("state.builderTopN=10;state.builderPanel='offense';setView('builder')")
         self.page.wait_for_selector('[data-offense-species]')
         self.assertGreater(self.page.locator('[data-offense-group="probable-ohko"] [data-offense-species], [data-offense-group="might-ohko"] [data-offense-species]').count(),0)

@@ -18,7 +18,7 @@
     return Math.min(1,Math.max(0,value));
   }
   function plan(meta,a,b,field={}) {
-    const hit=accuracy(a,b,meta,field),counts=new Map();
+    const hit=field.assumeHits ? 1 : accuracy(a,b,meta,field),counts=new Map();
     const add=(n,p)=>{if(p>0) counts.set(n,(counts.get(n) || 0)+p);};
     const bounds=meta.multihit,maximum=Array.isArray(bounds) ? bounds[1] : bounds;
     if(meta.multiaccuracy && a.ability!=='Skill Link' && a.item!=='Loaded Dice') {

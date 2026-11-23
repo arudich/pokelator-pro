@@ -240,10 +240,10 @@ class AppTests(unittest.TestCase):
         self.page.reload()
         self.assertEqual(self.page.locator('.team-row').count(),5)
         for _ in range(4):
-            self.page.locator('[data-remove-team-index]').click()
+            self.page.locator('.expanded-team [data-remove-team-index]').click()
         self.assertEqual(self.page.locator('.team-row').count(),1)
         self.assertEqual(self.evaluate('state.activeOurIndex'),0)
-        self.page.locator('[data-remove-team-index]').click()
+        self.page.locator('.expanded-team [data-remove-team-index]').click()
         self.assertEqual(self.page.locator('.team-row').count(),0)
         self.page.reload()
         self.assertEqual(self.page.locator('.team-row').count(),0)

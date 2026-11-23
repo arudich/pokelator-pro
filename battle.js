@@ -46,10 +46,11 @@
   function moveMeta(name) {
     const move = generation.moves.get(calc.toID(name));
     if (!move) return null;
-    return {name: move.name, category: move.category, type: window.CHAMPIONS_MOVE_TYPES?.[calc.toID(name)] || move.type,
+    const category=window.BALANCE_MOVES?.moves[calc.toID(name)]?.category || move.category || 'Status';
+    return {name: move.name, category, type: window.CHAMPIONS_MOVE_TYPES?.[calc.toID(name)] || move.type,
       power: move.basePower, selfBoosts:move.self?.boosts || {}, spread: ['allAdjacent', 'allAdjacentFoes'].includes(move.target),
-      multihit: move.multihit, defensiveStat: move.overrideDefensiveStat || (move.category === 'Physical' ? 'def' : 'spd'),
-      offensiveStat: move.overrideOffensiveStat || (move.category === 'Physical' ? 'atk' : 'spa')};
+      multihit: move.multihit, defensiveStat: move.overrideDefensiveStat || (category === 'Physical' ? 'def' : 'spd'),
+      offensiveStat: move.overrideOffensiveStat || (category === 'Physical' ? 'atk' : 'spa')};
   }
   function withStages(entry,stages = {}) {
     const boosts={...entry.boosts};

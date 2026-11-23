@@ -393,7 +393,8 @@ function statStages(entry,side) {
   return {offense:prefs.offenseStage,defense:prefs.defenseStage};
 }
 function compactStages(role,label,value,description,disabled=false) {
-  return `<fieldset class="compact-stage-control stat-stage-control" ${disabled ? 'disabled' : ''}><legend>${label}</legend><div class="stat-stage-options compact-stage-options">${[-2,-1,0,1,2].map(stage=>{
+  const limit=role==='builder-offense' ? 6 : 2;
+  return `<fieldset class="compact-stage-control stat-stage-control${limit===6 ? ' compact-stage-wide' : ''}" ${disabled ? 'disabled' : ''}><legend>${label}</legend><div class="stat-stage-options compact-stage-options">${Array.from({length:2*limit+1},(_,index)=>index-limit).map(stage=>{
     const text=stage>0 ? `+${stage}` : stage<0 ? `−${-stage}` : '0';
     const factor=stage>=0 ? (2+stage)/2 : 2/(2-stage);
     const hint=`${description} Stage ${text}: ×${Number(factor.toFixed(3))}.`;
@@ -891,7 +892,7 @@ function popularTeamBuild(species) {
     nature:nature?.name || (offense==='atk' ? 'Adamant' : 'Modest')};
 }
 
-function addTeamPokemon(name,savedBuild=null) {
+function addTeamPokemon(name,savedBuild=null,satisfyingSet=null) {
   const status = document.getElementById('teamAddStatus');
   const species = getPokemonByName(name);
   if (!species) {
@@ -899,7 +900,11 @@ function addTeamPokemon(name,savedBuild=null) {
     status.hidden = false;
     return false;
   }
-  state.ourTeam.push(sanitizeTeamEntry(savedBuild ? {...structuredClone(savedBuild),name:species.name} : {name:species.name,...popularTeamBuild(species)}));
+  if(!savedBuild && teamPokemonFilters?.hasMoveRequirements()) {
+    satisfyingSet=satisfyingSet || teamPokemonFilters.satisfyingSet(species);
+    if(!satisfyingSet){status.textContent='Choose a Pokémon that matches the move filters.';status.hidden=false;return false;}
+  }
+  state.ourTeam.push(sanitizeTeamEntry(savedBuild ? {...structuredClone(savedBuild),name:species.name} : {name:species.name,...popularTeamBuild(species),...satisfyingSet}));
   window.SiteUsage?.count('pokemon_added');
   if(!state.teamOffenseCustomized) resetTeamOffenseSelection();
   else state.teamOffenseExcluded.add(state.ourTeam.at(-1));
@@ -952,6 +957,53 @@ function pokemonUsageReference(species) {
   return data[exact] || (shared && data[shared]) || (!species.isMega && data[reference]) || null;
 }
 let teamPokemonFilters,opponentPokemonFilters;
+const priorityChoiceCache=new Map(),priorityRankingCache=new Map();
+let priorityJob=null;
+function priorityChoices(species,filters) {
+  const key=JSON.stringify([state.format,species.id,filters.abilities,filters.priorityConditional,filters.priorityUsage,filters.priorityCategory,filters.priorityType]);
+  if(!priorityChoiceCache.has(key))priorityChoiceCache.set(key,PriorityMoves.choices(species,getUsage(species),filters));
+  return priorityChoiceCache.get(key);
+}
+function priorityBuild(species,allowedAbilities=[]) {
+  const usage=getUsage(species),popular=rows=>[...(rows || [])].sort((a,b)=>(b.percent || 0)-(a.percent || 0));
+  const ability=popular(usage?.abilities).find(row=>species.abilities.includes(row.name) && (!allowedAbilities.length || allowedAbilities.includes(row.name)))?.name
+    || species.abilities.find(name=>!allowedAbilities.length || allowedAbilities.includes(name));
+  return sanitizeTeamEntry({name:species.name,...popularTeamBuild(species),ability,item:popular(usage?.items)[0]?.name || ''});
+}
+function priorityRanking(filters) {
+  const roster=builderRoster({stats:{spe:-1}},false),weights=statDistributionWeights(roster);
+  const options={format:state.format,weather:state.weather,terrain:state.terrain};
+  const key=JSON.stringify([options,state.metaMode,roster.map(s=>[s.id,weights.get(s.id)]),filters.abilities,
+    filters.priorityConditional,filters.priorityUsage,filters.priorityCategory,filters.priorityType]);
+  if(priorityRankingCache.has(key))return priorityRankingCache.get(key);
+  if(priorityJob?.key===key)return null;
+  priorityJob?.worker.terminate();
+  const worker=new Worker('priority-worker.js?v=20261123-priority');
+  priorityJob={key,worker,progress:'Ranking priority attacks…'};
+  const refresh=()=>{
+    const picker=activeUsagePicker;
+    if(picker && [teamPokemonFilters?.input,opponentPokemonFilters?.input].includes(picker.input)) {
+      picker.items=picker.choices(picker.query);picker.cursor=Math.min(picker.cursor,Math.max(0,picker.items.length-1));updateUsagePicker();
+    }
+  };
+  worker.onmessage=({data})=>{
+    if(priorityJob?.key!==key)return;
+    if(data.rows){
+      priorityRankingCache.set(key,new Map(data.rows.map(row=>[row.id,row.best])));
+      if(priorityRankingCache.size>4)priorityRankingCache.delete(priorityRankingCache.keys().next().value);
+      priorityJob=null;worker.terminate();
+    }else if(data.error){priorityJob.progress='Priority ranking unavailable. Try changing the filters.';worker.terminate();}
+    else priorityJob.progress=`Ranking priority attacks · ${data.progress}/${data.total}`;
+    refresh();
+  };
+  worker.onerror=()=>{if(priorityJob?.key===key){priorityJob.progress='Priority ranking unavailable. Try changing the filters.';worker.terminate();refresh();}};
+  const candidates=pokemonCatalog.flatMap(species=>{
+    const moves=priorityChoices(species,filters);
+    return moves.length ? [{species:defenseSpecies(species),entry:priorityBuild(species,filters.abilities),moves}] : [];
+  });
+  worker.postMessage({candidates,targets:roster.map(species=>({species:defenseSpecies(species),entry:priorityBuild(species),weight:weights.get(species.id) ?? 1})),options});
+  return null;
+}
 function buildSearchResults(query,includeAll=false,filters=null) {
   const clean=query.trim().toLowerCase();
   if(!clean && !includeAll && !filters?.active && !filters?.showAll) return [];
@@ -964,18 +1016,18 @@ function buildSearchResults(query,includeAll=false,filters=null) {
 function buildTeamSearchResults(query) {
   const regular=buildSearchResults(query,false,teamPokemonFilters),matches=new Set(regular.map(species=>species.id));
   if(!matches.size) return regular;
-  const saved=state.teamLibrary.flatMap(team=>(team.savedPokemon || team.pokemon).filter(entry=>matches.has(entry.id)).map(entry=>({
+  const saved=state.teamLibrary.flatMap(team=>(team.savedPokemon || team.pokemon).filter(entry=>matches.has(entry.id) && (!teamPokemonFilters.hasMoveRequirements() || teamPokemonFilters.matchesBuild(regular.find(species=>species.id===entry.id),entry))).map(entry=>({
     ...regular.find(species=>species.id===entry.id),savedBuild:structuredClone(entry),sourceTeamId:team.id,sourceTeamName:team.name
   }))).sort((a,b)=>(b.sourceTeamId===state.activeTeamId)-(a.sourceTeamId===state.activeTeamId)
     || a.sourceTeamName.localeCompare(b.sourceTeamName) || a.name.localeCompare(b.name));
   return [...regular,...saved];
 }
 function pokemonChoiceMarkup(species) {
-  const sortValue=species.pickerSort && species.pickerSort!=='usage' ? `${statLabels[species.pickerSort]} ${species.pickerSortValue}` : '';
+  const sortValue=species.pickerSort==='priority' ? (Number.isFinite(species.pickerSortValue) ? `${species.pickerSortValue.toFixed(1)}% avg HP` : species.priorityPending ? 'Ranking…' : 'Unavailable') : species.pickerSort && species.pickerSort!=='usage' ? `${statLabels[species.pickerSort]} ${species.pickerSortValue}` : '';
   if(species.savedBuild) {
     const build=species.savedBuild;
     return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" />
-      <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${sortValue || 'Saved build'}</small></div>
+      <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${species.pickerSort==='priority' ? 'Saved build' : sortValue || 'Saved build'}</small></div>
       <div class="saved-build-team">${escapeHtml(species.sourceTeamName)}</div>
       <div class="search-item-sub">${escapeHtml(build.nature.name)}${build.item ? ` · ${escapeHtml(build.item)}` : ''} · ${escapeHtml(build.ability)}</div>
       <div class="search-item-sub">${statOrder.filter(stat=>build.investment[stat]).map(stat=>`${statLabels[stat]} ${build.investment[stat]}`).join(' · ') || 'No stat investment'}</div>
@@ -984,8 +1036,8 @@ function pokemonChoiceMarkup(species) {
   const usage=pokemonUsageReference(species);
   const shared=usage && calc.toID(usage.name)!==calc.toID(species.id);
   return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" />
-    <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${sortValue || (usage ? `${species.pickerSort==='usage' && usage.rank ? '#'+usage.rank+' · ' : ''}${usage.percent.toFixed(2)}%${shared ? ' shared' : ''}` : 'Usage unavailable')}</small></div>
-    <div class="search-item-sub">${species.types.join(' / ')}${species.cosmeticBaseId ? ' · Cosmetic form · shared stats and usage' : ''}</div>${baseStatsMarkup(species)}</div>`;
+    <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small ${species.pickerSort==='priority' ? 'data-quick-tooltip="Mean damage of the best qualifying priority move against typical Top N builds; capped at full HP for each opponent. Conditions assumed satisfied. Weather, terrain and Meta Mode weights apply."' : ''}>${sortValue || (usage ? `${species.pickerSort==='usage' && usage.rank ? '#'+usage.rank+' · ' : ''}${usage.percent.toFixed(2)}%${shared ? ' shared' : ''}` : 'Usage unavailable')}</small></div>
+    <div class="search-item-sub">${species.types.join(' / ')}${species.cosmeticBaseId ? ' · Cosmetic form · shared stats and usage' : ''}</div>${baseStatsMarkup(species)}${species.satisfyingSet ? `<div class="search-item-sub satisfying-moves">${species.satisfyingSet.moveSet.map(name=>`<span>${escapeHtml(name)}</span>`).join(' · ')}</div>` : ''}</div>`;
 }
 function buildMoveChoices(species,query='') {
   const clean=query.trim().toLowerCase();
@@ -1042,17 +1094,28 @@ function closeUsagePicker() {
   if(popup.matches(':popover-open')) popup.hidePopover();
   popup.innerHTML='';input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');activeUsagePicker=null;
 }
-function bindUsagePicker(input,{choices,markup,choose,kind='pokemon',hint=''}) {
+function bindUsagePicker(input,{choices,markup,choose,kind='pokemon',hint='',moveFilterOptions={}}) {
   input.removeAttribute('list');input.autocomplete='off';input.setAttribute('role','combobox');
   input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-expanded','false');input.setAttribute('aria-controls','searchResults');
+  let moveFilters=null;
+  const unfilteredChoices=choices;
+  if(kind==='move')choices=query=>unfilteredChoices(query).filter(move=>moveFilters.accept(move));
   const open=(query)=>{
     closeUsagePicker();
     const popup=document.getElementById('searchResults');popup.className='search-results usage-choice-popup';popup.setAttribute('popover','manual');popup.setAttribute('role','listbox');
     const items=choices(query),exact=items.findIndex(item=>item.name.toLowerCase()===query.trim().toLowerCase());
-    activeUsagePicker={input,popup,items,cursor:Math.max(0,exact),query,markup,choose,kind,hint};
+    activeUsagePicker={input,popup,items,cursor:Math.max(0,exact),query,choices,markup,choose,kind,hint};
     updateUsagePicker();
   };
+  if(kind==='move') {
+    moveFilters=new MoveFilters.Picker({input,choices:()=>unfilteredChoices(''),
+      test:moveFilterOptions.matches || ((move,query)=>MoveFilters.matches(move,query,moveFilterOptions.species)),
+      onRequirement:moveFilterOptions.onRequirement,
+      onChange:show=>{if(show)open('');else if(activeUsagePicker?.input===input)open(activeUsagePicker.query);}});
+    moveFilters.mount();input.moveFilters=moveFilters;
+  }
   input.addEventListener('focus',()=>open(kind==='move' || kind==='ability' || kind==='item' ? '' : input.value));
+  if(kind==='move')input.addEventListener('click',()=>{if(activeUsagePicker?.input!==input)open('');});
   input.addEventListener('input',()=>open(input.value));
   input.addEventListener('blur',()=>{if(activeUsagePicker?.input===input) closeUsagePicker();});
   input.addEventListener('keydown',event=>{
@@ -1077,8 +1140,11 @@ function updateUsagePicker() {
   const {input,popup,items,cursor,kind}=picker;
   if(input.id==='pokemonSearchInput') {state.searchQuery=picker.query;state.searchResults=items;state.searchCursor=cursor;}
   const snapshot=window.META_USAGE?.formats[state.format];
-  popup.innerHTML=`<div class="choice-source">${escapeHtml(picker.hint || `${state.format} · ${snapshot?.month || ''} Showdown usage`)}</div>`
+  const priorityFilter=input===teamPokemonFilters?.input ? teamPokemonFilters : input===opponentPokemonFilters?.input ? opponentPokemonFilters : null;
+  const rankingHint=priorityFilter?.sort==='priority' ? `${priorityJob?.progress || 'Priority Strength · best attack · typical builds'} · Top ${state.builderTopN} · ${state.format}` : '';
+  popup.innerHTML=`<div class="choice-source">${escapeHtml(rankingHint || picker.hint || `${state.format} · ${snapshot?.month || ''} Showdown usage`)}</div>`
     +(items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="usage-choice-${index}" data-choice-index="${index}" class="${kind==='pokemon' ? 'search-item' : kind==='ability' ? 'ability-choice' : kind==='item' ? 'item-choice' : 'move-choice'} usage-choice ${index===cursor ? 'active' : ''}">${picker.markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>');
+  if(kind==='move' && input.moveFilters && !input.moveFilters.onRequirement)popup.querySelector('.choice-source').append(input.moveFilters.button);
   for(const row of popup.querySelectorAll('[data-choice-index]')) {
     row.addEventListener('pointerdown',event=>event.preventDefault());
     row.addEventListener('click',()=>{const item=items[Number(row.dataset.choiceIndex)];closeUsagePicker();picker.choose(item);});
@@ -1086,6 +1152,11 @@ function updateUsagePicker() {
   input.setAttribute('aria-expanded','true');
   if(items.length) input.setAttribute('aria-activedescendant',`usage-choice-${cursor}`);
   if(!popup.matches(':popover-open')) popup.showPopover();
+  positionUsagePicker();
+}
+function positionUsagePicker() {
+  if(!activeUsagePicker)return;
+  const {input,popup}=activeUsagePicker;
   const box=input.getBoundingClientRect();
   const width=Math.min(Math.max(box.width,340),innerWidth-16);
   popup.style.width=`${width}px`;popup.style.left=`${clamp(box.left,8,Math.max(8,innerWidth-width-8))}px`;
@@ -1158,7 +1229,7 @@ function bindSetEditors(container) {
       const isMove=input.dataset.setField.startsWith('move-');
       const isAbility=input.dataset.setField==='ability';
       const abilitySpecies=input.dataset.setSide==='our' ? battleSpecies(species,'our') : species;
-      bindUsagePicker(input,{kind:isMove ? 'move' : isAbility ? 'ability' : 'pokemon',choices:query=>isMove ? buildMoveChoices(species,query) : isAbility ? buildAbilityChoices(abilitySpecies,query) : input.dataset.setSide==='our' ? buildTeamSearchResults(query) : buildSearchResults(query),
+      bindUsagePicker(input,{moveFilterOptions:{species:{...abilitySpecies,ability:input.dataset.setSide==='our' ? battleEntry(state.ourTeam[Number(input.dataset.setIndex)]).ability : undefined}},kind:isMove ? 'move' : isAbility ? 'ability' : 'pokemon',choices:query=>isMove ? buildMoveChoices(species,query) : isAbility ? buildAbilityChoices(abilitySpecies,query) : input.dataset.setSide==='our' ? buildTeamSearchResults(query) : buildSearchResults(query),
         markup:isMove ? moveChoiceMarkup : isAbility ? abilityChoiceMarkup : pokemonChoiceMarkup,
         hint:isMove || isAbility ? `${state.format} ${isAbility ? 'ability' : 'move'} usage · ${getUsage(isAbility ? abilitySpecies : species)?.name || species.name} · Champions Battle Data` : '',
         choose:item=>{
@@ -1168,13 +1239,14 @@ function bindSetEditors(container) {
             if(state.teamOffenseExcluded.has(previous)) state.teamOffenseExcluded.add(state.ourTeam[index]);
             saveTeamToStorage();render();
             document.querySelector('.expanded-team .set-editor').open=true;
-          } else {input.value=item.name;input.dispatchEvent(new Event('change',{bubbles:true}));}
+          } else {input.satisfyingSet=item.satisfyingSet;input.value=item.name;input.dispatchEvent(new Event('change',{bubbles:true}));}
         }});
     }
     input.addEventListener('keydown', event => {
       if (event.key === 'Enter') { event.preventDefault(); input.blur(); }
     });
     input.addEventListener('change', () => {
+      if(input.moveFilters?.panel.matches(':popover-open'))return;
       const {setSide: side, setIndex: index, setField: field} = input.dataset;
       const team = side === 'our' ? state.ourTeam : state.opponentList;
       const entry = team[Number(index)];
@@ -1189,9 +1261,9 @@ function bindSetEditors(container) {
         if (!species) { input.value = entry.name; return; }
         const previous=getPokemonByName(entry.name);
         const cosmeticChange=(previous.cosmeticBaseId || previous.id)===(species.cosmeticBaseId || species.id);
-        team[index] = sanitizeTeamEntry({...entry, name: species.name, ability:cosmeticChange ? entry.ability : species.abilities[0],
+        team[index] = sanitizeTeamEntry({...entry, name: species.name, ability:input.satisfyingSet?.ability || (cosmeticChange ? entry.ability : species.abilities[0]),
           item: getPokemonByName(entry.name).isMega && !species.isMega ? '' : entry.item,
-          moveSet:cosmeticChange ? entry.moveSet : species.moves, damageMultiplier: 1});
+          moveSet:input.satisfyingSet?.moveSet || (cosmeticChange ? entry.moveSet : species.moves), damageMultiplier: 1});
         if(side==='our' && state.teamOffenseExcluded.has(entry)) state.teamOffenseExcluded.add(team[index]);
       } else if(field==='ability' && side==='our' && battleSpecies(entry,'our').megaStoneName) {
         getPreferences(entry,'our').baseAbilityChoice=input.value;savePreferences();
@@ -1469,6 +1541,7 @@ function pokemonListHeading(entry,index,remove=false,ours=false) {
   return `<div class="opponent-name-block"><div class="opponent-name-line">
     <div class="pokemon-identity"><div class="pokemon-name" title="${escapeHtml(entry.name)}">${escapeHtml(pokemonDisplayName(entry))}</div><div class="pokemon-type">${entry.types.join(' / ')}</div></div>
     ${ours ? knownItemMarkup(entry) : buildItemHints(entry)}<span class="column-tag">${index+1}</span>${ours ? teamOrderControls(entry,index) : ''}
+    ${ours ? `<button type="button" class="control-btn delete" data-remove-team-index="${index}" title="Remove ${escapeHtml(pokemonDisplayName(entry))}" aria-label="Remove ${escapeHtml(pokemonDisplayName(entry))} from team">×</button>` : ''}
     ${remove ? `<button type="button" class="control-btn" data-opponent-action="up" data-opponent-index="${index}" ${index===0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(entry.name)} earlier">↑</button><button type="button" class="control-btn" data-opponent-action="down" data-opponent-index="${index}" ${index===state.opponentList.length-1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(entry.name)} later">↓</button><button type="button" class="control-btn delete" data-opponent-action="delete" data-opponent-index="${index}" title="Remove ${escapeHtml(entry.name)}" aria-label="Remove ${escapeHtml(entry.name)} from opposition">✕</button>` : ''}
     </div></div>`;
 }
@@ -2285,7 +2358,7 @@ function renderTeamBuilder() {
   document.getElementById('defenseFaintedInput').closest('.fainted-control').hidden = !defense && !balance;
   renderFieldOptions();
   renderFaintedOptions();
-  document.getElementById('builderPanelTitle').textContent = balance ? 'Balance' : defense ? 'Defense' : teamOffense ? 'Team Offense' : offense ? 'Offense' : 'Speed tiers';
+  document.getElementById('builderPanelTitle').textContent = balance ? 'Balance' : defense ? 'Defense' : teamOffense ? 'Team Offense' : offense ? 'Offense' : 'Speed Tiers';
   document.getElementById('builderSpeedTiers').hidden = damage;
   document.getElementById('builderOffenseTiers').hidden = !damage;
   document.getElementById('builderOffenseTiers').setAttribute('aria-label','Opponent KO tiers');
@@ -2408,7 +2481,8 @@ function bindStaticControls() {
     const input=event.target.closest('input[data-compact-stage]');
     if(!input) return;
     const role=input.dataset.compactStage,value=Number(input.value),selected=state.ourTeam[state.activeOurIndex];
-    if(!Number.isInteger(value) || value < -2 || value > 2) return;
+    const limit=role==='builder-offense' ? 6 : 2;
+    if(!Number.isInteger(value) || value < -limit || value > limit) return;
     if(role==='battle-opponent-speed') {
       const opponent=state.opponentList[state.activeOpponentIndex];
       if(!opponent) return;
@@ -2636,19 +2710,19 @@ function bindStaticControls() {
     });
   });
   const createFilters=input=>new PokemonFilters({catalog:pokemonCatalog,generation:Battle.generation,usage:pokemonUsageReference,
-    moveMeta:Battle.moveMeta,bindPicker:bindUsagePicker,moveMarkup:moveChoiceMarkup,abilityMarkup:abilityChoiceMarkup,
+    moveMeta:Battle.moveMeta,priorityChoices,priorityRanking,usageData:getUsage,bindPicker:bindUsagePicker,moveMarkup:moveChoiceMarkup,abilityMarkup:abilityChoiceMarkup,
     onApply:()=>{input.value='';}});
   teamPokemonFilters=createFilters(document.getElementById('teamPokemonInput'));
   opponentPokemonFilters=createFilters(document.getElementById('pokemonSearchInput'));
   teamPokemonFilters.mount(document.getElementById('teamPokemonInput'));
   opponentPokemonFilters.mount(document.getElementById('pokemonSearchInput'));
   bindUsagePicker(document.getElementById('pokemonSearchInput'),{choices:query=>buildSearchResults(query,false,opponentPokemonFilters),markup:pokemonChoiceMarkup,choose:item=>addOpponentFromSearch(item.name)});
-  bindUsagePicker(document.getElementById('teamPokemonInput'),{choices:buildTeamSearchResults,markup:pokemonChoiceMarkup,choose:item=>addTeamPokemon(item.name,item.savedBuild)});
+  bindUsagePicker(document.getElementById('teamPokemonInput'),{choices:buildTeamSearchResults,markup:pokemonChoiceMarkup,choose:item=>addTeamPokemon(item.name,item.savedBuild,item.satisfyingSet)});
   document.addEventListener('pointerdown',event=>{
     if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target) && event.target!==activeUsagePicker.input) closeUsagePicker();
   });
   window.addEventListener('resize',closeUsagePicker);
-  document.addEventListener('scroll',event=>{if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target)) closeUsagePicker();},true);
+  document.addEventListener('scroll',event=>{if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target)){const box=activeUsagePicker.input.getBoundingClientRect();if(box.bottom>0 && box.top<innerHeight)positionUsagePicker();else closeUsagePicker();}},true);
 
   const clearButton = document.getElementById('clearOpponentsButton');
   document.getElementById('resetBattleButton').addEventListener('click',resetBattle);
@@ -2868,7 +2942,7 @@ function calculateMoveRange(attacker, defender, moveName, defenseInvestment = nu
   if (attacker.kind === 'opponent') attacker = {...attacker, ability: appliedOpponentAbility(attacker), item: appliedOpponentItem(attacker)};
   if (defender.kind === 'opponent') defender = {...defender, ability: appliedOpponentAbility(defender), item: appliedOpponentItem(defender)};
   return Battle.range(getPokemonByName(attacker.name), attacker, getPokemonByName(defender.name), defender,
-    moveName, {defenseInvestment, format: state.format, weather: state.weather, terrain: state.terrain,
+    moveName, {assumeHits:true,defenseInvestment, format: state.format, weather: state.weather, terrain: state.terrain,
       attackerStages:statStages(attacker,attacker.kind==='opponent' ? 'opponent' : 'our'),
       defenderStages:statStages(defender,defender.kind==='opponent' ? 'opponent' : 'our'),
       attackerAlliesFainted:attacker.kind === 'opponent' ? state.opponentsFainted : state.alliesFainted,...options});
@@ -2878,7 +2952,7 @@ function incomingThreats(opponent, ours, boostNature = null) {
   const species = battleSpecies(opponent,'opponent');
   const usage = getUsage(species);
   const ourSpecies = battleSpecies(ours,'our');
-  const options = {format: state.format, weather: state.weather, terrain: state.terrain,
+  const options = {assumeHits:true,format: state.format, weather: state.weather, terrain: state.terrain,
     attackerAlliesFainted:state.opponentsFainted,
     opponentItem: appliedOpponentItem(opponent),
     opponentAbility: appliedOpponentAbility(opponent),
@@ -2965,7 +3039,7 @@ function incomingScenarioMarkup(row,opponent) {
 function incomingNatureComparisons(opponent,ours) {
   const species=battleSpecies(opponent,'opponent'),ourSpecies=battleSpecies(ours,'our');
   const spreads=[...(getUsage(species)?.spreads || [])].sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || a.rank-b.rank);
-  const options={format:state.format,weather:state.weather,terrain:state.terrain,attackerAlliesFainted:state.opponentsFainted,
+  const options={assumeHits:true,format:state.format,weather:state.weather,terrain:state.terrain,attackerAlliesFainted:state.opponentsFainted,
     opponentItem:appliedOpponentItem(opponent),opponentAbility:appliedOpponentAbility(opponent),
     attackerStages:statStages(opponent,'opponent'),defenderStages:statStages(ours,'our'),boostOffenseNature:false};
   // Select threats at their boosted ceiling, then compare the same moves/spreads.

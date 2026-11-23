@@ -6,7 +6,7 @@
     <title>Pokelator Pro</title>
     <link rel="icon" type="image/png" sizes="64x64" href="assets/branding/favicon.png?v=20261121-math-icon" />
     <link rel="apple-touch-icon" sizes="180x180" href="assets/branding/apple-touch-icon.png?v=20261121-math-icon" />
-    <link rel="stylesheet" href="styles.css?v=20261122-suggestion-cards" />
+    <link rel="stylesheet" href="styles.css?v=20261123-move-filters" />
   </head>
   <body>
     <div class="app-shell">
@@ -66,7 +66,7 @@
         </aside>
 
         <section id="teamBuilderPanel" class="panel builder-panel" hidden>
-          <div class="panel-header builder-heading"><h2 id="builderPanelTitle">Speed tiers</h2>
+          <div class="panel-header builder-heading"><div class="builder-title-group"><h2 id="builderPanelTitle">Speed Tiers</h2><button type="button" class="view-info-button" aria-label="Hover for information" data-quick-tooltip="Hover over Pokémon, percentages, and controls for matchup details and explanations."><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></svg></button></div>
             <div class="builder-reference-toolbar" role="group" aria-label="Reference highlights">
               <label class="builder-icon-size">Icon Size<input id="builderIconSize" type="range" min="54" max="160" step="0.5" value="94.5" aria-label="Opponent icon size" /></label>
               <input id="builderReferenceSearch" type="search" placeholder="Find Pokémon…" aria-label="Find Pokémon to highlight" />
@@ -259,18 +259,22 @@
     <script src="data/item-sprites.js?v=20261118-mega-toggle"></script>
     <script src="team-files.js?v=20261121-team-editing"></script>
     <script src="data/move-types.js?v=20261120-champions-types"></script>
-    <script src="data/balance-moves.js?v=20261121-move-archetypes"></script>
+    <script src="data/balance-moves.js?v=20261123-categories"></script>
     <script src="components/move-summary.js?v=20261121-move-archetypes"></script>
     <script src="components/reference-sets.js?v=20261121-reference-drafts"></script>
-    <script src="components/pokemon-filters.js?v=20261122-smart-collapsed-filters"></script>
-    <script src="multi-hit.js?v=20261121-full-attacks"></script>
-    <script src="battle.js?v=20261122-middle-speed-chances"></script>
-    <script src="offense.js?v=20261121-full-attacks"></script>
+    <script src="components/priority-moves.js?v=20261123-distinct-moves"></script>
+    <script src="components/move-filters.js?v=20261123-move-filters"></script>
+    <script src="components/satisfying-moves.js?v=20261123-distinct-moves"></script>
+    <script src="components/pokemon-filters.js?v=20261123-distinct-moves"></script>
+    <script src="multi-hit.js?v=20261123-battle-assume-hits"></script>
+    <script src="battle.js?v=20261123-categories"></script>
+    <script src="offense.js?v=20261123-priority"></script>
     <script src="defense.js?v=20261121-full-attacks"></script>
     <script src="balance.js?v=20261121-full-attacks"></script>
     <script src="data/meta-usage.js?v=20261118-mega-toggle"></script>
     <script src="analytics.js?v=20261120-health-reports"></script>
-    <script src="app.js?v=20261122-nature-penalties"></script>
-    <script src="components/tutorial.js?v=20261122-nature-penalty-release"></script>
+    <script src="app.js?v=20261123-distinct-moves"></script>
+    <script src="components/tutorial.js?v=20261123-advanced-filtering"></script>
+    <script src="components/quick-tooltips.js?v=20261123-fast-hover"></script>
   </body>
 </html>

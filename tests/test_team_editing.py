@@ -10,6 +10,20 @@ class TeamEditingTests(unittest.TestCase):
     load=app_tests.AppTests.load
     evaluate=app_tests.AppTests.evaluate
 
+    def test_remove_unselected_member_preserves_active_pokemon_and_supports_undo(self):
+        self.load()
+        self.evaluate("""() => {
+          state.ourTeam=['Sylveon','Garchomp','Sneasler'].map(name=>sanitizeTeamEntry({name}));
+          state.activeOurIndex=1;saveTeamToStorage();render();
+        }""")
+        self.assertEqual(self.page.locator('[data-remove-team-index]').count(),3)
+        self.page.locator('.compact-team [data-remove-team-index="0"]').click()
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),['Garchomp','Sneasler'])
+        self.assertEqual(self.evaluate('state.ourTeam[state.activeOurIndex].name'),'Garchomp')
+        self.page.locator('#teamPokemonInput').blur()
+        self.page.keyboard.press('Control+z')
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),['Sylveon','Garchomp','Sneasler'])
+
     def fixture(self):
         self.load()
         self.evaluate("""() => {

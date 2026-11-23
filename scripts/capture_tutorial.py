@@ -1,4 +1,4 @@
-"""Capture four annotated pictures from the real app; run only for pre-publish review.
+"""Capture five annotated pictures from the real app; run only for pre-publish review.
 
     .venv/bin/python scripts/capture_tutorial.py
 
@@ -114,9 +114,67 @@ def capture():
             tiles=[('speed','Speed','Find Investment Thresholds'),('offense','Offense + Team Offense','Try Move Swaps · Compare Coverage'),('defense','Defense','Invest Free Points into Bulk'),('balance','Balance','Compare 1v1s · Optimize All Stats')]
             export('builder','Investments That Change the Matchup','<div class="quad">'+''.join(f'<div class="tile"><div class="tile-head"><h2>{label}</h2><span>{detail}</span></div><div class="crop"><img src="{panels[key]}"></div></div>' for key,label,detail in tiles)+'</div>')
             export('highlights','A Shortlist Across Every View',f'''<div class="focus"><div class="frame focus-main"><img src="{highlighted}"></div><div class="focus-label">Search + Click → Highlight</div><div class="focus-side"><div class="tag">Named Highlight Sets</div><p style="margin-top:14px">Shortlists for specific teams, matchups and threats</p><div class="frame"><img src="{saved}"></div><div class="callout"><b>★ Focus the Calculations</b><span>Show only highlighted Pokémon<br>Score and optimize over that set</span></div><div class="callout"><b>Keep Your References</b><span>Shared across views<br>Remembered after reload</span></div></div></div>''')
+            capture_filtering_picture(page,context)
             browser.close()
     finally:
         server.shutdown();server.server_close();thread.join()
 
 
-if __name__=='__main__':capture()
+
+
+def capture_filtering_picture(page,context):
+    """One simple real filter example, rather than a screenshot of every control."""
+    page.evaluate("""() => {
+      setView('builder');
+      teamPokemonFilters.reset();
+      teamPokemonFilters.change('moveQueries',[{selfBoost:'atk'},{category:'Physical',type:'Fire',minPower:75}]);
+      teamPokemonFilters.openSections.add('moves');teamPokemonFilters.render();
+      teamPokemonFilters.panel.hidden=false;
+    }""")
+    panel=page.locator('#teamPokemonInputFilters [data-filter-section=moves]')
+    panel.scroll_into_view_if_needed()
+    rules='data:image/png;base64,'+base64.b64encode(panel.screenshot(animations='disabled')).decode()
+    page.locator('#teamPokemonInputFilters [data-filter-apply]').click()
+    page.wait_for_selector('#searchResults .search-item')
+    page.wait_for_function("[...document.querySelectorAll('#searchResults img')].every(i=>i.complete)",timeout=30000)
+    box=page.locator('#searchResults').bounding_box();box['height']=min(310,box['height'])
+    results='data:image/png;base64,'+base64.b64encode(page.screenshot(clip=box,animations='disabled')).decode()
+    art=context.new_page();art.set_viewport_size({'width':1440,'height':810})
+    art.set_content('''<!doctype html><html><head><style>
+      *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#edf3ff;background:#101b2b}
+      main{width:1440px;height:810px;padding:38px 46px;background:radial-gradient(ellipse at 10% 10%,#234351,transparent 62%),#101b2b}
+      .eyebrow{font-size:15px;letter-spacing:2px;color:#a8c6d9;font-weight:700}h1{font-size:39px;letter-spacing:-1px;margin:16px 0 36px}
+      .layout{display:grid;grid-template-columns:1fr 650px;gap:40px;align-items:center}.quote{font-size:46px;font-weight:750;line-height:1.16;letter-spacing:-1.4px;margin:0 0 28px}
+      em{color:#8cd8ed;font-style:normal}.sub{font-size:21px;line-height:1.5;color:#c9deec;margin:0}.frame{border:1px solid #617f98;border-radius:13px;overflow:hidden;background:#172b3b;box-shadow:0 12px 38px #0005;margin-bottom:16px}
+      img{display:block;width:100%;height:auto}.label{padding:10px 15px;font-size:17px;font-weight:700;color:#b8d6e8}.results{max-height:340px;overflow:hidden}
+      .footer{font-size:17px;color:#b8d0df;margin-top:30px}.pill{display:inline-block;border:1px solid #6cc3ff;border-radius:20px;padding:8px 13px;margin:0 7px 10px 0;color:#c9f2ff;font-size:17px}
+    </style></head><body><main><div class="eyebrow">POKELATOR PRO / QUICK TOUR</div><h1>Advanced Filtering</h1><div class="layout"><div>
+      <p class="quote">“An <em>Attack boost</em> and a <em>physical Fire move</em> with <em>75+ power</em>”</p>
+      <p class="sub">Find Pokémon that meet every requirement, then narrow by type, ability and more</p>
+      <div style="margin-top:28px"><span class="pill">Combine Move Requirements</span><span class="pill">Keep Valid Options</span></div>
+    </div><div><div class="frame"><div class="label">Two Move Requirements · One Pokémon</div><img src="'''+rules+'''" /></div><div class="frame results"><img src="'''+results+'''" /></div></div></div>
+      <div class="footer">The Same Move Filters Work When Editing Your Team</div></main></body></html>''')
+    art.screenshot(path=str(OUTPUT/'filtering.png'),type='png',animations='disabled');art.close()
+    print('Captured filtering',flush=True)
+
+
+def capture_filtering_only():
+    OUTPUT.mkdir(parents=True,exist_ok=True)
+    server=http.server.ThreadingHTTPServer(('127.0.0.1',0),functools.partial(QuietHandler,directory=str(ROOT)))
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        with sync_playwright() as playwright:
+            browser=playwright.chromium.launch()
+            context=browser.new_context(viewport={'width':1800,'height':1020},device_scale_factor=3)
+            context.add_init_script("localStorage.setItem('pokelator-pro-tutorial-seen-v1','true')")
+            page=context.new_page();page.set_default_timeout(30000)
+            page.goto(f'http://127.0.0.1:{server.server_port}',wait_until='domcontentloaded');page.wait_for_selector('.move-row')
+            capture_filtering_picture(page,context);browser.close()
+    finally:
+        server.shutdown();server.server_close();thread.join()
+
+
+if __name__=='__main__':
+    import sys
+    if '--only-filtering' in sys.argv:capture_filtering_only()
+    else:capture()

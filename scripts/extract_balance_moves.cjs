@@ -7,7 +7,7 @@ const overrides=require(path.resolve(process.argv[5])).Moves;
 const typeOverrides=Object.fromEntries(Object.entries(overrides).filter(([,move])=>typeof move.type==='string').map(([id,move])=>[id,move.type]));
 const dex=Dex.mod('champions',{Scripts:{inherit:'gen9'},Moves:overrides});
 const metadata=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
-const fields=['name','type','shortDesc','target','accuracy','priority','boosts','drain','heal','multihit','multiaccuracy','recoil','secondary','secondaries','self','selfdestruct','status','volatileStatus','flags','pp'];
+const fields=['name','type','category','shortDesc','target','accuracy','priority','boosts','drain','heal','multihit','multiaccuracy','recoil','hasCrashDamage','weather','terrain','secondary','secondaries','self','selfdestruct','status','volatileStatus','flags','pp'];
 const moves={};
 for(const move of [...dex.moves.all()].sort((a,b)=>a.id.localeCompare(b.id))) {
   moves[move.id]=Object.fromEntries(fields.filter(key=>move[key]!==undefined).map(key=>[key,move[key]]));

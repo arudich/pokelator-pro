@@ -265,5 +265,6 @@
     return candidates[0] || {kind:'rest',error:unavailable[0] || 'No calculable damaging move in this set.',
       coverage:spreads.reduce((sum,spread) => sum+(Number.isFinite(spread.percent) && spread.percent>0 ? spread.percent : 0),0),count:spreads.length};
   }
-  window.Offense = {groups,meanDamage,category,summarize,analyze,points,best,canEvaluateMove,bestSwap,repeatedScore,tierHits,tierProbability,firstHitProbability};
+  const canSuggestMove=name=>canEvaluateMove(name) && !excludedSuggestions.has(Battle.moveMeta(name).name);
+  window.Offense = {groups,meanDamage,category,summarize,analyze,points,best,canEvaluateMove,canSuggestMove,bestSwap,repeatedScore,tierHits,tierProbability,firstHitProbability};
 })();

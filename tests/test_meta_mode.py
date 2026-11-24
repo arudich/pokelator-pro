@@ -16,8 +16,9 @@ class MetaModeTests(unittest.TestCase):
         self.assertEqual(button.get_attribute('aria-pressed'),'true')
         self.assertIn('Showdown',button.get_attribute('title'))
         result=self.evaluate("""() => {
-          const roster=['Sneasler','Rillaboom'].map(getPokemonByName),weights=statDistributionWeights(roster);
           const data=META_USAGE.formats.Doubles.species;
+          data.sneasler={name:'Sneasler',rank:2,percent:20};data.rillaboom={name:'Rillaboom',rank:1,percent:40};
+          const roster=['Sneasler','Rillaboom'].map(getPokemonByName),weights=statDistributionWeights(roster);
           return {ratio:weights.get('Sneasler')/weights.get('Rillaboom'),
             expected:data.sneasler.percent/data.rillaboom.percent,total:[...weights.values()].reduce((s,n)=>s+n,0)};
         }""")

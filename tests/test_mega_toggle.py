@@ -11,11 +11,12 @@ class MegaToggleTests(unittest.TestCase):
     evaluate = app_tests.AppTests.evaluate
 
     def fixture(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("""() => {
           state.ourTeam=[sanitizeTeamEntry({name:'Mega Charizard X',investment:{atk:32,spe:32},moveSet:['Dragon Claw','Flamethrower']})];
           state.opponentList=[sanitizeOpponentEntry({name:'Mega Garchomp'})];
-          state.activeOurIndex=state.activeOpponentIndex=0;state.builderTopN=1;saveTeamToStorage();render();
+          state.activeOurIndex=state.activeOpponentIndex=0;state.builderTopN=1;
+          builderRoster=()=>[getPokemonByName('Mega Garchomp')];saveTeamToStorage();render();
         }""")
 
     def test_both_toggles_change_battle_not_saved_sidebar_and_keep_stones(self):

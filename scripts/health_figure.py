@@ -9,6 +9,7 @@ def summary_html(snapshot,checks,warnings,usage,baseline):
     audited=dt.datetime.fromisoformat(snapshot['auditedAt'].replace('Z','+00:00')).astimezone(ZoneInfo('America/New_York'))
     status='Attention needed' if warnings else 'Healthy'
     coverage=snapshot.get('coverage',{})
+    meta_notice='<section><h2>Meta Changes</h2>'+''.join('<p>'+esc(change)+'</p>' for change in snapshot.get('metaChanges',[]))+'</section>' if snapshot.get('metaChanges') else ''
     try:
         refreshed=dt.datetime.fromisoformat(snapshot['checkedAt'].replace('Z','+00:00'))
         age=max(0,(audited-refreshed).total_seconds()/3600)
@@ -65,7 +66,7 @@ def summary_html(snapshot,checks,warnings,usage,baseline):
       .data-row{{display:flex;justify-content:space-between;font-size:13px;padding:8px 0}}.data-row strong{{font-weight:normal;color:#546b80}}.coverage-row{{display:grid;grid-template-columns:145px 1fr 75px;gap:15px;font-size:12px;align-items:center;margin:12px 0}}.coverage-row strong{{text-align:right;font-weight:normal}}.delta-track{{height:10px;position:relative;background:#f1f5f7;border-radius:3px}}.delta-track b{{position:absolute;left:50%;height:14px;top:-2px;border-left:1px solid #a9b8c3}}.delta-track i{{position:absolute;height:10px;background:#3e7a91}}.delta-track .loss{{background:#b06d54}}.loss{{color:#a34a31}}.baseline-note{{background:#f4f7f9;padding:13px 15px;margin-top:15px;border-radius:7px;font-size:12px;color:#64768a}}
       .alert{{background:#fff7e9;border:1px solid #f0dfba;border-radius:9px;padding:16px 18px}}.alert h2{{font-size:15px;margin-bottom:8px}}.alert ul{{margin:0;padding-left:18px;font-size:12px}}.alert li{{margin:6px 0}}.empty{{border:1px dashed #c5d1da;border-radius:8px;padding:20px;color:#5c7286;font-size:15px}}.empty p{{font-size:12px;margin-bottom:0}}footer{{font-size:10px;color:#748598;border-top:1px solid #e1e8ee;padding-top:16px;margin-top:25px}}footer p{{margin:5px 0}}
     </style></head><body><main><header><div><div class="eyebrow">POKELATOR / HEALTH REPORT</div><h1>Site health &amp; activity</h1><div class="date">{esc(audited.strftime('%B %d, %Y'))} · {esc(audited.strftime('%I:%M %p %Z'))}</div></div><span class="badge">{status}</span></header>
-    <div class="cards">{card_html}</div>{alert}<section>{activity}</section><section><h2>Data &amp; mechanics</h2>{''.join(data_rows)}{comparison}</section>
+    <div class="cards">{card_html}</div>{alert}<section>{activity}</section><section><h2>Data &amp; mechanics</h2>{''.join(data_rows)}{comparison}</section>{meta_notice}
     <footer><p>{esc(snapshot.get('url',''))}</p><p>Activity counts represent approximate browser actions, not unique people or real battles. Teams stay local.</p></footer></main></body></html>'''
 
 

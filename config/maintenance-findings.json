@@ -3,6 +3,11 @@
   "purpose": "Verified dispositions, not a blanket suppression list. Reopen when evidence contradicts a disposition.",
   "findings": [
     {
+      "id": "static-meta-browser-test-assumptions",
+      "disposition": "fixed",
+      "verification": "An extreme alternative-meta run exposed 29 failures in named item/ability/move scenarios, fixed cutoff membership, default natures/builds, and guaranteed preview improvements. Named scenarios now use persistent explicit fixtures; integration expectations derive from current input and choose relevant opponents explicitly. CI runs both current and shifted usage data. Legitimate large shifts are report-only observations; malformed or missing data remains a validation failure. See tests/META-TESTING.md."
+    },
+    {
       "id": "builder-live-usage-rank-assumptions",
       "disposition": "fixed",
       "verification": "November 24 rerun passed Garbodor but Cinderace entering the Top 100 exposed another live-data assumption. The builder cutoff test now checks the entire displayed species set against current ranks plus base-Speed matches at both 100 and 50. The format-switch boundary test uses fixed rank 1/11 fixtures instead of assuming Rillaboom always straddles the real Top 10."

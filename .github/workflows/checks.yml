@@ -9,6 +9,13 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
+    name: ${{ matrix.meta == 'current' && 'test' || 'test (shifted meta)' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        meta: [current, shifted]
+    env:
+      POKELATOR_TEST_META: ${{ matrix.meta }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -27,7 +34,8 @@ jobs:
       - run: node --test tests/test_usage_endpoint.mjs tests/test_move_effect_projection.mjs
       - run: python -m unittest discover -s tests -v
       - run: python scripts/build_site.py
-      - uses: actions/upload-artifact@v7.0.2
+      - if: matrix.meta == 'current'
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: website
           path: dist/

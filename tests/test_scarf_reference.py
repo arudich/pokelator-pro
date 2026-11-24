@@ -11,7 +11,7 @@ class ScarfReferenceTests(unittest.TestCase):
     evaluate = app_tests.AppTests.evaluate
 
     def test_common_threshold_highlight_persistence_and_no_calculation_effect(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.evaluate("""() => {
           const usage=getUsage(getPokemonByName('Kingambit'));
@@ -44,7 +44,7 @@ class ScarfReferenceTests(unittest.TestCase):
         self.assertEqual(self.evaluate("getItemHints(getPokemonByName('Mega Garchomp')).length"),0)
 
     def test_tooltip_dismisses_after_click_and_stays_in_viewport(self):
-        self.load()
+        self.load(frozen_usage=True)
         for width in [1440,390]:
             self.page.set_viewport_size({'width':width,'height':844})
             item=self.page.locator('#opponentList [data-opponent-item="Life Orb"]')

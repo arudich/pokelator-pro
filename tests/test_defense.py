@@ -53,7 +53,7 @@ class DefenseTests(unittest.TestCase):
         self.assertAlmostEqual(result['rare']['score'],0.1)
 
     def test_kingambit_against_mega_chandelure_is_not_invalidated_by_metal_burst(self):
-        self.load()
+        self.load(frozen_usage=True)
         result=self.evaluate("""() => {
           const attacker=getPokemonByName('Kingambit'),ours=sanitizeTeamEntry({name:'Mega Chandelure',investment:{spa:32,spe:32}});
           const usage=structuredClone(getUsage(attacker));

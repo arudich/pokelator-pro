@@ -11,7 +11,7 @@ class ItemSizeTests(unittest.TestCase):
     evaluate = app_tests.AppTests.evaluate
 
     def test_fixed_size_and_name_row_position(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("['Sylveon','Bellibolt'].forEach(addOpponentFromSearch)")
         self.assertTrue(self.evaluate("""() => [...document.querySelectorAll('.opponent-row .item-hints')].every(hints=>{
           const row=hints.closest('.opponent-name-line'),tag=row.querySelector('.column-tag').getBoundingClientRect();

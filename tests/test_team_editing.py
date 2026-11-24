@@ -112,7 +112,7 @@ class TeamEditingTests(unittest.TestCase):
         self.load()
         self.evaluate("""() => {
           state.ourTeam=[sanitizeTeamEntry({name:'Vivillon Sandstorm Pattern',nature:'Timid',item:'Iron Ball',investment:{}})];
-          state.activeOurIndex=0;state.builderPanel='speed';setView('builder');
+          state.activeOurIndex=0;state.builderPanel='speed';builderRoster=()=>[getPokemonByName('Excadrill')];setView('builder');
         }""")
         self.assertEqual(self.evaluate("Battle.speed(getPokemonByName(state.ourTeam[0].name),{...state.ourTeam[0],investment:{spe:32}})"),77)
         icon=self.page.locator('[data-tier-species="Excadrill"]')

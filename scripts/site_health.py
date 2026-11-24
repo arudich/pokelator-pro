@@ -56,6 +56,32 @@ def inspect_snapshot(current,baseline=None,now=None):
     return warnings
 
 
+def meta_changes(current,baseline=None):
+    """Report substantial popularity shifts without marking healthy data as broken."""
+    notices=[]
+    for key,label in [('sourceLeaders','in-game popularity'),('metaLeaders','Showdown usage')]:
+        for format,rows in current.get(key,{}).items():
+            previous=(baseline or {}).get(key,{}).get(format,[])
+            if not rows or not previous:continue
+            old={row['name']:row for row in previous}
+            top=rows[:10];prior_top={row['name'] for row in previous[:10]}
+            newcomers=[row['name'] for row in top if row['name'] not in prior_top]
+            changes=[]
+            if len(top)==10 and len(previous)>=10 and len(newcomers)>=5:
+                changes.append(f'{len(newcomers)}/10 new top-ten Pokémon')
+            for row in rows:
+                prior=old.get(row['name'])
+                if not prior:
+                    if len(previous)>=20 and row['rank']<=10:changes.append(f"{row['name']} entered the top ten at #{row['rank']}")
+                    continue
+                if abs(row['rank']-prior['rank'])>=10:
+                    changes.append(f"{row['name']} rank {prior['rank']} → {row['rank']}")
+                if row.get('percent') is not None and prior.get('percent') is not None and abs(row['percent']-prior['percent'])>=10:
+                    changes.append(f"{row['name']} usage {prior['percent']:.1f}% → {row['percent']:.1f}%")
+            if changes:notices.append(f'{format} {label}: major meta change to review (not a collection failure): '+ '; '.join(changes[:4])+(f'; +{len(changes)-4} more' if len(changes)>4 else ''))
+    return notices
+
+
 def historical_snapshot(repo,token,now):
     """Use a retained report near a month ago, never today's checkout as the baseline."""
     if not repo or not token:return None
@@ -108,7 +134,14 @@ def audit_browser(url,output):
               const moveData=JSON.parse(moveText.slice(moveText.indexOf(' = ')+3).trim().replace(/;$/,''));
               coverage.moveEffects=Object.keys(moveData.moves).length;
               for(const [format,data] of Object.entries(window.META_USAGE.formats)) coverage[format+' meta species']=Object.keys(data.species).length;
-              return {...status,coverage,formats:window.META_USAGE.formats && Object.fromEntries(
+              const sourceLeaders=Object.fromEntries(['Singles','Doubles'].map(format=>{
+                const unique=new Map();
+                for(const p of roster) {const u=p.usage?.[format];if(u && !unique.has(u.name)) unique.set(u.name,{name:u.name,rank:u.rank});}
+                return [format,[...unique.values()].sort((a,b)=>a.rank-b.rank).slice(0,20)];
+              }));
+              const metaLeaders=Object.fromEntries(Object.entries(window.META_USAGE.formats).map(([format,data])=>
+                [format,Object.values(data.species).sort((a,b)=>a.rank-b.rank).slice(0,20).map(({name,rank,percent})=>({name,rank,percent}))]));
+              return {...status,coverage,sourceLeaders,metaLeaders,formats:window.META_USAGE.formats && Object.fromEntries(
                 Object.entries(window.META_USAGE.formats).map(([k,v])=>[k,{month:v.month,format:v.format,sha256:v.sha256,species:Object.keys(v.species).length}]))};
             }""")
             checks.append('Battle page loaded and calculated damage.')
@@ -171,6 +204,7 @@ def render_report(snapshot,checks,warnings,usage,baseline,run_url):
            f'- Last successful refresh: {snapshot.get("checkedAt","unavailable")}',
            f'- Engine: {snapshot.get("engine",{}).get("version","unavailable")}']
     for label,data in snapshot.get('formats',{}).items():lines.append(f'- {label} usage: {data["month"]} · {data["species"]} entries')
+    if snapshot.get('metaChanges'):lines+=['', '## Meta Changes',*['- '+change for change in snapshot['metaChanges']]]
     lines+=['- Coverage compared with '+baseline['auditedAt'][:10]+'.' if baseline else '- A month-old comparison will become available after 25 days of reports.',
             '', '## Usage statistics']
     if usage.get('available'):
@@ -226,6 +260,7 @@ def main():
     try:baseline=historical_snapshot(os.getenv('GITHUB_REPOSITORY'),os.getenv('GITHUB_TOKEN'),now)
     except Exception:warnings.append('Historical coverage comparison could not be downloaded.')
     warnings+=inspect_snapshot(snapshot,baseline,now)
+    snapshot['metaChanges']=meta_changes(snapshot,baseline)
     try:
         from refresh_meta_usage import snapshot as latest_usage
         latest=latest_usage(discover=True)

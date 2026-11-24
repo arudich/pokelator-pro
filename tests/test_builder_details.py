@@ -142,7 +142,7 @@ class BuilderDetailTests(unittest.TestCase):
         self.assertEqual(self.page.locator('#battleFaintedInput [aria-pressed=true]').get_attribute('data-fainted-count'),'0')
 
     def test_battle_skulls_boost_supreme_overlord_for_each_attacking_side(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("""() => {
           state.ourTeam=[sanitizeTeamEntry({name:'Kingambit',ability:'Supreme Overlord',moveSet:['Kowtow Cleave']})];
           state.activeOurIndex=0;state.opponentList=[sanitizeOpponentEntry({name:'Garchomp'})];state.activeOpponentIndex=0;render();

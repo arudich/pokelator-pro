@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from site_health import inspect_snapshot,usage_report,render_report,send_email
+from site_health import inspect_snapshot,meta_changes,usage_report,render_report,send_email
 from health_figure import summary_html
 
 
@@ -30,6 +30,39 @@ class SiteHealthTests(unittest.TestCase):
         self.assertTrue(any('72 hours' in x for x in warnings))
         self.assertTrue(any('400' in x and '347' in x for x in warnings))
         self.assertTrue(any('Missing data' in x for x in warnings))
+
+    def test_large_meta_movement_is_reported_separately_from_data_loss(self):
+        leaders=[{'name':f'Species{i}','rank':i+1,'percent':20-i/2} for i in range(20)]
+        baseline={**self.current,'metaLeaders':{'Doubles':leaders},'sourceLeaders':{'Doubles':leaders}}
+        import copy
+        current=copy.deepcopy(baseline)
+        self.assertEqual(meta_changes(current,baseline),[])
+        current['metaLeaders']['Doubles'][0]['percent']+=0.1
+        self.assertEqual(meta_changes(current,baseline),[])
+        # Same coverage and valid ranks: half the top ten changes and one usage spikes.
+        moved=copy.deepcopy(leaders[5:]+leaders[:5])
+        for rank,row in enumerate(moved,1):row['rank']=rank
+        moved[0]['percent']+=15
+        current['metaLeaders']['Doubles']=moved
+        current['sourceLeaders']['Doubles']=moved
+        warnings=meta_changes(current,baseline)
+        self.assertEqual(len(warnings),2)
+        self.assertTrue(all('major meta change' in warning and 'not a collection failure' in warning for warning in warnings))
+        self.assertIn('5/10 new top-ten',warnings[0])
+        self.assertTrue(any('usage' in warning and '→' in warning for warning in warnings))
+        newcomer=copy.deepcopy(baseline)
+        newcomer['metaLeaders']['Doubles'][0]['name']='New Contender'
+        self.assertIn('New Contender entered the top ten',meta_changes(newcomer,baseline)[0])
+        # Legacy reports establish a baseline without inventing a change.
+        self.assertEqual(meta_changes(current,self.current),[])
+        self.assertEqual(inspect_snapshot(current,baseline,self.now),[])
+        current['metaChanges']=warnings
+        report=render_report(current,[],[],{'available':False,'reason':'not connected'},baseline,'https://example.test/run')
+        self.assertIn('## Meta Changes',report)
+        self.assertIn('Healthy',report)
+        markup=summary_html(current,[],[],{'available':False,'reason':'not connected'},baseline)
+        self.assertIn('<h2>Meta Changes</h2>',markup)
+        self.assertNotIn('Attention needed',markup)
 
     def test_usage_windows_do_not_overlap_and_new_tracking_has_no_false_trend(self):
         with patch('site_health.request_json',return_value={'firstRecordedDay':'2026-11-01','rows':[

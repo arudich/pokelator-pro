@@ -31,7 +31,7 @@ class WeatherSpeedTests(unittest.TestCase):
             self.page.set_viewport_size({'width':width,'height':900})
             self.assertTrue(normal.evaluate("row=>{const label=row.querySelector('.speed-tier').getBoundingClientRect(),badge=row.querySelector('.speed-chance').getBoundingClientRect();return badge.left>=label.right+8 && badge.right<=row.getBoundingClientRect().right+1}"))
         self.page.set_viewport_size({'width':1440,'height':900})
-        self.evaluate("state.builderPanel='speed';state.builderTopN=347;setView('builder')")
+        self.evaluate("state.builderPanel='speed';state.builderTopN=builderRankLimit();setView('builder')")
         icon=self.page.locator('#builderSpeedTie [data-tier-species="Sylveon"]')
         self.assertEqual(icon.locator('.speed-chance-badge').inner_text(),'90%')
         self.assertTrue(icon.evaluate("icon=>{const box=icon.getBoundingClientRect(),badge=icon.querySelector('.speed-chance-badge').getBoundingClientRect();return badge.left>=box.left && badge.right<=box.right && badge.bottom<=box.bottom && badge.width<box.width/2 && badge.height<box.height/3}"))
@@ -94,13 +94,13 @@ class WeatherSpeedTests(unittest.TestCase):
         self.assertIn('speed-boosted nature',normal.inner_text())
         self.assertEqual(normal.locator('.speed-chance').inner_text(),'45%')
         self.assertIn('Speed spreads × natures',normal.locator('.speed-chance').get_attribute('title'))
-        self.evaluate("state.builderPanel='speed';state.builderTopN=347;setView('builder')")
+        self.evaluate("state.builderPanel='speed';state.builderTopN=builderRankLimit();setView('builder')")
         icon=self.page.locator('[data-speed-group="nature"] [data-tier-species="Kingambit"]')
         self.assertEqual(icon.locator('.speed-chance-badge').inner_text(),'45%')
         self.assertEqual(icon.locator('.speed-investment-badge').count(),1)
 
     def test_opposing_basculegion_rain_changes_speed_and_ability_toggle_updates_it(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("""() => {
           state.ourTeam=[sanitizeTeamEntry({name:'Garchomp',nature:'Jolly',investment:{spe:32}})];
           state.opponentList=[sanitizeOpponentEntry({name:'Basculegion Female'})];

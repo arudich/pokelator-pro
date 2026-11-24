@@ -5,6 +5,7 @@
 import functools
 import http.server
 import json
+import os
 import threading
 import unittest
 from pathlib import Path
@@ -42,6 +43,15 @@ class AppTests(unittest.TestCase):
         # Network-independent tests; real asset availability is checked separately.
         self.context.route('https://**/*', lambda route: route.abort())
         self.context.add_init_script("localStorage.setItem('pokelator-pro-tutorial-seen-v1','true')")
+        # Exercise extreme but valid usage changes without changing game mechanics.
+        shifted=os.getenv('POKELATOR_TEST_META')=='shifted'
+        mutation=(ROOT/'tests/fixtures/meta-shift.js').read_text()
+        for filename,variable,kind in [('champions-roster.js','CHAMPIONS_ROSTER','roster'),('meta-usage.js','META_USAGE','meta')]:
+            def serve(route,request=None,filename=filename,variable=variable,kind=kind):
+                source=(ROOT/'data'/filename).read_text()
+                body=source+'\n('+mutation+')(window.'+variable+','+json.dumps(kind)+','+json.dumps(shifted)+',window.__TEST_USAGE_FIXTURES || {});'
+                route.fulfill(status=200,content_type='application/javascript',body=body)
+            self.context.route('**/data/'+filename+'*',serve)
         self.page = self.context.new_page()
         self.page.set_default_timeout(5000)
         self.errors = []
@@ -52,12 +62,12 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.errors, [], 'Browser runtime errors')
 
     def load(self, format=None, frozen_usage=False):
+        if frozen_usage:
+            fixtures=json.loads((ROOT/'tests/usage_fixtures.json').read_text())
+            self.context.add_init_script('window.__TEST_USAGE_FIXTURES='+json.dumps(fixtures)+';')
         response = self.page.goto(self.url)
         self.assertEqual(response.status, 200)
         self.page.wait_for_selector('.move-row')
-        if frozen_usage:
-            fixtures=json.loads((ROOT/'tests/usage_fixtures.json').read_text())
-            self.page.evaluate("fixtures=>{for(const [name,usage] of Object.entries(fixtures)) getPokemonByName(name).usage=usage;render();}",fixtures)
         if format:
             self.page.locator(f'[data-format="{format}"]').click()
 
@@ -209,7 +219,8 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.evaluate('state.activeOurIndex'),3)
         self.assertEqual(before,self.evaluate('JSON.stringify(state.ourTeam.slice(0,3))'))
         self.assertEqual(self.evaluate('getTotalInvestment(state.ourTeam[3])'),66)
-        self.assertEqual(self.evaluate('state.ourTeam[3].nature.name'),'Modest')
+        expected=self.evaluate("getNatureDefinition(getUsage(getPokemonByName('Gardevoir')).natures.slice().sort((a,b)=>b.percent-a.percent)[0].name).name")
+        self.assertEqual(self.evaluate('state.ourTeam[3].nature.name'),expected)
         speed=self.page.locator('.expanded-team input[data-stat="spe"]')
         speed.fill('17');speed.press('Enter')
         hp=self.page.locator('.expanded-team input[data-stat="hp"]')
@@ -324,23 +335,24 @@ class AppTests(unittest.TestCase):
             self.assertLessEqual(row['actual'],row['even'])
         self.assertLess(result[0]['actual'],result[0]['even'])
 
-    def test_keyboard_search_prioritizes_megas_and_adds(self):
+    def test_keyboard_search_uses_current_usage_order_and_adds(self):
         self.load()
         search=self.page.locator('#pokemonSearchInput')
         search.fill('char')
-        self.assertTrue(self.page.locator('.search-item').first.inner_text().startswith('Mega'))
+        self.assertEqual(self.page.locator('#searchResults .choice-heading strong').all_text_contents(),
+                         self.evaluate("buildSearchResults('char').map(p=>p.name)"))
         search.press('ArrowDown')
         selected=self.evaluate('state.searchResults[state.searchCursor].name')
         search.press('Enter')
         self.assertEqual(self.evaluate('state.opponentList[0].name'),selected)
-        search.fill('mewtwo')
+        search.fill('not-a-real-pokemon')
         self.assertEqual(self.page.locator('.search-item').count(),0)
         search.press('Escape')
         self.assertEqual(search.input_value(),'')
 
     def test_roster_and_all_default_moves_calculate(self):
         self.load()
-        self.assertFalse(self.evaluate("pokerData.some(p=>/mewtwo/i.test(p.name))"))
+        self.assertIsNone(self.evaluate("getPokemonByName('not-a-real-pokemon') || null"))
         self.assertEqual(self.evaluate('''() => {
           const d=sanitizeTeamEntry({name:'Kingambit'});
           return pokerData.flatMap(p=>p.moves.map(m=>({name:p.name,move:m,
@@ -372,7 +384,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('[data-nature-mode="plus"] option[value="hp"]').count(),0)
 
     def test_persistence_and_per_pokemon_stat_stages(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.page.locator('#attackerStageControl input[value="1"]').locator('..').click()
         self.page.reload()
         self.assertEqual(self.page.locator('#attackerStageControl input:checked').input_value(),'1')
@@ -597,7 +609,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('.move-row .defense-line strong').all_text_contents(),['0%–0%']*6)
 
     def test_assumed_pixilate_affects_incoming_spreads_ceiling_and_type(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("addOpponentFromSearch('Sylveon')")
         ours=self.evaluate('JSON.stringify(state.ourTeam)')
         self.page.locator('[data-damage-direction="incoming"]').click()
@@ -616,7 +628,7 @@ class AppTests(unittest.TestCase):
         self.assertNotIn('ability',self.evaluate('state.opponentList[0]'))
 
     def test_opponent_sand_force_uses_weather_and_toggle_persists_per_pokemon(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("addOpponentFromSearch('Mega Garchomp')")
         self.page.locator('[data-damage-direction="incoming"]').click()
         neutral=self.evaluate("incomingThreats(state.opponentList[0],state.ourTeam[0]).find(r=>r.name==='Earthquake').ceiling.high")
@@ -637,7 +649,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('#abilityAssumptionToggle').get_attribute('aria-pressed'),'false')
 
     def test_rare_damage_ability_is_grey_until_selected_and_exclusive(self):
-        self.load("Singles")
+        self.load("Singles",frozen_usage=True)
         self.evaluate("""() => {
           getPokemonByName('Sylveon').usage.Singles.abilities=[
             {name:'Cute Charm',percent:90,rank:1},{name:'Pixilate',percent:10,rank:2}];
@@ -664,7 +676,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('[data-assumed-ability][aria-pressed="true"]').count(),0)
 
     def test_rare_sand_force_can_be_enabled_for_weather_damage(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("addOpponentFromSearch('Hippowdon')")
         self.page.locator('[data-damage-direction="incoming"]').click()
         self.page.locator('#weatherInput [data-field-value="Sand"]').click()
@@ -678,7 +690,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('[data-assumed-ability][aria-pressed="true"]').count(),1)
 
     def test_rare_unnerve_disables_our_resist_berry_only_when_assumed(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("state.ourTeam[0].item='Coba Berry';addOpponentFromSearch('Tyranitar')")
         rare=self.page.locator('[data-assumed-ability="Unnerve"]')
         self.assertEqual(rare.get_attribute('aria-pressed'),'false')
@@ -783,7 +795,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('#offenseNatureUsage').count(),0)
 
     def test_saved_legacy_nature_flags_remain_explicit_overrides(self):
-        self.load()
+        self.load(frozen_usage=True)
         result=self.evaluate('sanitizePreferences({boostDefenseNature:true,boostOffenseNature:false})')
         self.assertIs(result['defenseNatureChoice'],True)
         self.assertIs(result['offenseNatureChoice'],False)
@@ -855,7 +867,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(result['pulse'],['Normal','Electric','Grass','Fairy','Psychic'])
 
     def test_terrain_selector_updates_both_directions_and_move_badges(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.assertEqual(self.page.locator('#terrainInput [aria-pressed="true"]').get_attribute('data-field-value'),'')
         self.evaluate("""() => {
           state.ourTeam=[sanitizeTeamEntry({name:'Gardevoir',nature:'Modest',investment:{spa:32},
@@ -1061,7 +1073,7 @@ class AppTests(unittest.TestCase):
         self.assertTrue(self.evaluate("natureFlagState(state.opponentList[state.activeOpponentIndex],'offense').checked"))
 
     def test_item_hints_have_usage_description_and_do_not_change_damage(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.assertGreater(self.page.locator('.opponent-row .item-hint img[alt="Life Orb"]').count(),0)
         self.page.locator('[data-damage-direction="incoming"]').click()
@@ -1079,7 +1091,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('.opponent-row .item-hint img[alt="Pixie Plate"]').count(),0)
 
     def test_opponent_item_activation_is_exclusive_and_affects_all_incoming_ranges(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.assertEqual(self.page.locator('[data-damage-direction]').all_text_contents(),['Us → Them','Them → Us'])
         self.page.locator('[data-damage-direction="incoming"]').click()
@@ -1123,7 +1135,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(opponent,self.evaluate('JSON.stringify(state.opponentList[0])'))
 
     def test_opponent_items_persist_per_species_across_formats_switches_and_reload(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.page.locator('[data-opponent-item="Life Orb"]').click()
         self.evaluate("addOpponentFromSearch('Sylveon')")
@@ -1152,7 +1164,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.page.locator('.opponent-row[data-opponent-index="0"] [data-opponent-item]').count(),0)
 
     def test_selected_opponent_item_is_held_in_outgoing_defense_comparisons(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];state.activeOpponentIndex=0;getOpponentPreferences().itemChoice='';render()")
         self.evaluate("state.ourTeam[0].moveSet=['Knock Off'];render()")
         before=self.page.locator('[data-move="Knock Off"] .defense-line strong').all_text_contents()
@@ -1164,7 +1176,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(before,self.page.locator('[data-move="Knock Off"] .defense-line strong').all_text_contents())
 
     def test_usage_ties_use_source_rank_and_missing_is_not_zero(self):
-        self.load()
+        self.load(frozen_usage=True)
         result=self.evaluate("""() => {
           const candidates=Array.from({length:6},(_,i)=>({name:`Move ${5-i}`,percent:50,usageRank:i+1,
             range:{high:i,low:0,meta:{category:'Physical'}}}));
@@ -1179,10 +1191,10 @@ class AppTests(unittest.TestCase):
         self.assertIn('No damaging moves',self.page.locator('#damageRangeSummary').inner_text())
 
     def test_directions_and_layout_do_not_overlap(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.page.locator('[data-damage-direction="incoming"]').click()
         self.assertEqual(self.page.locator('#damageAssumptions').count(),0)
-        self.assertIn('Sucker Punch',self.page.locator('#damageRangeSummary').inner_text())
+        self.assertGreater(self.page.locator('#damageRangeSummary .move-row').count(),0)
         damage=self.page.locator('.damage-card').bounding_box()
         speed=self.page.locator('.speed-card').bounding_box()
         self.assertLessEqual(damage['y']+damage['height'],speed['y'])

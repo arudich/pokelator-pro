@@ -12,7 +12,7 @@ class ReferenceSetTests(unittest.TestCase):
     evaluate=app_tests.AppTests.evaluate
 
     def builder(self):
-        self.load()
+        self.load(frozen_usage=True)
         self.evaluate("state.builderTopN=3;state.builderPanel='speed';setView('builder')")
 
     def select_reference(self,name):

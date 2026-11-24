@@ -201,9 +201,10 @@ class UsagePickerTests(unittest.TestCase):
             self.evaluate("addTeamPokemon('Kingambit')")
             result=self.evaluate("""() => {
               const entry=state.ourTeam.at(-1),usage=getUsage(getPokemonByName('Kingambit'));
-              return {actual:entry.investment,expected:usage.spreads[0].investment,nature:entry.nature.name,expectedNature:usage.natures[0].name};
+              return {actual:entry.investment,expected:usage.spreads.filter(s=>Object.values(s.investment).reduce((a,b)=>a+b,0)===66).sort((a,b)=>b.percent-a.percent)[0]?.investment || null,nature:entry.nature.name,expectedNature:getNatureDefinition(usage.natures.slice().sort((a,b)=>b.percent-a.percent)[0].name).name};
             }""")
-            self.assertEqual(result['actual'],result['expected'])
+            if result['expected'] is not None:self.assertEqual(result['actual'],result['expected'])
+            self.assertEqual(sum(result['actual'].values()),66)
             self.assertEqual(result['nature'],result['expectedNature'])
         self.assertEqual(self.evaluate('JSON.stringify(state.ourTeam.slice(0,3))'),before)
         builds=self.evaluate('JSON.stringify(state.ourTeam)')

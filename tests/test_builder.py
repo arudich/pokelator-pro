@@ -231,7 +231,8 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(self.page.locator('#builderSpeedTie [data-tier-species="Sneasler"]').count(),1)
 
     def test_builder_has_no_scroll_spacers_and_middle_icons_wrap_together(self):
-        self.load();self.page.locator('#teamBuilderButton').click();self.assert_centered()
+        self.load();self.evaluate('state.builderTopN=builderRankLimit()')
+        self.page.locator('#teamBuilderButton').click();self.assert_centered()
         self.assertEqual(self.page.locator('.tier-scroll-pad, .builder-base-tier').count(),0)
         middle=self.page.locator('.builder-tier-group:not([data-speed-group^="always-"])')
         self.assertGreater(middle.count(),0)

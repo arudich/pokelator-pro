@@ -10,8 +10,8 @@ class BalanceTests(unittest.TestCase):
     tearDown = app_tests.AppTests.tearDown
     evaluate = app_tests.AppTests.evaluate
 
-    def load(self):
-        app_tests.AppTests.load(self)
+    def load(self, frozen_usage=False):
+        app_tests.AppTests.load(self,frozen_usage=frozen_usage)
         self.page.add_script_tag(url=self.url+'/data/balance-moves.js')
 
     def test_aqua_step_self_boost_changes_next_turn_order_and_respects_blockers(self):
@@ -159,7 +159,7 @@ class BalanceTests(unittest.TestCase):
         self.assertTrue(any('Weak fixed pair' in warning for warning in result['weak']))
 
     def test_clefable_always_has_moonblast_under_fixed_core_rule(self):
-        self.load()
+        self.load(frozen_usage=True)
         result=self.evaluate("""async () => {
           const ours=sanitizeTeamEntry({name:'Mega Medicham',nature:'Jolly',investment:{atk:32,spe:32},moveSet:['Close Combat','Fake Out','Ice Punch','Poison Jab']});
           const species=getPokemonByName('Clefable'),usage=getUsage(species);

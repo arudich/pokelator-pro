@@ -189,16 +189,21 @@ class BuilderTests(unittest.TestCase):
         field=self.page.locator('#builderTopN')
         self.assertEqual(field.input_value(),'100')
         before=self.evaluate('JSON.stringify(state.ourTeam)')
-        self.assertGreater(self.page.locator('.tier-pokemon').count(),100)  # Forms share parent ranks.
+        def assert_usage_cutoff(limit):
+            expected=self.evaluate("""limit => {
+              const speed=getPokemonByName(state.ourTeam[state.activeOurIndex].name).stats.spe;
+              return pokerData.filter(p=>p.stats.spe===speed ||
+                (Number.isInteger(p.usage?.Doubles?.rank) && p.usage.Doubles.rank<=limit)).map(p=>p.id).sort();
+            }""",limit)
+            actual=self.page.locator('.tier-pokemon').evaluate_all('(rows)=>rows.map(r=>r.dataset.tierSpecies).sort()')
+            self.assertEqual(actual,expected)
+        assert_usage_cutoff(100)
         self.assertLess(self.page.locator('.tier-pokemon').count(),self.evaluate('pokerData.length'))
-        self.assertEqual(self.page.locator('[data-tier-species="Dragapult"]').count(),1)
-        self.assertEqual(self.page.locator('[data-tier-species="Cinderace"]').count(),0)
-        self.assertEqual(self.page.locator('[data-tier-species="Garchomp-Mega"]').count(),1)
         tile=self.page.locator('.tier-pokemon').first
         self.assertEqual(tile.bounding_box()['width'],94.5)
         self.assertEqual(tile.locator('img').bounding_box()['width'],85.5)
         field.fill('50');field.press('Enter');self.assert_centered()
-        self.assertEqual(self.page.locator('[data-tier-species="Dragapult"]').count(),0)
+        assert_usage_cutoff(50)
         self.assertEqual(self.page.locator('#builderSpeedTie [data-tier-species="Sceptile"]').count(),1)
         self.assertEqual(before,self.evaluate('JSON.stringify(state.ourTeam)'))
         self.page.reload();self.page.locator('#teamBuilderButton').click()
@@ -212,7 +217,9 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(self.page.locator('#builderSpeedTie [data-tier-species="Sneasler"]').count(),1)
 
     def test_builder_usage_cutoff_uses_selected_format(self):
-        self.load();self.page.locator('#teamBuilderButton').click()
+        self.load()
+        self.evaluate("getPokemonByName('Rillaboom').usage.Doubles.rank=1;getPokemonByName('Rillaboom').usage.Singles.rank=11")
+        self.page.locator('#teamBuilderButton').click()
         field=self.page.locator('#builderTopN');field.fill('10');field.press('Enter')
         self.assertEqual(self.page.locator('[data-tier-species="Rillaboom"]').count(),1)
         self.page.locator('#battleViewButton').click()

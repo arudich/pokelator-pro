@@ -3,6 +3,11 @@
   "purpose": "Verified dispositions, not a blanket suppression list. Reopen when evidence contradicts a disposition.",
   "findings": [
     {
+      "id": "builder-live-usage-rank-assumptions",
+      "disposition": "fixed",
+      "verification": "November 24 rerun passed Garbodor but Cinderace entering the Top 100 exposed another live-data assumption. The builder cutoff test now checks the entire displayed species set against current ranks plus base-Speed matches at both 100 and 50. The format-switch boundary test uses fixed rank 1/11 fixtures instead of assuming Rillaboom always straddles the real Top 10."
+    },
+    {
       "id": "garbodor-live-spread-test-assumption",
       "disposition": "fixed",
       "verification": "November 23 nightly failed because the most popular Garbodor spread changed from 64 to 66 points. A deterministic partial/full fixture now verifies preserving a saved 64-point build, choosing a less popular complete build for new additions, and filling partial-only reports. The all-species 66-point default invariant remains checked against current data."

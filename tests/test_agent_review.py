@@ -6,10 +6,62 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from agent_review import unavailable_reason,validated_review,deliver,email_review
+from agent_review import unavailable_reason,validated_review,deliver,email_review,notify_failure,source_evidence
 
 
 class AgentReviewTests(unittest.TestCase):
+    def test_nightly_failure_email_does_not_collect_upstream_or_request_ai(self):
+        run={'head_branch':'main','head_repository':{'full_name':'owner/repo'},'conclusion':'failure',
+             'name':'Nightly data and engine refresh','html_url':'https://example.test/run'}
+        jobs={'jobs':[{'name':'refresh','steps':[{'name':'Browser tests','conclusion':'failure'}]}]}
+        with patch.dict('os.environ',{'GITHUB_REPOSITORY':'owner/repo'}),\
+             patch('agent_review.github',side_effect=[run,jobs]) as github,\
+             patch('agent_review.download') as download,patch('review_sources.collect') as collect,\
+             patch('agent_review.send_email') as send:
+            notify_failure(123)
+        self.assertEqual(github.call_count,2)
+        download.assert_not_called();collect.assert_not_called()
+        body=send.call_args.args[0]
+        self.assertIn('refresh: Browser tests',body)
+        self.assertIn('not published',body)
+        self.assertIn('No paid AI review',body)
+        self.assertIn(run['html_url'],body)
+
+    def test_failure_notification_rejects_untrusted_or_successful_source_runs(self):
+        valid={'head_branch':'main','head_repository':{'full_name':'owner/repo'},'conclusion':'failure'}
+        for change in [{'head_branch':'contributor'},{'head_repository':{'full_name':'fork/repo'}},{'conclusion':'success'}]:
+            with self.subTest(change=change),patch.dict('os.environ',{'GITHUB_REPOSITORY':'owner/repo'}),\
+                 patch('agent_review.github',return_value={**valid,**change}),patch('agent_review.send_email') as send:
+                with self.assertRaises(ValueError):notify_failure(123)
+                send.assert_not_called()
+
+    def test_paid_review_evidence_omits_known_failure_logs(self):
+        run={'head_branch':'main','head_repository':{'full_name':'owner/repo'},'html_url':'https://example.test/run','name':'Health'}
+        jobs={'jobs':[{'name':'audit','conclusion':'failure','steps':[{'name':'Browser tests','conclusion':'failure'}]}]}
+        with tempfile.TemporaryDirectory() as temp,patch.dict('os.environ',{'GITHUB_REPOSITORY':'owner/repo','GITHUB_TOKEN':'private'}),\
+             patch('agent_review.github',side_effect=[run,jobs,{'artifacts':[]}]),\
+             patch('agent_review.download') as download,patch('review_sources.collect',return_value=[]),\
+             patch('agent_review.subprocess.run') as history:
+            history.return_value.stdout='Recent data changes'
+            source_evidence(123,Path(temp))
+            evidence=(Path(temp)/'evidence.md').read_text()
+        download.assert_not_called()
+        self.assertIn('Browser tests',evidence)
+        self.assertIn('Do not diagnose them',evidence)
+
+    def test_only_health_schedule_opts_in_to_paid_review(self):
+        workflows=Path(__file__).resolve().parents[1]/'.github/workflows'
+        failure=(workflows/'refresh-investigation.yml').read_text()
+        self.assertIn('notify-failure',failure)
+        for marker in ['agent-review.yml','OPENAI_API_KEY','codex-action']:
+            self.assertNotIn(marker,failure)
+        health=(workflows/'site-health.yml').read_text()
+        self.assertIn("cron: '37 14 1,15 * *'",health)
+        self.assertIn('paid_review: true',health)
+        review=(workflows/'agent-review.yml').read_text()
+        self.assertIn('default: false',review)
+        self.assertEqual(review.count('if: inputs.paid_review'),2)
+
     def test_email_is_concise_without_discarding_full_artifact_evidence(self):
         data={'status':'attention','summary':'A refresh was blocked.',
               'findings':[{'severity':'high','finding':'The CSV species differs.',

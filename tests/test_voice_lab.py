@@ -1,5 +1,6 @@
 import unittest
 import json
+import datetime
 import test_app as app_tests
 from test_opponent_voice import MOCK
 
@@ -29,7 +30,7 @@ class VoiceLabTests(unittest.TestCase):
         return self.page.evaluate("JSON.parse(localStorage.getItem('pokelator-voice-lab-v2'))")
 
     def test_one_start_records_five_then_reconnects_and_persists(self):
-        self.load_lab();self.page.clock.install()
+        self.load_lab();self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc))
         names=self.names();self.assertEqual(len(names),5)
         self.assertEqual(names[0],self.page.locator('#species option').first.inner_text())
         self.assertEqual(self.page.evaluate('voiceTest.starts'),0)
@@ -50,7 +51,7 @@ class VoiceLabTests(unittest.TestCase):
         self.assertTrue(download.value.suggested_filename.endswith('.json'))
 
     def test_final_chunks_do_not_advance_until_group_is_finished(self):
-        self.load_lab();self.page.clock.install();names=self.names();self.page.keyboard.press('Space')
+        self.load_lab();self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc));names=self.names();self.page.keyboard.press('Space')
         self.final(', '.join(names[:2]));self.page.clock.fast_forward(1000)
         self.assertEqual(self.names(),names)
         self.final(', '.join(names[2:]));self.page.clock.fast_forward(2499)
@@ -60,7 +61,7 @@ class VoiceLabTests(unittest.TestCase):
         self.assertEqual(len(self.run_data()['batches']),1)
 
     def test_pause_keeps_delayed_final_without_result_deadline(self):
-        self.load_lab();self.page.clock.install();names=self.names();self.page.keyboard.press('Space')
+        self.load_lab();self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc));names=self.names();self.page.keyboard.press('Space')
         self.page.evaluate("voiceTest.sessions.at(-1).stop=function(){voiceTest.stops++;};voiceTest.sessions.at(-1).onspeechstart();")
         self.page.keyboard.press('Space');self.page.clock.fast_forward(4000)
         self.final(', '.join(names));self.page.evaluate('voiceTest.sessions.at(-1).onend()')
@@ -68,7 +69,7 @@ class VoiceLabTests(unittest.TestCase):
         self.assertEqual(self.page.evaluate('voiceTest.starts'),1)
 
     def test_unexpected_names_are_not_substituted_with_expected_names(self):
-        self.load_lab();self.page.clock.install();names=self.names();self.page.keyboard.press('Space')
+        self.load_lab();self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc));names=self.names();self.page.keyboard.press('Space')
         self.final(names[0]+', Abomasnow');self.page.clock.fast_forward(2500)
         batch=self.run_data()['batches'][0]
         self.assertEqual(batch['matchedCount'],1)
@@ -91,7 +92,7 @@ class VoiceLabTests(unittest.TestCase):
           return data;
         }""")
         self.page.add_init_script("localStorage.setItem('pokelator-voice-lab-v2',"+json.dumps(json.dumps(data))+");")
-        self.page.reload();self.page.clock.install();self.assertEqual(self.names(),['Sneasler'])
+        self.page.reload();self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc));self.assertEqual(self.names(),['Sneasler'])
         self.page.keyboard.press('Space');self.final('Sneasler');self.page.clock.fast_forward(2500)
         self.assertIn('Run complete',self.page.locator('#status').inner_text())
         self.assertEqual(len([a for a in self.run_data()['attempts'] if a['expected']['name']=='Sneasler']),2)
@@ -111,7 +112,7 @@ class VoiceLabTests(unittest.TestCase):
         self.assertNotIn('Charizard',self.names())
         self.assertEqual(self.page.locator('#results tr').count(),1)
         self.assertIn('1 /',self.page.locator('#progress').inner_text())
-        self.page.locator('#species').select_option(label='Charizard');self.page.clock.install();self.page.keyboard.press('Space')
+        self.page.locator('#species').select_option(label='Charizard');self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc));self.page.keyboard.press('Space')
         self.final('Mega Charizard Y');self.page.clock.fast_forward(2500)
         last=self.run_data()['batches'][-1]
         self.assertIn('Mega Charizard Y',[m['name'] for m in last['matches']])
@@ -120,7 +121,7 @@ class VoiceLabTests(unittest.TestCase):
     def test_consecutive_successes_retire_across_runs_and_failure_resets(self):
         history=[{'id':'Sneasler','key':f'past-{i}','at':f'2000-01-0{i}T00:00:00Z','correct':True} for i in [1,2]]
         self.page.add_init_script("localStorage.setItem('pokelator-voice-validation-v1',"+json.dumps(json.dumps(history))+");")
-        self.load_lab();self.page.clock.install()
+        self.load_lab();self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc))
         self.assertNotIn('Sneasler',self.names())
         self.assertIn('1 reliable names skipped',self.page.locator('#progress').inner_text())
         # Explicit navigation still permits validation of a retired name.
@@ -145,7 +146,7 @@ class VoiceLabTests(unittest.TestCase):
         self.assertIn('0 reliable names skipped',self.page.locator('#progress').inner_text())
 
     def test_microphone_activity_prevents_transcript_stall_from_cutting_audio(self):
-        self.load_lab();self.page.clock.install();names=self.names()
+        self.load_lab();self.page.clock.install();self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc));names=self.names()
         self.page.evaluate("""()=>{
           voiceTest.level=.03;voiceTest.trackStops=0;voiceTest.contextCloses=0;
           navigator.mediaDevices.getUserMedia=async()=>{voiceTest.mediaRequests++;return {getTracks:()=>[{stop(){voiceTest.trackStops++;}}]};};

@@ -94,6 +94,17 @@ class OpponentVoiceTests(unittest.TestCase):
                 self.assertEqual(self.page.locator('#opponentVoiceButton').get_attribute('data-state'),'idle')
                 self.assertFalse(self.page.locator('#opponentVoiceStatus').is_visible())
 
+    def test_short_space_activates_focused_button_but_hold_only_records(self):
+        self.mock('granted');self.load();self.page.clock.install();self.page.clock.pause_at(1000000000000)
+        self.evaluate("voiceTest.clicks=0;document.getElementById('clearOpponentsButton').addEventListener('click',()=>voiceTest.clicks++)")
+        button=self.page.locator('#clearOpponentsButton');button.focus()
+        self.page.keyboard.press('Space')
+        self.assertEqual(self.evaluate('voiceTest.clicks'),1)
+        self.assertEqual(self.evaluate('voiceTest.starts'),0)
+        self.page.keyboard.down('Space');self.page.clock.fast_forward(500);self.page.keyboard.up('Space')
+        self.assertEqual(self.evaluate('voiceTest.clicks'),1)
+        self.assertEqual(self.evaluate('voiceTest.starts'),1)
+
     def test_click_stop_clears_listening_before_browser_end_and_can_restart(self):
         self.mock('granted')
         self.page.add_init_script('SpeechRecognition.prototype.stop=function(){voiceTest.stops++;};')

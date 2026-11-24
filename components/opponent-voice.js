@@ -280,7 +280,13 @@
       button.addEventListener('pointerdown',event=>event.preventDefault());
       button.addEventListener('click',()=>{if(this.want)this.stop();else this.start('toggle');});
       document.addEventListener('keydown',event=>this.keydown(event));
-      document.addEventListener('keyup',event=>{if(event.code==='Space' && this.held){event.preventDefault();this.release();}});
+      document.addEventListener('keyup',event=>{
+        if(event.code!=='Space' || !this.held)return;
+        const shortPress=this.timer!==null,target=this.spaceTarget;
+        event.preventDefault();this.release();
+        // Reserve a hold for voice, but retain normal short-Space button activation.
+        if(shortPress && target?.isConnected && target.contains(event.target))target.click();
+      });
       window.addEventListener('blur',()=>{if(this.permission==='unknown' && this.session)this.release();else this.cancel();});
       document.addEventListener('visibilitychange',()=>{if(document.hidden)this.cancel();});
       // This read-only permission query never asks to use the microphone.
@@ -320,6 +326,7 @@
       if(target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]') || document.querySelector('dialog[open]'))return;
       if(event.defaultPrevented)return;
       event.preventDefault();if(this.held || event.repeat)return;
+      this.spaceTarget=target.closest('button,summary,[role="button"]');
       this.held=true;
       this.timer=setTimeout(()=>{
         this.timer=null;if(!this.held || !this.active() || this.disabled)return;
@@ -327,7 +334,7 @@
         if(!this.want)this.start('hold');
       },500);
     }
-    release(){clearTimeout(this.timer);this.timer=null;this.held=false;if(this.want==='hold')this.stop();}
+    release(){clearTimeout(this.timer);this.timer=null;this.held=false;this.spaceTarget=null;if(this.want==='hold')this.stop();}
     cancel(){this.release();this.stop();}
     start(mode) {
       if(this.disabled || !this.active())return;

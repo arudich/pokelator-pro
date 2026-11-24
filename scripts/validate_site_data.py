@@ -42,6 +42,8 @@ def validate(root=ROOT,baseline_root=ROOT):
                     if category=='spreads':
                         values=[row['investment'][stat] for stat in STATS]
                         if any(not isinstance(n,int) or not 0<=n<=32 for n in values) or sum(values)>66:raise ValueError('Invalid spread')
+                if not any((row.get('percent') or 0)>0 for row in rows) and (category=='spreads' or any((row.get('percent') or 0)>0 for row in old_rows)):
+                    raise ValueError(f'{species["id"]} {format}: no usable {category} percentages; review source {usage.get("source","unknown")}')
     missing=set(previous)-ids
     if missing:raise ValueError('Previously supported species missing; review before publishing: '+', '.join(sorted(missing)))
     meta=payload(root/'data/meta-usage.js')

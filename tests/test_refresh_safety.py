@@ -1,4 +1,6 @@
 import json
+import csv
+import io
 from pathlib import Path
 import shutil
 import sys
@@ -16,6 +18,32 @@ TABLE=('Total battles: 1000\n'+''.join(f' | {i} | Species{i} | 0.5% | 10 |\n' fo
 
 
 class RefreshSafetyTests(unittest.TestCase):
+    def test_csv_percentage_loss_is_rejected_even_when_rows_and_ranks_are_intact(self):
+        fixture=ROOT/'tests/fixtures/furfrou-usage.csv'
+        original=list(csv.DictReader(io.StringIO(fixture.read_text())))
+        form={'saved_name':'Furfrou','showdown_name':'Furfrou','form_kind':'Base',
+              'hp':150,'attack':100,'defense':100,'sp_attack':100,'sp_defense':100,'speed':100,
+              'image_path':'pokemon_champions_assets/pokemon/Furfrou.png','types':['Normal'],'abilities':'Fur Coat'}
+        record={'showdownName':'Furfrou','summary':{'forms':[form]},'learnableMoveNames':['Tackle'],
+                'battleDataCsvs':[{'season':'Current','format':'Singles','path':'Singles/Furfrou.csv'}]}
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);shutil.copytree(ROOT/'data',root/'data');shutil.copytree(ROOT/'vendor',root/'vendor')
+            path=root/'csv/Singles/Furfrou.csv';path.parent.mkdir(parents=True)
+            for source_category,category in [('stat_points','spreads'),('move','moves'),('held_item','items'),('ability','abilities'),('stat_alignment','natures')]:
+                with self.subTest(category=category):
+                    rows=[dict(row) for row in original]
+                    for row in rows:
+                        if row['category']==source_category:row['percentage']=''
+                    with path.open('w') as file:
+                        writer=csv.DictWriter(file,fieldnames=rows[0].keys());writer.writeheader();writer.writerows(rows)
+                    built=build({'pokemon':[record],'generatedAt':'fixture'},path.parent.parent)['pokemon'][0]
+                    roster=payload(ROOT/'data/champions-roster.js')
+                    species=next(p for p in roster['pokemon'] if p['id']=='Furfrou')
+                    species['usage']['Singles']=built['usage']['Singles']
+                    self.assertEqual([row['rank'] for row in built['usage']['Singles'][category]],list(range(1,len(built['usage']['Singles'][category])+1)))
+                    (root/'data/champions-roster.js').write_text('window.CHAMPIONS_ROSTER = '+json.dumps(roster)+';')
+                    with self.assertRaisesRegex(ValueError,'Furfrou Singles: no usable '+category+' percentages'):validate(root)
+
     def test_monthly_usage_rejects_interior_gaps_duplicates_and_malformed_rows(self):
         table=TABLE.decode()
         cases=[table.replace(' | 2 | Species2 | 0.5% | 10 |\n',''),

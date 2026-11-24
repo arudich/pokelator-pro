@@ -4,7 +4,6 @@ import io
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import urllib.error
 import urllib.request
@@ -46,6 +45,25 @@ def github(path):
                         {'Authorization':'Bearer '+os.environ['GITHUB_TOKEN']})
 
 
+def notify_failure(run_id):
+    """Send deterministic failure details without upstream collection or an AI call."""
+    repo=os.environ['GITHUB_REPOSITORY']
+    run=github(f'actions/runs/{run_id}')
+    if run['head_branch']!='main' or run.get('head_repository',{}).get('full_name')!=repo:
+        raise ValueError('Only this repository main branch can supply failure notifications')
+    if run.get('conclusion')!='failure':raise ValueError('Source workflow has not failed')
+    failures=[]
+    for job in github(f'actions/runs/{run_id}/jobs?per_page=100')['jobs']:
+        for step in job.get('steps',[]):
+            if step.get('conclusion')=='failure':failures.append(f'{job["name"]}: {step["name"]}')
+    lines=[f'{run["name"]} failed.',*['- '+step for step in failures],
+           '', 'The update was not published; the previous deployed snapshot remains live.',
+           'No paid AI review was requested. Share this email with your coding assistant to investigate.',
+           '', 'Workflow and logs: '+run['html_url']]
+    send_email('\n'.join(lines),failures or ['Workflow failed.'],f'refresh-failure-{run_id}',None,run['html_url'])
+    print('Failure notification sent without a paid AI review.')
+
+
 def source_evidence(run_id,directory):
     directory.mkdir(parents=True,exist_ok=True)
     report=directory/'health-report';report.mkdir(exist_ok=True)
@@ -59,15 +77,7 @@ def source_evidence(run_id,directory):
         if 'agent' in job['name'].lower() or 'deliver' in job['name'].lower():continue
         failed=[s['name'] for s in job['steps'] if s.get('conclusion')=='failure']
         lines.append(f'Job {job["name"]}: {job["conclusion"]}; failed steps: {failed}')
-        if failed:
-            try:
-                raw=download(f'https://api.github.com/repos/{repo}/actions/jobs/{job["id"]}/logs',headers)
-                text=raw.decode(errors='replace')[-60000:]
-                # GitHub masks secrets; additionally redact familiar token/email shapes.
-                text=re.sub(r'\b(?:sk-[A-Za-z0-9_-]+|gh[pousr]_[A-Za-z0-9_]+)\b','[redacted]',text)
-                text=re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]+','[email redacted]',text)
-                lines+=['## Failed job log (untrusted evidence)',text]
-            except Exception:lines.append('Failed-job logs could not be downloaded.')
+    lines.append('Known workflow failures are reported automatically. Do not diagnose them; focus on silent data and mechanics problems not already identified by checks.')
     try:
         artifacts=github(f'actions/runs/{run_id}/artifacts')['artifacts']
         artifact=next(a for a in artifacts if a['name']=='health-report' and not a['expired'])
@@ -166,11 +176,12 @@ def deliver(directory,result,outcome):
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=['prepare','deliver'])
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=['prepare','deliver','notify-failure'])
     parser.add_argument('--source-run');parser.add_argument('--directory',default='review-input')
     parser.add_argument('--outcome',default='failure');parser.add_argument('--result',default='review-result/assessment.json')
     args=parser.parse_args()
-    if args.mode=='prepare':source_evidence(int(args.source_run),Path(args.directory))
+    if args.mode=='notify-failure':notify_failure(int(args.source_run))
+    elif args.mode=='prepare':source_evidence(int(args.source_run),Path(args.directory))
     else:deliver(Path(args.directory),Path(args.result),args.outcome)
 
 

@@ -1,9 +1,9 @@
-name: Investigate failed nightly refresh
+name: Notify failed nightly refresh
 on:
   workflow_dispatch:
     inputs:
       source_run:
-        description: 'Health or nightly-refresh run ID to investigate'
+        description: 'Failed nightly-refresh run ID to report (no paid AI)'
         required: true
         type: string
   workflow_run:
@@ -16,14 +16,28 @@ concurrency:
   group: refresh-investigation
   cancel-in-progress: false
 jobs:
-  investigate:
+  notify:
     if: >-
       github.repository == 'arudich/pokelator-pro' &&
       (github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'failure' &&
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.head_repository.full_name == github.repository))
-    uses: ./.github/workflows/agent-review.yml
-    with:
-      source_run: ${{ github.event.inputs.source_run || format('{0}', github.event.workflow_run.id) }}
-    secrets: inherit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Email the failure without a paid AI review
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ github.event.inputs.source_run || format('{0}', github.event.workflow_run.id) }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_EMAIL_TO: ${{ secrets.HEALTH_EMAIL_TO }}
+          HEALTH_EMAIL_FROM: ${{ secrets.HEALTH_EMAIL_FROM }}
+        run: python scripts/agent_review.py notify-failure --source-run "$SOURCE_RUN"

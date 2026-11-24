@@ -5,6 +5,10 @@ on:
       source_run:
         type: string
         required: true
+      paid_review:
+        description: 'Explicit opt-in for the scheduled intelligent review'
+        type: boolean
+        default: false
     secrets:
       OPENAI_API_KEY:
         required: false
@@ -19,6 +23,7 @@ permissions:
   actions: read
 jobs:
   prepare:
+    if: inputs.paid_review
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
@@ -30,7 +35,7 @@ jobs:
       - uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.12'
-      - name: Gather data, history, audit and failed-step logs
+      - name: Gather data, history, live audit and upstream evidence
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SOURCE_RUN: ${{ inputs.source_run }}
@@ -41,6 +46,7 @@ jobs:
           path: review-input/
           retention-days: 90
   agent:
+    if: inputs.paid_review
     needs: prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 12

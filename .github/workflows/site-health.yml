@@ -50,4 +50,5 @@ jobs:
     uses: ./.github/workflows/agent-review.yml
     with:
       source_run: ${{ github.run_id }}
+      paid_review: true
     secrets: inherit

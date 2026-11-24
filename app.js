@@ -285,6 +285,9 @@ function builderRoster(selected, includeBaseMatches = true) {
 function referenceAttributes(id) {
   return `data-reference-id="${escapeHtml(id)}" role="button" tabindex="0" aria-pressed="${builderReferences.has(id)}"`;
 }
+function tierSelectionControls() {
+  return '<span class="tier-selection-controls"><button type="button" data-tier-select="all" title="Highlight every Pokémon in this tier">Select All</button><button type="button" data-tier-select="none" title="Remove highlights from this tier">Select None</button></span>';
+}
 function syncReferenceHighlights() {
   for(const icon of document.querySelectorAll('[data-reference-id]')) {
     const active=builderReferences.has(icon.dataset.referenceId);
@@ -338,6 +341,13 @@ function bindReferenceControls() {
     }});
   const panel=document.getElementById('teamBuilderPanel');
   panel.addEventListener('click',event=>{
+    const selection=event.target.closest('[data-tier-select]');
+    if(selection) {
+      const tier=selection.closest('.builder-tier-group,.builder-speed-tie');
+      const ids=[...tier.querySelectorAll('[data-reference-id]')].map(icon=>icon.dataset.referenceId);
+      updateReferences(()=>builderReferences.selectMany(ids,selection.dataset.tierSelect==='all'));
+      return;
+    }
     const icon=event.target.closest('[data-reference-id]');if(!icon) return;
     updateReferences(()=>builderReferences.toggle(icon.dataset.referenceId));
   });
@@ -2014,7 +2024,7 @@ function renderOffenseRows(rows,key,context = '',groups = Offense.groups) {
       return `<span class="tier-pokemon${builderReferences.has(member.species.id) ? ' reference-highlighted' : ''}${showChance && chance!==null ? ' has-ko-chance' : ''}${scenario?.active ? ` field-assumed field-${scenario.value.toLowerCase()}` : ''}${changed ? ` tier-changed ${better ? 'tier-improved' : 'tier-worsened'}` : ''}" ${referenceAttributes(member.species.id)} data-scenario-id="${escapeHtml(member.scenarioId || member.species.id)}" data-scenario-weight="${member.weight ?? 1}" ${scenario ? `data-field-active="${scenario.active}"` : ''} ${changed ? `data-baseline-tier="${changed}"` : ''} data-offense-species="${escapeHtml(member.species.id)}" ${state.builderPanel === 'defense' ? `data-defense-species="${escapeHtml(member.species.id)}"` : state.builderPanel === 'balance' ? `data-balance-species="${escapeHtml(member.species.id)}"` : ''} title="${escapeHtml(description)}">
         <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${winBadge}${chanceBadge}${thresholds.some(t=>t.text) ? `<span class="stat-thresholds">${thresholds.filter(t=>t.text).map(t=>`<span class="stat-threshold-badge" data-stat-threshold="${t.stat}">${escapeHtml(t.text)}</span>`).join('')}</span>` : ''}</span>`;
     }).join('');
-    return `<section class="builder-tier-group" data-offense-group="${group.kind}"><h3>${group.kind === 'guaranteed-ohko' ? 'Nearly Guaranteed OHKO<sup class="ko-caveat" tabindex="0" title="Based on reported statistical usage spreads, not the maximum possible bulk. Unreported builds may survive." aria-label="Based on usage spreads, not maximum possible bulk">?</sup>' : group.label}${state.builderPanel==='balance' ? '' : `<small class="tier-point-value">${Offense.points(group)} points</small>`}<span class="offense-tier-count">${members.length}</span></h3><div class="tier-icon-cloud">${icons}</div></section>`;
+    return `<section class="builder-tier-group" data-offense-group="${group.kind}"><h3>${group.kind === 'guaranteed-ohko' ? 'Nearly Guaranteed OHKO<sup class="ko-caveat" tabindex="0" title="Based on reported statistical usage spreads, not the maximum possible bulk. Unreported builds may survive." aria-label="Based on usage spreads, not maximum possible bulk">?</sup>' : group.label}${state.builderPanel==='balance' ? '' : `<small class="tier-point-value">${Offense.points(group)} points</small>`}${members.length ? tierSelectionControls() : ''}<span class="offense-tier-count">${members.length}</span></h3><div class="tier-icon-cloud">${icons}</div></section>`;
   }).join('');
   if (key !== offenseAnchorKey) { offenseAnchorKey = key; list.scrollTop = 0; }
   document.getElementById('builderOffenseContext').textContent = `${state.format} · Weather: ${state.weather || 'None'} · Terrain: ${state.terrain || 'None'}${context}`;
@@ -2471,12 +2481,12 @@ function renderTeamBuilder() {
       <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${badge}${chanceBadge}</span>`;
   };
   const cloud = members => members.length ? `<div class="tier-icon-cloud">${members.map(icon).join('')}</div>` : '';
-  const tie = members => `<section id="builderSpeedTie" class="builder-speed-tie" aria-label="Speed Tie, matching base Speed"><h3>Speed Tie <small>Base ${data.baseSpeed}</small></h3>${cloud(members)}</section>`;
+  const tie = members => `<section id="builderSpeedTie" class="builder-speed-tie" aria-label="Speed Tie, matching base Speed"><h3>Speed Tie <small>Base ${data.baseSpeed}</small>${tierSelectionControls()}</h3>${cloud(members)}</section>`;
   list.innerHTML = data.groups.filter(group => group.members.length).map(group => {
     const ties = group.members.filter(member => member.tie);
     const body = ties.length ? cloud(group.members.filter(member => member.baseSpeed > data.baseSpeed)) + tie(ties)
       + cloud(group.members.filter(member => member.baseSpeed < data.baseSpeed)) : cloud(group.members);
-    return `<section class="builder-tier-group" data-speed-group="${group.kind}"><h3>${group.label}</h3>${body}</section>`;
+    return `<section class="builder-tier-group" data-speed-group="${group.kind}"><h3>${group.label}${tierSelectionControls()}</h3>${body}</section>`;
   }).join('');
   const key = `${state.activeTeamId}:${state.activeOurIndex}:${species.id}:${data.target}:${state.format}:${state.builderTopN}`;
   if (key !== builderAnchorKey) {

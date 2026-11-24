@@ -317,7 +317,7 @@
     keydown(event) {
       if(event.code!=='Space' || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || !this.active() || this.disabled)return;
       const target=event.target;
-      if(target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]') || target.closest('button,a,summary') && target!==this.button || document.querySelector('dialog[open]'))return;
+      if(target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]') || document.querySelector('dialog[open]'))return;
       if(event.defaultPrevented)return;
       event.preventDefault();if(this.held || event.repeat)return;
       this.held=true;
@@ -377,7 +377,9 @@
       try {recognition.start();}catch(error){this.failed=true;this.session=null;this.want=null;this.say(`Speech recognition could not start (${error.name || 'unknown error'}). Click the microphone to try again.`);this.sync();}
     }
     stop() {
-      this.want=null;this.sync();const session=this.session;
+      this.want=null;
+      if(this.status.textContent==='Listening…')this.say('');
+      this.sync();const session=this.session;
       if(session && !session.stopping){session.stopping=true;try{session.recognition.stop();}catch{session.stopping=false;}}
     }
   }

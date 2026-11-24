@@ -20,6 +20,22 @@ class ReferenceSetTests(unittest.TestCase):
         display=self.evaluate('name=>getPokemonByName(name).name',name)
         self.page.locator('#searchResults .choice-heading strong').filter(has_text=re.compile('^'+re.escape(display)+'$')).click()
 
+    def test_tier_selection_adds_and_removes_only_that_tier(self):
+        self.builder()
+        for panel in ['speed','offense','team-offense','defense','balance']:
+            with self.subTest(panel=panel):
+                self.evaluate("builderReferences.clear();builderReferences.toggle('Gogoat',true)")
+                self.page.locator(f'[data-builder-panel="{panel}"]').click()
+                self.page.wait_for_selector('.builder-tier-group [data-reference-id]:visible',timeout=30000)
+                tier=self.page.locator('.builder-tier-group:visible').filter(has=self.page.locator('[data-reference-id]')).first
+                ids=set(tier.locator('[data-reference-id]').evaluate_all('(icons)=>icons.map(icon=>icon.dataset.referenceId)'))
+                tier.locator(':scope > h3 [data-tier-select="all"]').click()
+                self.assertEqual(set(self.evaluate('builderReferences.active.ids')),ids|{'Gogoat'})
+                self.assertEqual(tier.locator('[data-reference-id][aria-pressed="false"]').count(),0)
+                tier.locator(':scope > h3 [data-tier-select="none"]').click()
+                self.assertEqual(set(self.evaluate('builderReferences.active.ids')),{'Gogoat'}-ids)
+                self.assertEqual(tier.locator('[data-reference-id][aria-pressed="true"]').count(),0)
+
     def test_keyboard_search_outside_top_n_and_shared_highlights_in_all_views(self):
         self.builder()
         self.assertFalse(self.evaluate("builderRoster(getPokemonByName(state.ourTeam[0].name)).some(p=>p.id==='Gogoat')"))

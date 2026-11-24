@@ -979,7 +979,7 @@ a { color: var(--accent); }
 .builder-assumptions p { line-height: 1.5; }
 .builder-assumptions[open] { max-height: 25vh; overflow-y: auto; }
 .builder-assumptions[open] summary { position: sticky; top: 0; z-index: 2; background: var(--panel); }
-.offense-tier-count { float: right; font-weight: 400; }
+.offense-tier-count { font-weight: 400; }
 .builder-move-trial { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding:10px 12px; margin-bottom:5px; border:1px solid var(--soft-border); border-radius:8px; background:rgba(255,255,255,0.025); color: var(--text); font-size: 0.75rem; }
 .builder-move-trial input { margin: 0; accent-color:var(--accent); }
 .builder-move-trial > label { display:inline-flex; align-items:center; gap:8px; }
@@ -994,6 +994,10 @@ a { color: var(--accent); }
 .builder-speed-tiers { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 0 10px; }
 .builder-tier-group { padding: 14px 0; border-top: 2px solid var(--divider); }
 .builder-tier-group > h3 { position: sticky; top: 0; z-index: 1; margin: 0 0 10px; padding: 7px 0; background: var(--panel); font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.builder-tier-group > h3, .builder-speed-tie > h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tier-selection-controls { display: inline-flex; gap: 6px; margin-left: auto; }
+.tier-selection-controls button { padding: 3px 7px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 0.7rem; cursor: pointer; }
+.tier-selection-controls button:hover, .tier-selection-controls button:focus-visible { color: var(--accent); border-color: var(--accent); }
 .tier-icon-cloud { display: flex; flex-wrap: wrap; gap: 7px; min-width: 0; }
 .tier-pokemon { display: inline-flex; flex: 0 0 94.5px; width: 94.5px; height: 94.5px; align-items: center; justify-content: center; border-radius: 8px; background: rgba(255,255,255,0.035); }
 .tier-pokemon:hover { outline: 1px solid var(--accent); background: rgba(108,195,255,0.14); }

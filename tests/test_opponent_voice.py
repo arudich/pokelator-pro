@@ -80,6 +80,37 @@ class OpponentVoiceTests(unittest.TestCase):
         self.assertEqual(self.evaluate('voiceTest.starts'),1)
         self.assertEqual(self.page.locator('#opponentVoiceButton').get_attribute('data-state'),'listening')
 
+    def test_space_hold_works_after_clear_and_outside_opponent_pane(self):
+        self.mock('granted');self.load();self.page.clock.install();self.page.clock.pause_at(1000000000000)
+        self.page.locator('#clearOpponentsButton').click()
+        for selector in ['#clearOpponentsButton','#battleViewButton','#metaModeToggle']:
+            with self.subTest(focus=selector):
+                self.page.locator(selector).focus()
+                starts=self.evaluate('voiceTest.starts')
+                self.page.keyboard.down('Space');self.page.clock.fast_forward(500)
+                self.assertEqual(self.evaluate('voiceTest.starts'),starts+1)
+                self.assertEqual(self.page.locator('#opponentVoiceStatus').inner_text(),'Listening…')
+                self.page.keyboard.up('Space')
+                self.assertEqual(self.page.locator('#opponentVoiceButton').get_attribute('data-state'),'idle')
+                self.assertFalse(self.page.locator('#opponentVoiceStatus').is_visible())
+
+    def test_click_stop_clears_listening_before_browser_end_and_can_restart(self):
+        self.mock('granted')
+        self.page.add_init_script('SpeechRecognition.prototype.stop=function(){voiceTest.stops++;};')
+        self.load();self.page.clock.install();self.page.clock.pause_at(1000000000000)
+        button=self.page.locator('#opponentVoiceButton')
+        button.click()
+        self.assertEqual(self.page.locator('#opponentVoiceStatus').inner_text(),'Listening…')
+        button.click()
+        self.assertEqual(button.get_attribute('data-state'),'idle')
+        self.assertFalse(self.page.locator('#opponentVoiceStatus').is_visible())
+        self.evaluate('voiceTest.sessions.at(-1).onend()')
+        self.page.clock.fast_forward(200)
+        self.assertEqual(self.evaluate('voiceTest.starts'),1)
+        button.click()
+        self.assertEqual(self.evaluate('voiceTest.starts'),2)
+        self.assertEqual(button.get_attribute('data-state'),'listening')
+
     def test_granted_space_hold_lights_up_and_release_stops(self):
         self.mock('granted');self.load();self.page.clock.install();self.page.clock.pause_at(1000000000000)
         self.page.keyboard.down('Space');self.page.clock.fast_forward(499)

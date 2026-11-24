@@ -29,6 +29,11 @@
       this.save();
     }
     clear() {this.active.ids=[];this.only=false;this.save();}
+    selectMany(ids,selected) {
+      const next=new Set(this.active.ids);
+      for(const id of ids) if(this.valid.has(id)) {if(selected) next.add(id);else next.delete(id);}
+      this.active.ids=[...next];this.save();
+    }
     load(id) {
       if(this.sets.some(set=>set.id===id)) {
         this.activeId=id;this.draft={...this.saved,ids:[...this.saved.ids]};this.save();

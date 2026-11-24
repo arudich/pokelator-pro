@@ -7,7 +7,7 @@
     {title:'Advanced Filtering',image:'filtering',alt:'An Attack boost and a physical Fire move with 75 or more power: two compact move requirements above actual matching Pokémon results.',caption:'Find Pokémon that meet several move requirements, then combine them with type, resistance and ability filters.'},
     {title:'Fast Matchup Answers',image:'battle',alt:'Actual Battle View with highlighted voice input and opponent selection, damage ranges, weather, terrain, abilities, items, stat stages and Speed comparisons, plus a real item tooltip labeled Hover When Confused!.',caption:'Add opponents by voice or search, then test battle conditions and modifiers. Hover When Confused!'},
     {title:'Smarter Stat Investments',image:'builder',alt:'Speed, Offense, Defense and Balance panels showing investment thresholds, move previews, defensive spread suggestions and one-on-one matchups.',caption:'Compare Speed, Offense, Team Offense, Defense and Balance, then lock in stronger moves and stat spreads.'},
-    {title:'Your Matchup Shortlists',image:'highlights',alt:'Highlighted opponent borders, Pokémon search, the highlighted-only filter and named highlight sets in Team Builder.',caption:'Click or search to highlight Pokémon across views, focus calculations on them, and save named sets to revisit.'}
+    {title:'Your Matchup Shortlists',image:'highlights',alt:'Highlighted opponent borders, Pokémon search, the highlighted-only filter and named highlight sets in Team Builder.',caption:'Highlight Pokémon individually or by tier, focus calculations on them, and save named sets to revisit.'}
   ];
   const dialog=document.createElement('dialog');
   dialog.id='tutorialDialog';dialog.className='tutorial-dialog';
@@ -24,7 +24,7 @@
   function render() {
     const slide=slides[current];
     title.textContent=slide.title;caption.textContent=slide.caption;
-    picture.src=`assets/tutorial/${slide.image}.png?v=20261124-voice-forms-release`;picture.alt=slide.alt;
+    picture.src=`assets/tutorial/${slide.image}.png?v=20261124-tier-selection-release`;picture.alt=slide.alt;
     previous.disabled=current===0;next.hidden=current===slides.length-1;done.hidden=current!==slides.length-1;
     dialog.querySelector('#tutorialProgress').textContent=`${current+1} / ${slides.length}`;
     dots.querySelectorAll('button').forEach((button,index)=>button.setAttribute('aria-current',String(index===current)));

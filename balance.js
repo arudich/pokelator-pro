@@ -225,8 +225,10 @@
       if(meta.recoil && !['Rock Head','Magic Guard'].includes(a.entry.ability)) a.hp=Math.max(0,a.hp-Math.max(1,Math.floor(dealt*meta.recoil[0]/meta.recoil[1])));
       if(a.entry.item==='Life Orb' && a.entry.ability!=='Magic Guard' && !(a.entry.ability==='Sheer Force' && (meta.secondary || meta.secondaries))) a.hp=Math.max(0,a.hp-Math.max(1,Math.floor(a.maxHP/10)));
       if(name==='Knock Off' && !(b.species.isMega || b.species.megaStoneName) && b.entry.ability!=='Sticky Hold') consume(b);
-      if(a.entry.ability!=='Sheer Force' && b.entry.ability!=='Shield Dust' && b.entry.item!=='Covert Cloak') {
-        for(const secondary of meta.secondaries || (meta.secondary ? [meta.secondary] : [])) if(rng()<(secondary.chance || 100)/100*(a.entry.ability==='Serene Grace' ? 2 : 1)) {
+      if(a.entry.ability!=='Sheer Force') {
+        for(const secondary of meta.secondaries || (meta.secondary ? [meta.secondary] : [])) if(rng()<(secondary.chance ?? 100)/100*(a.entry.ability==='Serene Grace' ? 2 : 1)) {
+          if(secondary.self?.boosts) change(a,secondary.self.boosts);
+          if(b.entry.ability==='Shield Dust' || b.entry.item==='Covert Cloak') continue;
           if(secondary.volatileStatus==='flinch' && b.entry.ability!=='Inner Focus') b.flinched=true;
           if(secondary.boosts) change(b,secondary.boosts);
           const status=secondary.status || (secondary.statusChoices?.length ? secondary.statusChoices[Math.floor(rng()*secondary.statusChoices.length)] : '');

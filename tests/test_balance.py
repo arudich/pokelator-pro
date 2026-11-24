@@ -14,6 +14,35 @@ class BalanceTests(unittest.TestCase):
         app_tests.AppTests.load(self)
         self.page.add_script_tag(url=self.url+'/data/balance-moves.js')
 
+    def test_aqua_step_self_boost_changes_next_turn_order_and_respects_blockers(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const base={investment:{hp:0,atk:0,def:0,spa:0,spd:0,spe:0},ability:'No Ability'};
+          const run=(ability='No Ability',item='',attackerAbility='No Ability')=>{
+            const a=Balance.side(getPokemonByName('Quaquaval'),{...base,ability:attackerAbility},['Aqua Step']);
+            const b=Balance.side(getPokemonByName('Blastoise'),{...base,ability,item},['Body Slam']);
+            a.maxHP=a.hp=b.maxHP=b.hp=100;
+            const order=[];
+            // Fix effective speeds independently of current usage builds.
+            a.species={...a.species,stats:{...a.species.stats,spe:80}};
+            b.species={...b.species,stats:{...b.species.stats,spe:100}};
+            const range=(attacker,defender,name,hits)=>{
+              if(hits!==undefined) order.push(attacker===a ? 'us' : 'them');
+              return {rolls:[60],hp:defender.maxHP,defenderAbility:defender.entry.ability,
+                meta:{type:'Normal',category:'Physical'}};
+            };
+            const outcome=Balance.duel(a,b,{},range,()=>0.9);
+            return {winner:outcome.winner,order,boost:a.entry.boosts.spe || 0};
+          };
+          return {normal:run(),shield:run('Shield Dust'),cloak:run('No Ability','Covert Cloak'),
+            sheer:run('No Ability','','Sheer Force')};
+        }""")
+        for case in ['normal','shield','cloak']:
+            self.assertEqual(result[case]['winner'],'us')
+            self.assertEqual(result[case]['order'],['them','us','us'])
+            self.assertGreaterEqual(result[case]['boost'],1)
+        self.assertEqual(result['sheer'],{'winner':'them','order':['them','us','them'],'boost':0})
+
     def test_first_impression_is_only_available_before_first_move_action(self):
         self.load()
         result=self.evaluate("""() => {

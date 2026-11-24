@@ -29,15 +29,31 @@ def fetch(url):
     return urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'PokelatorPro usage snapshot'}),timeout=40).read()
 
 
+def validate_usage_records(records):
+    if not records:raise ValueError('No species usage data')
+    ranks=[];names=set()
+    for key,row in records.items():
+        name=re.sub('[^a-z0-9]','',row['name'].lower())
+        if not name or name in names or key!=name:raise ValueError('Duplicate or inconsistent usage species identity')
+        names.add(name)
+        rank=row.get('rank')
+        if type(rank) is not int or rank<1:raise ValueError('Invalid usage rank')
+        ranks.append(rank)
+        if not 0<=row['percent']<=100:raise ValueError('Invalid usage percentage')
+    if sorted(ranks)!=list(range(1,len(ranks)+1)):raise ValueError('Usage ranks must be unique and consecutive starting at one')
+
+
 def parse_usage(text):
     records={}
     for line in text.splitlines():
         columns=[part.strip() for part in line.split('|')]
-        if len(columns)>4 and columns[1].isdigit() and columns[3].endswith('%'):
+        if len(columns)>1 and columns[1].isdigit():
+            if len(columns)<=4 or not columns[3].endswith('%'):raise ValueError('Malformed ranked usage row')
             value=float(columns[3][:-1]);name=columns[2]
-            if not 0<=value<=100:raise ValueError('Invalid usage percentage')
-            records[re.sub('[^a-z0-9]','',name.lower())]={'name':name,'percent':value,'rank':int(columns[1])}
-    if not records:raise ValueError('No species usage data')
+            key=re.sub('[^a-z0-9]','',name.lower())
+            if key in records:raise ValueError('Duplicate usage species identity')
+            records[key]={'name':name,'percent':value,'rank':int(columns[1])}
+    validate_usage_records(records)
     return records
 
 

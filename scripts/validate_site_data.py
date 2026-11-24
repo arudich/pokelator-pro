@@ -1,6 +1,7 @@
 """Validate snapshots and engine integrity without network access."""
 import hashlib
 import json
+from refresh_meta_usage import validate_usage_records
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -50,7 +51,7 @@ def validate(root=ROOT,baseline_root=ROOT):
         if not value['species']:raise ValueError('Empty meta usage')
         previous_count=len(prior_meta['formats'].get(format,{}).get('species',{}))
         if previous_count and len(value['species'])<previous_count*0.9:raise ValueError(f'{format}: meta coverage fell from {previous_count} to {len(value["species"])} species; review before publishing')
-        if any(not 0<=row['percent']<=100 for row in value['species'].values()):raise ValueError('Invalid meta usage')
+        validate_usage_records(value['species'])
     for line in (root/'vendor/SHA256SUMS').read_text().splitlines():
         digest,name=line.split(maxsplit=1);path=root/name
         if path.parent!=root/'vendor' or hashlib.sha256(path.read_bytes()).hexdigest()!=digest:raise ValueError('Engine integrity mismatch')

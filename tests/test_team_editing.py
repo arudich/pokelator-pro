@@ -131,12 +131,16 @@ class TeamEditingTests(unittest.TestCase):
         self.load()
         result=self.evaluate("""() => {
           state.format='Doubles';
-          const species=getPokemonByName('Garbodor'),usage=getUsage(species);
-          const full=usage.spreads.find(row=>Object.values(row.investment).reduce((a,b)=>a+b,0)===66);
-          const saved=sanitizeTeamEntry({name:'Garbodor',investment:usage.spreads[0].investment});
+          const species=getPokemonByName('Garbodor');
+          const partialSpread={percent:80,rank:1,investment:{hp:32,atk:32,def:0,spa:0,spd:0,spe:0}};
+          const full={percent:20,rank:2,investment:{hp:32,atk:32,def:0,spa:0,spd:2,spe:0}};
+          const previous=species.usage.Doubles;
+          species.usage.Doubles={...previous,spreads:[partialSpread,full]};
+          const saved=sanitizeTeamEntry({name:'Garbodor',investment:partialSpread.investment});
           state.ourTeam=[saved];state.activeOurIndex=0;saveTeamToStorage();
           addTeamPokemon('Garbodor');
-          const partial=popularTeamBuild({...species,usage:{Doubles:{spreads:[usage.spreads[0]]}}});
+          const partial=popularTeamBuild({...species,usage:{Doubles:{spreads:[partialSpread]}}});
+          species.usage.Doubles=previous;
           return {original:getTotalInvestment(saved),actual:state.ourTeam.at(-1).investment,expected:full.investment,
             partial:partial.investment,incomplete:pokerData.filter(species=>getTotalInvestment(popularTeamBuild(species))!==66).map(species=>species.name)};
         }""")

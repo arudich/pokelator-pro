@@ -1,7 +1,22 @@
 {
-  "reviewedOn": "2026-11-21",
+  "reviewedOn": "2026-11-24",
   "purpose": "Verified dispositions, not a blanket suppression list. Reopen when evidence contradicts a disposition.",
   "findings": [
+    {
+      "id": "garbodor-live-spread-test-assumption",
+      "disposition": "fixed",
+      "verification": "November 23 nightly failed because the most popular Garbodor spread changed from 64 to 66 points. A deterministic partial/full fixture now verifies preserving a saved 64-point build, choosing a less popular complete build for new additions, and filling partial-only reports. The all-species 66-point default invariant remains checked against current data."
+    },
+    {
+      "id": "balance-damaging-secondary-self-boosts",
+      "disposition": "fixed",
+      "verification": "Balance applies secondary.self.boosts to the attacker after a damaging hit. Deterministic Aqua Step duels verify the Speed boost reverses turn-two order and winner, including Shield Dust and Covert Cloak opponents; Sheer Force suppresses the boost. Existing target-secondary/status blocker tests remain in place."
+    },
+    {
+      "id": "monthly-meta-interior-rank-gap",
+      "disposition": "fixed",
+      "verification": "Both monthly usage parsing and stored snapshot validation require unique consecutive positive integer ranks and consistent unique normalized species identities. Regressions remove rank 2 while retaining enough rows to pass coverage thresholds, and reject duplicate ranks, normalized-name collisions, and malformed ranked rows. New-month parse failures still refuse silent fallback."
+    },
     {
       "id": "daily-defense-test-score-threshold",
       "disposition": "fixed",

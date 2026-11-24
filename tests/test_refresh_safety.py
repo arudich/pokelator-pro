@@ -7,7 +7,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
-from refresh_meta_usage import snapshot
+from refresh_meta_usage import snapshot,parse_usage
 from validate_site_data import payload,validate
 from build_roster import build
 
@@ -16,6 +16,28 @@ TABLE=('Total battles: 1000\n'+''.join(f' | {i} | Species{i} | 0.5% | 10 |\n' fo
 
 
 class RefreshSafetyTests(unittest.TestCase):
+    def test_monthly_usage_rejects_interior_gaps_duplicates_and_malformed_rows(self):
+        table=TABLE.decode()
+        cases=[table.replace(' | 2 | Species2 | 0.5% | 10 |\n',''),
+               table.replace(' | 2 | Species2 |',' | 1 | Species2 |'),
+               table.replace('Species2 |','Species-1 |'),
+               table.replace(' | 2 | Species2 | 0.5% |',' | 2 | Species2 | broken |')]
+        for text in cases:
+            with self.subTest(text=text[:120]),self.assertRaises(ValueError):parse_usage(text)
+        self.assertEqual(len(parse_usage(table)),100)
+        def fetch(url):return cases[0].encode() if url.endswith('.txt') else self.fetch(url)
+        with self.assertRaisesRegex(RuntimeError,'refusing silent fallback.*consecutive'):
+            snapshot(discover=True,fetcher=fetch,minimum_species=90)
+
+    def test_stored_monthly_usage_rejects_one_missing_interior_rank(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);shutil.copytree(ROOT/'data',root/'data');shutil.copytree(ROOT/'vendor',root/'vendor')
+            meta=payload(root/'data/meta-usage.js')
+            records=meta['formats']['Doubles']['species']
+            del records[next(key for key,row in records.items() if row['rank']==2)]
+            (root/'data/meta-usage.js').write_text('window.META_USAGE = '+json.dumps(meta)+';')
+            with self.assertRaisesRegex(ValueError,'unique and consecutive'):validate(root)
+
     def test_csv_body_identity_must_match_source_record_including_shared_forms(self):
         record={'showdownName':'Venusaur','summary':{'forms':[]},'battleDataCsvs':[
             {'season':'Current','format':'Singles','path':'Singles/Venusaur.csv'}]}

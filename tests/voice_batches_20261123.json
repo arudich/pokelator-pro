@@ -1,0 +1,173 @@
+[
+  {
+    "transcript": "mega chandelure crocodile mega scrafty kangaskhan salamence",
+    "expected": [
+      "Chandelure-Mega",
+      "Krookodile",
+      "Scrafty-Mega",
+      "Kangaskhan",
+      "Salamence"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "houndstone ditto belly bolt surfetched glacion",
+    "expected": [
+      "Houndstone",
+      "Ditto",
+      "Bellibolt",
+      "Sirfetch’d",
+      "Glaceon"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "mudsdale in telion metagross alcromi mega agron",
+    "expected": [
+      "Mudsdale",
+      "Inteleon",
+      "Metagross",
+      "Alcremie",
+      "Aggron-Mega"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "gallerian sloking guard of war riper vile plume mega amphoros",
+    "expected": [
+      "Slowking-Galar",
+      "Gardevoir",
+      "Rhyperior",
+      "Vileplume",
+      "Ampharos-Mega"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "geridos azumarill megahoundoom mr mime skelege",
+    "expected": [
+      "Gyarados",
+      "Azumarill",
+      "Houndoom-Mega",
+      "Mr. Mime",
+      "Skeledirge"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "hisuian decidui mega audeno lipard arcanine taros aqua",
+    "expected": [
+      "Decidueye-Hisui",
+      "Audino-Mega",
+      "Liepard",
+      "Arcanine",
+      "Tauros-Paldea-Aqua"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "mega crabominable mega gallerc mega abomasnow caesor cinderace",
+    "expected": [
+      "Crabominable-Mega",
+      "Golurk-Mega",
+      "Abomasnow-Mega",
+      "Scizor",
+      "Cinderace"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "meowstick mega for alligator mega steelix mega gallade mega caesor",
+    "expected": [
+      "Meowstic",
+      "Feraligatr-Mega",
+      "Steelix-Mega",
+      "Gallade-Mega",
+      "Scizor-Mega"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "floet hallucha spiritum greninja lucario",
+    "expected": [
+      "Floette-Eternal",
+      "Hawlucha",
+      "Spiritomb",
+      "Greninja",
+      "Lucario"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "chestnut malamar nevern joltion mega electros  yeah",
+    "expected": [
+      "Chesnaught",
+      "Malamar",
+      "Noivern",
+      "Jolteon",
+      "Eelektross-Mega"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "squawkabilli rampardos slow king megabedril alicazam",
+    "expected": [
+      "Squawkabilly",
+      "Rampardos",
+      "Slowking",
+      "Beedrill-Mega",
+      "Alakazam"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "mega x cadrill per circer quakal",
+    "expected": [
+      "Excadrill-Mega",
+      "Perrserker",
+      "Quaquaval",
+      "Clawitzer",
+      "Banette-Mega"
+    ],
+    "unresolved": [
+      "Quaquaval",
+      "Clawitzer",
+      "Banette-Mega"
+    ]
+  },
+  {
+    "transcript": "make a sableye persian alola mega metacham delphox scrafty",
+    "expected": [
+      "Sableye-Mega",
+      "Persian-Alola",
+      "Medicham-Mega",
+      "Delphox",
+      "Scrafty"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "mega lucario infernape torterra kafagus mega barbarical",
+    "expected": [
+      "Lucario-Mega",
+      "Infernape",
+      "Torterra",
+      "Cofagrigus",
+      "Barbaracle-Mega"
+    ],
+    "unresolved": []
+  },
+  {
+    "transcript": "ride you alola mega gala superior slurpuff aromatus",
+    "expected": [
+      "Raichu-Alola",
+      "Glalie-Mega",
+      "Serperior",
+      "Slurpuff",
+      "Aromatisse"
+    ],
+    "unresolved": [
+      "Glalie-Mega"
+    ]
+  }
+]

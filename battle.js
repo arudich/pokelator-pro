@@ -63,9 +63,18 @@
     }
     return changed ? {...entry,boosts} : entry;
   }
+  function forecastSpecies(species,ability,weather) {
+    if(!/^Castform(?:-|$)/.test(species?.calcId||species?.id||''))return species;
+    const form=ability==='Forecast'?({'Sun':['Sunny','Fire'],'Harsh Sunshine':['Sunny','Fire'],
+      Rain:['Rainy','Water'],'Heavy Rain':['Rainy','Water'],Snow:['Snowy','Ice'],Hail:['Snowy','Ice']}[weather]):null;
+    return {...species,calcId:form?`Castform-${form[0]}`:'Castform',name:form?`Castform ${form[0]} Form`:'Castform',types:[form?form[1]:'Normal']};
+  }
   function range(attackerSpecies, attacker, defenderSpecies, defender, moveName, options = {}) {
     ({species:attackerSpecies,entry:attacker}=window.Battle.resolveCombatant(attackerSpecies,attacker));
     ({species:defenderSpecies,entry:defender}=window.Battle.resolveCombatant(defenderSpecies,defender));
+    const forecastWeather=[attacker.ability,defender.ability].some(a=>['Air Lock','Cloud Nine'].includes(a))?'':options.weather;
+    attackerSpecies=forecastSpecies(attackerSpecies,attacker.ability,forecastWeather);
+    defenderSpecies=forecastSpecies(defenderSpecies,defender.ability,forecastWeather);
     const meta = moveMeta(moveName);
     if (!meta) return {error: 'Unknown move'};
     try {
@@ -274,7 +283,7 @@
         scenario:{active,field,value,ability:setter,...fields}};
     });
   }
-  window.Battle = {generation, natureOptions, natureStats, effectiveStat, moveMeta, range, withStages, speed, speedTier,speedUsageChance,speedField,fieldScenarios,
+  window.Battle = {generation, natureOptions, natureStats, effectiveStat, moveMeta, range, withStages, speed, speedTier,speedUsageChance,speedField,fieldScenarios,forecastSpecies,
     incomingRange, incomingScenarios, selectThreats, isDamageAbility, requiredMegaItem, builderSpeedGroups,
     resolveCombatant:(species,entry)=>({species,entry})};
 })();

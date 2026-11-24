@@ -23,7 +23,7 @@ const MAX_STAT_POINTS = 32;
 const ABILITY_USAGE_THRESHOLD = 50;
 const NATURE_USAGE_THRESHOLD = 50;
 const rosterSnapshot = window.CHAMPIONS_ROSTER;
-const pokerData = rosterSnapshot.pokemon;
+const pokerData = PokemonForms.catalog(rosterSnapshot);
 const cosmeticPokemon=(rosterSnapshot.cosmeticForms || []).flatMap(form=>{
   const base=pokerData.find(species=>species.id===form.baseId);
   return base ? [{...base,...form,calcId:base.calcId || base.id,cosmeticBaseId:base.id}] : [];
@@ -31,6 +31,15 @@ const cosmeticPokemon=(rosterSnapshot.cosmeticForms || []).flatMap(form=>{
 const pokemonCatalog=[...pokerData,...cosmeticPokemon];
 const builderReferences=new ReferenceSets(pokemonCatalog.map(species=>species.id));
 const ordinaryForms=new Map();
+const megaFormChoices=new Map();
+function megaBaseSpecies(species) {
+  return species?.isMega ? getPokemonByName(Battle.generation.species.get(calc.toID(species.calcId||species.id))?.baseSpecies) || species : species;
+}
+function availableMegaForms(species) {
+  const base=megaBaseSpecies(species);if(!base)return [];
+  if(!megaFormChoices.has(base.id))megaFormChoices.set(base.id,pokerData.filter(p=>p.isMega&&megaBaseSpecies(p)?.id===base.id));
+  return megaFormChoices.get(base.id);
+}
 const natureOptions = Battle.natureOptions;
 const itemOptions = [...Battle.generation.items].map(item => item.name);
 const statOrder = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
@@ -47,6 +56,8 @@ function escapeHtml(value) {
 function getPokemonRoster() { return pokemonCatalog; }
 function getPokemonByName(name) {
   const key = String(name || '').trim().toLowerCase();
+  if(PokemonForms.alias(key)) return pokemonCatalog.find(p=>p.id==='Aegislash-Blade');
+  if(/^castform(?:[- ](?:sunny|rainy|snowy)(?: form)?)?$/.test(key))return pokemonCatalog.find(p=>p.id==='Castform');
   return pokemonCatalog.find(p => p.name.toLowerCase() === key || p.id.toLowerCase() === key) || null;
 }
 function savedSpecies(entry) {
@@ -55,6 +66,25 @@ function savedSpecies(entry) {
 }
 function battleSpecies(entry,side='opponent') {
   const species=savedSpecies(entry);
+  if(PokemonForms.isCastform(species)){
+    const base=getPokemonByName('Castform'),prefs=getPreferences(base,side);
+    const ability=side==='opponent'?(prefs.abilityChoice==='auto'?'Forecast':prefs.abilityChoice)
+      :entry.ability??state.ourTeam.find(p=>p.id==='Castform')?.ability??'Forecast';
+    const other=side==='our'?state.opponentList[state.activeOpponentIndex]:state.ourTeam[state.activeOurIndex];
+    const otherAbility=other&&!PokemonForms.isCastform(savedSpecies(other))
+      ?side==='our'?appliedOpponentAbility(other):battleEntry(other).ability:'';
+    const weather=['Air Lock','Cloud Nine'].includes(otherAbility)?'':state.weather;
+    return Battle.forecastSpecies(base,ability,weather);
+  }
+  if(species?.selectedMegaFromBase)return species;
+  if(side==='opponent'&&species&&!species.isMega){
+    const prefs=getPreferences(species,side),mega=availableMegaForms(species).find(p=>p.id===prefs.megaFormId&&Battle.requiredMegaItem(p)===prefs.itemChoice);
+    if(mega)return {...mega,id:species.id,calcId:mega.id,megaStoneName:Battle.requiredMegaItem(mega),selectedMegaFromBase:true};
+  }
+  if(PokemonForms.isAegislash(species)) {
+    const canonical=getPokemonByName('Aegislash');
+    return getPreferences(canonical,side).bladeActive ? canonical : PokemonForms.shield(rosterSnapshot,canonical);
+  }
   if(!species?.isMega || getPreferences(species,side).megaActive) return species;
   if(ordinaryForms.has(species.id)) return ordinaryForms.get(species.id);
   const engine=Battle.generation.species.get(calc.toID(species.id));
@@ -76,11 +106,12 @@ function battleEntry(entry,side='our') {
   return species?.megaStoneName ? {...entry,ability:ordinaryAbility(species,entry,side),item:species.megaStoneName} : entry;
 }
 function getPokemonImage(name) {
-  const species = getPokemonByName(name);
+  const species = /^Castform (Sunny|Rainy|Snowy) Form$/.test(name)?rosterSnapshot.pokemon.find(p=>p.name===name)
+    :name==='Aegislash Shield Forme' ? rosterSnapshot.pokemon.find(p=>p.id==='Aegislash') : getPokemonByName(name);
   return species ? new URL(species.image, 'https://championsbattledata.com/').href : '';
 }
 function baseStatsMarkup(entry) {
-  const species=getPokemonByName(entry.name);
+  const species=entry.stats ? entry : getPokemonByName(entry.name);
   const labels={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};
   const values=statOrder.map(stat=>[stat,stat==='hp' && species.stats.hp===1 ? 1 : species.stats[stat]-(stat==='hp' ? 75 : 20)]);
   const description=`${species.name} base stats: ${values.map(([stat,value])=>`${labels[stat]} ${value}`).join(' · ')}. Before investment, nature and stat stages.`;
@@ -364,7 +395,7 @@ function natureChoice(raw, field, legacyField) {
   return typeof raw?.[legacyField] === 'boolean' ? raw[legacyField] : 'auto';
 }
 function sanitizePreferences(raw = {}) {
-  return {megaActive:raw?.megaActive!==false,baseAbilityChoice:typeof raw?.baseAbilityChoice==='string' ? raw.baseAbilityChoice : 'auto',offenseStage:Number.isInteger(raw?.offenseStage) ? clamp(raw.offenseStage,-6,6) : 0,
+  return {megaFormId:typeof raw?.megaFormId==='string'?raw.megaFormId:'',bladeActive:raw?.bladeActive!==false,megaActive:raw?.megaActive!==false,baseAbilityChoice:typeof raw?.baseAbilityChoice==='string' ? raw.baseAbilityChoice : 'auto',offenseStage:Number.isInteger(raw?.offenseStage) ? clamp(raw.offenseStage,-6,6) : 0,
     speedStage:Number.isInteger(raw?.speedStage) ? clamp(raw.speedStage,-2,2) : 0,
     builderOpponentOffenseStage:Number.isInteger(raw?.builderOpponentOffenseStage) ? clamp(raw.builderOpponentOffenseStage,-2,2) : 0,
     builderOpponentSpeedStage:Number.isInteger(raw?.builderOpponentSpeedStage) ? clamp(raw.builderOpponentSpeedStage,-2,2) : 0,
@@ -384,6 +415,7 @@ function loadPreferences() {
 }
 function getPreferences(entry, side) {
   if (!entry) return sanitizePreferences();
+  if(PokemonForms.isAegislash(entry))entry=getPokemonByName('Aegislash');
   const key = `${side}:${entry.id}`;
   if (!state.preferences[key]) state.preferences[key] = sanitizePreferences(side === 'our' ? entry : {});
   return state.preferences[key];
@@ -535,6 +567,11 @@ function getItemHints(species) {
   const usage = getUsage(species);
   const hints = (usage?.items || []).filter(row => row.percent >= 5 && itemHintMetadata(row.name))
     .map(row => ({...itemHintMetadata(row.name), percent: row.percent, reference: usage.name}));
+  for(const mega of availableMegaForms(species)){
+    const stone=Battle.requiredMegaItem(mega);if(!stone)continue;
+    hints.push({name:stone,image:window.ITEM_SPRITES[stone],percent:null,reference:species.name,megaFormId:mega.id,
+      description:`Mega Evolve into ${mega.name}. Click again to return to ${species.name}.`});
+  }
   // A manual selection stays visible across formats even if it is no longer common.
   const selected = getPreferences(species,'opponent').itemChoice;
   if (selected && itemHintMetadata(selected) && !hints.some(item => item.name === selected)) {
@@ -545,9 +582,11 @@ function getItemHints(species) {
   return hints;
 }
 function appliedOpponentItem(opponent) {
-  const species = opponent && getPokemonByName(opponent.name);
-  if (!species || species.isMega) return '';
+  const species = opponent && savedSpecies(opponent);
+  if (!species) return '';
+  if(species.isMega)return Battle.requiredMegaItem(species);
   const selected = getPreferences(opponent, 'opponent').itemChoice;
+  if(availableMegaForms(species).some(mega=>Battle.requiredMegaItem(mega)===selected))return selected;
   const item = window.ITEM_HINTS[calc.toID(selected)];
   return item && Battle.generation.items.get(calc.toID(item.name)) ? item.name : '';
 }
@@ -555,12 +594,13 @@ function buildItemHints(entry) {
   const species = getPokemonByName(entry.name);
   if(species?.isMega) return `<div class="item-hints">${megaStoneMarkup(entry,'opponent')}</div>`;
   const hints = getItemHints(species);
-  if (!hints.length) return '';
+  const stance=stanceMarkup(entry,'opponent');
+  if (!hints.length) return stance ? `<div class="item-hints">${stance}</div>` : '';
   const active = getPreferences(entry,'opponent').itemChoice;
-  return `<div class="item-hints" aria-label="Opponent item choices">${hints.map(item => {
+  return `<div class="item-hints" aria-label="Opponent item choices">${stance}${hints.map(item => {
     const enabled = item.name === active;
     const frequency = item.percent === null ? 'Usage not reported' : `${item.percent}% ${state.format} usage`;
-    const description = `${item.name} · ${frequency} (${item.reference}). ${item.description} ${item.referenceOnly ? (enabled ? 'Highlighted for reference. Click to clear.' : 'Click to highlight for reference.') : enabled ? 'Active for damage calculations. Click to deactivate.' : 'Not applied to damage. Click to activate.'}`;
+    const description = item.megaFormId ? `${item.name}. ${item.description} ${enabled?'Mega form active.':'Mega form inactive.'}` : `${item.name} · ${frequency} (${item.reference}). ${item.description} ${item.referenceOnly ? (enabled ? 'Highlighted for reference. Click to clear.' : 'Click to highlight for reference.') : enabled ? 'Active for damage calculations. Click to deactivate.' : 'Not applied to damage. Click to activate.'}`;
     return `<button class="item-hint" type="button" data-opponent-item="${escapeHtml(item.name)}" aria-pressed="${enabled}"
       aria-label="${escapeHtml(description)}">
       <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy" />
@@ -956,7 +996,7 @@ function pokemonUsageReference(species) {
     || (exact.startsWith('vivillon') ? 'vivillon' : null);
   return data[exact] || (shared && data[shared]) || (!species.isMega && data[reference]) || null;
 }
-let teamPokemonFilters,opponentPokemonFilters;
+let teamPokemonFilters,opponentVoice;
 const priorityChoiceCache=new Map(),priorityRankingCache=new Map();
 let priorityJob=null;
 function priorityChoices(species,filters) {
@@ -982,7 +1022,7 @@ function priorityRanking(filters) {
   priorityJob={key,worker,progress:'Ranking priority attacks…'};
   const refresh=()=>{
     const picker=activeUsagePicker;
-    if(picker && [teamPokemonFilters?.input,opponentPokemonFilters?.input].includes(picker.input)) {
+    if(picker && [teamPokemonFilters?.input].includes(picker.input)) {
       picker.items=picker.choices(picker.query);picker.cursor=Math.min(picker.cursor,Math.max(0,picker.items.length-1));updateUsagePicker();
     }
   };
@@ -1140,7 +1180,7 @@ function updateUsagePicker() {
   const {input,popup,items,cursor,kind}=picker;
   if(input.id==='pokemonSearchInput') {state.searchQuery=picker.query;state.searchResults=items;state.searchCursor=cursor;}
   const snapshot=window.META_USAGE?.formats[state.format];
-  const priorityFilter=input===teamPokemonFilters?.input ? teamPokemonFilters : input===opponentPokemonFilters?.input ? opponentPokemonFilters : null;
+  const priorityFilter=input===teamPokemonFilters?.input ? teamPokemonFilters : null;
   const rankingHint=priorityFilter?.sort==='priority' ? `${priorityJob?.progress || 'Priority Strength · best attack · typical builds'} · Top ${state.builderTopN} · ${state.format}` : '';
   popup.innerHTML=`<div class="choice-source">${escapeHtml(rankingHint || picker.hint || `${state.format} · ${snapshot?.month || ''} Showdown usage`)}</div>`
     +(items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="usage-choice-${index}" data-choice-index="${index}" class="${kind==='pokemon' ? 'search-item' : kind==='ability' ? 'ability-choice' : kind==='item' ? 'item-choice' : 'move-choice'} usage-choice ${index===cursor ? 'active' : ''}">${picker.markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>');
@@ -1497,22 +1537,30 @@ function renderSearchResults() {
   if(activeUsagePicker?.input.id==='pokemonSearchInput') updateUsagePicker();
 }
 
-function addOpponentFromSearch(name) {
-  const match = getPokemonByName(name);
-  if (!match) return;
-
-  const entry = sanitizeOpponentEntry({name: match.name});
-
-  state.opponentList.unshift(entry);
-  state.activeOpponentIndex = 0;
-  state.searchQuery = '';
-  state.searchCursor = 0;
-
-  const input = document.getElementById('pokemonSearchInput');
-  if (input) input.value = '';
-
-  render();
+function addOpponentsByName(names) {
+  const byFamily=new Map();
+  for(const species of names.map(getPokemonByName).filter(Boolean)){
+    const id=megaBaseSpecies(species).id;
+    if(!byFamily.get(id)?.isMega||species.isMega)byFamily.set(id,species);
+  }
+  const requested=[...byFamily.values()];
+  if(!requested.length)return;
+  const family=entry=>megaBaseSpecies(savedSpecies(entry)).id;
+  const existing=new Map();for(const entry of state.opponentList)if(!existing.has(family(entry)))existing.set(family(entry),entry);
+  const added=requested.map(species=>{
+    const previous=existing.get(megaBaseSpecies(species).id);
+    if(!species.isMega)return previous||sanitizeOpponentEntry({name:species.name});
+    const entry=previous?.id===species.id?previous:sanitizeOpponentEntry({name:species.name});
+    state.preferences[`opponent:${species.id}`]=sanitizePreferences({...getPreferences(previous||entry,'opponent'),megaActive:true,megaFormId:'',itemChoice:''});
+    return entry;
+  });
+  const seen=new Set(added.map(family));
+  state.opponentList=[...added,...state.opponentList.filter(entry=>{if(seen.has(family(entry)))return false;seen.add(family(entry));return true;})];
+  state.activeOpponentIndex=0;state.searchQuery='';state.searchCursor=0;
+  const input=document.getElementById('pokemonSearchInput');if(input)input.value='';
+  savePreferences();render();
 }
+function addOpponentFromSearch(name) {addOpponentsByName([name]);}
 
 function resetBattle() {
   state.weather='';state.terrain='';state.alliesFainted=0;state.opponentsFainted=0;
@@ -1526,10 +1574,17 @@ function resetBattle() {
 
 function knownItemMarkup(entry) {
   if(savedSpecies(entry)?.isMega) return megaStoneMarkup(entry,'our');
-  if(!entry.item) return '';
+  const stance=stanceMarkup(entry,'our');
+  if(!entry.item) return stance;
   const image=window.ITEM_SPRITES?.[entry.item],hint=window.ITEM_HINTS[calc.toID(entry.item)] || {description:window.ITEM_DESCRIPTIONS?.[calc.toID(entry.item)]};
   const label=`${entry.item}${hint?.description ? `. ${hint.description}` : ''}`;
-  return `<span class="item-hint known-item" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(entry.item)}" />` : `<small>${escapeHtml(entry.item)}</small>`}</span>`;
+  return `${stance}<span class="item-hint known-item" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(entry.item)}" />` : `<small>${escapeHtml(entry.item)}</small>`}</span>`;
+}
+function stanceMarkup(entry,side) {
+  const species=savedSpecies(entry);if(!PokemonForms.isAegislash(species))return '';
+  const active=getPreferences(species,side).bladeActive;
+  const label=`${active?'Blade':'Shield'} Forme active. Click to use ${active?'Shield':'Blade'} Forme.`;
+  return `<button type="button" class="item-hint mega-stone stance-toggle" data-stance-side="${side}" aria-pressed="${active}" aria-label="${label}"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 2 8 7v8h8V7zM5 16h14M12 16v6M9 22h6" fill="none" stroke="currentColor" stroke-width="2"/></svg><span role="tooltip" class="item-tooltip" popover="manual">${label}</span></button>`;
 }
 function megaStoneMarkup(entry,side) {
   const species=savedSpecies(entry),stone=Battle.requiredMegaItem(species),active=getPreferences(species,side).megaActive;
@@ -2310,6 +2365,7 @@ function centerBuilderTie() {
   }
 }
 function setView(view) {
+  if(view!=='battle')opponentVoice?.cancel();
   if (view!=='builder') {cancelDefenseSearch();cancelOffenseThresholdSearch();cancelBalanceSearch();}
   state.view = view;
   saveUISettings();
@@ -2499,6 +2555,8 @@ function bindStaticControls() {
     document.querySelector(`input[data-compact-stage="${role}"]:checked`)?.focus({preventScroll:true});
   });
   document.addEventListener('click',event=>{
+    const stance=event.target.closest('[data-stance-side]');
+    if(stance){const prefs=getPreferences(getPokemonByName('Aegislash'),stance.dataset.stanceSide);prefs.bladeActive=!prefs.bladeActive;savePreferences();render();return;}
     const button=event.target.closest('[data-mega-side]');if(!button) return;
     const species=getPokemonByName(button.dataset.megaId),prefs=getPreferences(species,button.dataset.megaSide);
     prefs.megaActive=!prefs.megaActive;savePreferences();render();
@@ -2526,7 +2584,7 @@ function bindStaticControls() {
     const button=event.target.closest('[data-field-option]');
     if(!button) return;
     state[button.dataset.fieldOption]=button.dataset.fieldValue;
-    renderFieldOptions();renderOpponentList();renderDamageRanges();renderSpeedSummary();renderTeamBuilder();
+    renderFieldOptions();renderOpponentList();renderActiveSummary();renderDamageRanges();renderSpeedSummary();renderTeamBuilder();
   });
   document.getElementById('metaModeToggle').addEventListener('click',()=>{
     state.metaMode=!state.metaMode;saveUISettings();render();
@@ -2672,9 +2730,10 @@ function bindStaticControls() {
     if (!getItemHints(getPokemonByName(opponent.name)).some(item => item.name === name)) return;
     const prefs=getPreferences(opponent,'opponent');
     prefs.itemChoice = prefs.itemChoice === name ? '' : name;
+    prefs.megaFormId=prefs.itemChoice?getItemHints(getPokemonByName(opponent.name)).find(item=>item.name===prefs.itemChoice)?.megaFormId||'':'';
     savePreferences();
     renderOpponentList();
-    renderActiveSummary();renderDamageRanges();
+    renderActiveSummary();renderDamageRanges();renderSpeedSummary();renderTeamBuilder();
     [...document.querySelectorAll(`.opponent-row[data-opponent-index="${index}"] [data-opponent-item]`)]
       .find(item => item.dataset.opponentItem === name)?.focus({preventScroll: true});
   });
@@ -2690,7 +2749,7 @@ function bindStaticControls() {
     const field=battleSpecies(opponent,'opponent').megaStoneName ? 'baseAbilityChoice' : 'abilityChoice';
     getOpponentPreferences()[field] = appliedOpponentAbility(opponent) === name ? '' : name;
     savePreferences();
-    renderDamageRanges();
+    renderActiveSummary();renderDamageRanges();
     renderSpeedSummary();renderTeamBuilder();
     [...document.querySelectorAll('[data-assumed-ability]')].find(b => b.dataset.assumedAbility === name)?.focus();
   });
@@ -2713,11 +2772,10 @@ function bindStaticControls() {
     moveMeta:Battle.moveMeta,priorityChoices,priorityRanking,usageData:getUsage,bindPicker:bindUsagePicker,moveMarkup:moveChoiceMarkup,abilityMarkup:abilityChoiceMarkup,
     onApply:()=>{input.value='';}});
   teamPokemonFilters=createFilters(document.getElementById('teamPokemonInput'));
-  opponentPokemonFilters=createFilters(document.getElementById('pokemonSearchInput'));
   teamPokemonFilters.mount(document.getElementById('teamPokemonInput'));
-  opponentPokemonFilters.mount(document.getElementById('pokemonSearchInput'));
-  bindUsagePicker(document.getElementById('pokemonSearchInput'),{choices:query=>buildSearchResults(query,false,opponentPokemonFilters),markup:pokemonChoiceMarkup,choose:item=>addOpponentFromSearch(item.name)});
+  bindUsagePicker(document.getElementById('pokemonSearchInput'),{choices:query=>buildSearchResults(query),markup:pokemonChoiceMarkup,choose:item=>addOpponentFromSearch(item.name)});
   bindUsagePicker(document.getElementById('teamPokemonInput'),{choices:buildTeamSearchResults,markup:pokemonChoiceMarkup,choose:item=>addTeamPokemon(item.name,item.savedBuild,item.satisfyingSet)});
+  opponentVoice=new OpponentVoice.Controller({button:document.getElementById('opponentVoiceButton'),status:document.getElementById('opponentVoiceStatus'),catalog:pokemonCatalog,rank:species=>pokemonUsageReference(species)?.percent || 0,add:addOpponentsByName,active:()=>state.view==='battle'});
   document.addEventListener('pointerdown',event=>{
     if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target) && event.target!==activeUsagePicker.input) closeUsagePicker();
   });
@@ -3032,7 +3090,7 @@ function incomingScenarioMarkup(row,opponent) {
   };
   const scenarios=groupIncomingScenarios(row.scenarios);
   const first=scenarios[0],rest=scenarios.slice(1);
-  const ceiling=`<div class="defense-line offense-ceiling"><span>Maximum-offense ceiling</span>${natureRangeMarkup(row.ceiling,row.boostedCeiling,stat,'offense',opponent)}<small>${spreadLabel(row.ceilingInvestment)}</small></div>`;
+  const ceiling=`<div class="defense-line offense-ceiling"><span>Maximum-offense ceiling</span>${natureRangeMarkup(row.ceiling,row.boostedCeiling,stat,'offense',opponent)}</div>`;
   return `<div class="incoming-ranges">${first ? spreadRow(first) : '<p class="status-note">Stat-spread usage unavailable.</p>'}${ceiling}</div>
     ${rest.length ? `<details class="spread-comparisons"><summary>Other Damage Ranges (${rest.length})</summary><div class="spread-list">${rest.map(spreadRow).join('')}</div></details>` : ''}`;
 }
@@ -3140,6 +3198,6 @@ function renderDamageRanges() {
 Battle.resolveCombatant=(species,entry)=>{
   const side=Array.isArray(entry.moveSet) ? 'our' : 'opponent';
   const effective=battleSpecies(species,side);
-  return effective?.megaStoneName ? {species:effective,entry:battleEntry({...entry,id:species.id,name:species.name},side)} : {species,entry};
+  return effective?.megaStoneName || PokemonForms.isAegislash(species) || PokemonForms.isCastform(species) ? {species:effective,entry:battleEntry({...entry,id:species.id,name:species.name},side)} : {species,entry};
 };
 initializeApp();

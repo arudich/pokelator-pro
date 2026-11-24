@@ -6,7 +6,7 @@
     <title>Pokelator Pro</title>
     <link rel="icon" type="image/png" sizes="64x64" href="assets/branding/favicon.png?v=20261121-math-icon" />
     <link rel="apple-touch-icon" sizes="180x180" href="assets/branding/apple-touch-icon.png?v=20261121-math-icon" />
-    <link rel="stylesheet" href="styles.css?v=20261123-move-filters" />
+    <link rel="stylesheet" href="styles.css?v=20261123-opponent-voice" />
   </head>
   <body>
     <div class="app-shell">
@@ -228,7 +228,8 @@
               type="text"
               autocomplete="off"
               placeholder="Type a Pokémon"
-            /></div>
+            /><button id="opponentVoiceButton" type="button" class="mini-button opponent-voice-button" aria-label="Add opponents by voice" aria-pressed="false" data-state="idle" data-quick-tooltip="Add a group of opponent Pokemon by voice!  Click to toggle microphone, or hold down Space."><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/><path class="mic-slash" d="M3 3l18 18"/></svg></button></div>
+            <p id="opponentVoiceStatus" class="status-note" aria-live="polite" hidden></p>
             <div id="searchResults" class="search-results" aria-live="polite"></div>
           </div>
 
@@ -253,6 +254,7 @@
     <script src="vendor/smogon-data.min.js"></script>
     <script src="vendor/smogon-calc.min.js"></script>
     <script src="data/champions-roster.js?v=20261121-team-editing"></script>
+    <script src="components/pokemon-forms.js?v=20261123-stance"></script>
     <script src="data/item-hints.js"></script>
     <script src="data/item-descriptions.js?v=20261121-team-editing"></script>
     <script src="data/ability-effects.js?v=20261118-mega-toggle"></script>
@@ -273,7 +275,8 @@
     <script src="balance.js?v=20261121-full-attacks"></script>
     <script src="data/meta-usage.js?v=20261118-mega-toggle"></script>
     <script src="analytics.js?v=20261120-health-reports"></script>
-    <script src="app.js?v=20261123-distinct-moves"></script>
+    <script src="components/opponent-voice.js?v=20261123-opponent-voice"></script>
+    <script src="app.js?v=20261123-opponent-voice"></script>
     <script src="components/tutorial.js?v=20261123-advanced-filtering"></script>
     <script src="components/quick-tooltips.js?v=20261123-fast-hover"></script>
   </body>

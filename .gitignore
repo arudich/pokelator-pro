@@ -15,3 +15,6 @@ test-results/
 dist/
 .refresh-cache/
 .wrangler/
+
+# Generated local marketing renders
+output/

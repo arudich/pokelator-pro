@@ -1209,3 +1209,22 @@ a { color: var(--accent); }
 
 .satisfying-moves { line-height:1.45; margin-top:3px; }
 .satisfying-moves span { white-space:nowrap; }
+
+.opponent-voice-button { display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:38px; padding:7px 10px; }
+.opponent-voice-button svg { width:19px; height:21px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.opponent-voice-button .mic-slash { display:none; }
+.opponent-voice-button[data-state="listening"] { color:var(--accent); border-color:var(--accent); background:color-mix(in srgb,var(--accent) 22%,var(--panel)); box-shadow:0 0 12px color-mix(in srgb,var(--accent) 45%,transparent); }
+.opponent-voice-button[data-state="disabled"] { opacity:.45; }
+.opponent-voice-button[data-state="disabled"] .mic-slash { display:block; }
+.voice-consent-dialog { width:min(440px,calc(100vw - 32px)); box-sizing:border-box; padding:22px; border:1px solid var(--accent); border-radius:14px; background:var(--panel); color:var(--text); box-shadow:0 20px 70px var(--shadow); }
+.voice-consent-dialog::backdrop { background:rgba(5,12,22,.65); }
+.voice-consent-dialog h2 { margin:0 0 14px; font-size:1.1rem; }
+.voice-consent-dialog p { font-size:.85rem; line-height:1.5; }
+.voice-consent-dialog small { color:var(--muted); font-size:.7rem; }
+.voice-consent-dialog .inline-actions { justify-content:flex-end; margin-top:20px; }
+.voice-consent-dialog [data-voice-allow] { color:var(--accent); border-color:var(--accent); }
+
+.firefox-voice-help { margin: 8px 0; padding: 10px 12px; border-left: 2px solid var(--accent); background: var(--panel-alt); border-radius: 4px; }
+.firefox-voice-help p { margin: 5px 0; }
+.firefox-voice-help code { font-size: inherit; overflow-wrap: anywhere; }
+.firefox-voice-help details { margin: 6px 0; }

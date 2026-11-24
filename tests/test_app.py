@@ -909,7 +909,7 @@ class AppTests(unittest.TestCase):
         move.press('Enter')
         self.assertEqual(self.evaluate('state.ourTeam[0].moveSet[0]'),'Earthquake')
         self.assertEqual(self.page.locator('[data-set-side="opponent"]').count(),0)
-        self.evaluate("for(let i=0;i<7;i++) addOpponentFromSearch('Gengar')")
+        self.evaluate("['Gengar','Sylveon','Garchomp','Dragonite','Pelipper','Sneasler','Volcarona'].forEach(addOpponentFromSearch)")
         self.assertEqual(self.page.locator('.opponent-row').count(),6)
         self.page.locator('#toggleOpponentsButton').click()
         self.assertEqual(self.page.locator('.opponent-row').count(),9)
@@ -922,6 +922,7 @@ class AppTests(unittest.TestCase):
             entry=self.evaluate('name => sanitizeOpponentEntry({name,moveSet:["Protect"],investment:{atk:32},item:"Life Orb",nature:"Adamant"})',name)
             for field in ['moveSet','investment','item','nature','ability']:
                 self.assertNotIn(field,entry)
+        self.evaluate("addOpponentFromSearch('Gengar')")
         self.assertEqual(self.page.locator('[data-set-side="opponent"]').count(),0)
         self.assertIn('No assumed moves',self.page.locator('#opponentActiveSummary').inner_text())
         self.assertEqual(self.page.locator('.move-row').first.locator('.defense-line').count(),3)
@@ -1160,7 +1161,7 @@ class AppTests(unittest.TestCase):
         self.evaluate("addOpponentFromSearch('Sylveon')")
         self.assertEqual(self.page.locator('[data-opponent-item="Fairy Feather"]').get_attribute('aria-pressed'),'true')
         self.evaluate("addOpponentFromSearch('Mega Garchomp');getPreferences(state.opponentList[0],'opponent').itemChoice='Life Orb';render()")
-        self.assertEqual(self.evaluate('appliedOpponentItem(state.opponentList[0])'),'')
+        self.assertEqual(self.evaluate('appliedOpponentItem(state.opponentList[0])'),'Garchompite')
         self.assertEqual(self.page.locator('.opponent-row[data-opponent-index="0"] [data-opponent-item]').count(),0)
 
     def test_selected_opponent_item_is_held_in_outgoing_defense_comparisons(self):

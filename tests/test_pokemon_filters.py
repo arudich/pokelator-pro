@@ -48,20 +48,12 @@ class PokemonFilterTests(unittest.TestCase):
         self.assertEqual(result['values'],sorted(result['values'],reverse=True))
         self.assertFalse(self.errors)
 
-    def test_opponent_filters_are_independent_and_reference_search_unfiltered(self):
+    def test_opponent_search_has_voice_instead_of_filters(self):
         self.load()
-        result=self.evaluate("""() => {
-          opponentPokemonFilters.types=['Fire'];opponentPokemonFilters.sort='atk';
-          const filtered=buildSearchResults('',false,opponentPokemonFilters);
-          return {count:filtered.length,fire:filtered.every(p=>p.types.includes('Fire')),value:filtered[0].pickerSortValue,
-            stat:filtered[0].stats.atk-20,team:teamPokemonFilters.active,
-            reference:buildSearchResults('Garchomp',true).some(p=>p.name==='Garchomp')};
-        }""")
-        self.assertGreater(result['count'],0)
-        self.assertTrue(result['fire'])
-        self.assertEqual(result['value'],result['stat'])
-        self.assertFalse(result['team'])
-        self.assertTrue(result['reference'])
+        self.assertEqual(self.page.locator('.opponent-panel .pokemon-filter-toggle').count(),0)
+        self.assertEqual(self.page.locator('#opponentVoiceButton').count(),1)
+        self.assertEqual(self.page.locator('.our-team-panel .pokemon-filter-toggle').count(),1)
+        self.assertTrue(self.evaluate("buildSearchResults('Garchomp',true).some(p=>p.name==='Garchomp')"))
 
     def test_super_effective_stab_includes_learnable_protean_moves(self):
         self.load()

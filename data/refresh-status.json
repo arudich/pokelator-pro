@@ -1,8 +1,8 @@
 {
-  "checkedAt": "2026-11-24T20:36:32.001204+00:00",
-  "rosterGeneratedAt": "2026-11-24T19:51:44.201Z",
+  "checkedAt": "2026-11-25T17:25:56.242920+00:00",
+  "rosterGeneratedAt": "2026-11-25T15:50:29.000Z",
   "rosterSource": "https://championsbattledata.com/data/pokemon-index.json",
-  "rosterSha256": "2f20325d9d3c4790d8ab73af5ab9b540217dd3a8a496200d1c7bc176503b3a03",
+  "rosterSha256": "df99f3ccdd672c2f6eaff45fb171a5d7bb520ded930ebcbf741432f19c52b6af",
   "engine": {
     "package": "@smogon/calc",
     "version": "0.12.0",
@@ -50,7 +50,7 @@
     },
     "sprites": {
       "url": "https://championsbattledata.com/items/",
-      "sha256": "4378771e42801bb1fcf2a35c26d2fbd06a7c9692cb557f689c6661ed1a110dc5"
+      "sha256": "3bd692aaef8abca5dbecc8e5b11ed5b7785e9092f4b7fb80b056473f4161b8aa"
     }
   },
   "usageDiscovery": {

@@ -268,10 +268,12 @@ function recordTeamHistory() {
   teamHistory.present=snapshot;teamHistory.signature=signature;
 }
 function restoreTeamHistory(redo=false) {
+  const direction=redo ? 'future' : 'past';
+  if(!teamHistory[direction].length) return false;
   // Commit/close the focused editor before replacing its backing team objects.
   // Otherwise its blur handler can write the old input value into restored state.
   document.activeElement?.blur?.();
-  const source=redo ? teamHistory.future : teamHistory.past;
+  const source=teamHistory[direction];
   if(!source.length) return false;
   const snapshot=source.pop();
   (redo ? teamHistory.past : teamHistory.future).push(teamHistory.present);
@@ -1108,13 +1110,13 @@ function removeTeamPokemon(index) {
   document.getElementById('teamAddStatus').hidden = true;
   saveTeamToStorage();
   render();
-  document.getElementById('teamPokemonInput').focus();
 }
 
 function moveTeamPokemon(index,step) {
   const destination=index+step;
   if(![-1,1].includes(step) || !reorderTeamPokemon(index,destination)) return;
-  document.querySelector(`[data-move-team-index="${destination}"][data-team-step="${step}"]`)?.focus();
+  const arrows=`[data-move-team-index="${destination}"]:enabled`;
+  (document.querySelector(`${arrows}[data-team-step="${step}"]`) || document.querySelector(arrows))?.focus();
 }
 function reorderTeamPokemon(index,destination) {
   if(index===destination || ![index,destination].every(slot=>Number.isInteger(slot) && slot>=0 && slot<state.ourTeam.length)) return false;

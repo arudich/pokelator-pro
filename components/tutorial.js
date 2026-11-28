@@ -24,7 +24,7 @@
   function render() {
     const slide=slides[current];
     title.textContent=slide.title;caption.textContent=slide.caption;
-    picture.src=`assets/tutorial/${slide.image}.png?v=20261128-dark-item-hovers`;picture.alt=slide.alt;
+    picture.src=`assets/tutorial/${slide.image}.png?v=20261128-roster-focus`;picture.alt=slide.alt;
     previous.disabled=current===0;next.hidden=current===slides.length-1;done.hidden=current!==slides.length-1;
     dialog.querySelector('#tutorialProgress').textContent=`${current+1} / ${slides.length}`;
     dots.querySelectorAll('button').forEach((button,index)=>button.setAttribute('aria-current',String(index===current)));

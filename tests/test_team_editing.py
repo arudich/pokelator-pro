@@ -20,9 +20,19 @@ class TeamEditingTests(unittest.TestCase):
         self.page.locator('.compact-team [data-remove-team-index="0"]').click()
         self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),['Garchomp','Sneasler'])
         self.assertEqual(self.evaluate('state.ourTeam[state.activeOurIndex].name'),'Garchomp')
-        self.page.locator('#teamPokemonInput').blur()
+        self.assertFalse(self.page.locator('#teamPokemonInput').evaluate('input => input.matches(":focus")'))
+        self.assertFalse(self.page.locator('#searchResults').is_visible())
         self.page.keyboard.press('Control+z')
         self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),['Sylveon','Garchomp','Sneasler'])
+
+    def test_undo_without_team_history_leaves_the_picker_open(self):
+        self.load()
+        search=self.page.locator('#teamPokemonInput')
+        search.click()
+        self.assertEqual(search.get_attribute('aria-expanded'),'true')
+        search.press('Control+z')
+        self.assertTrue(search.evaluate('input => input.matches(":focus")'))
+        self.assertEqual(search.get_attribute('aria-expanded'),'true')
 
     def fixture(self):
         self.load()

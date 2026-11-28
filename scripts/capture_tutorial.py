@@ -135,9 +135,20 @@ def capture_filtering_picture(page,context):
     panel.scroll_into_view_if_needed()
     rules='data:image/png;base64,'+base64.b64encode(panel.screenshot(animations='disabled')).decode()
     page.locator('#teamPokemonInputFilters [data-filter-apply]').click()
-    page.wait_for_selector('#searchResults .search-item')
-    page.wait_for_function("[...document.querySelectorAll('#searchResults img')].every(i=>i.complete)",timeout=30000)
-    box=page.locator('#searchResults').bounding_box();box['height']=min(310,box['height'])
+    # Use the real narrow grid layout so its cards and toolbar remain readable in the picture.
+    page.set_viewport_size({'width':720,'height':900})
+    page.locator('#teamPokemonInput').click()
+    page.locator('#searchResults').get_by_role('button',name='Grid',exact=True).click()
+    grid=page.locator('#pokemonGridResults')
+    grid.get_by_role('button',name='Base stats',exact=True).click()
+    grid.locator('.search-item').first.wait_for()
+    box=grid.bounding_box()
+    row_ends=grid.locator('.search-item').evaluate_all("cards=>[...new Set(cards.map(card=>card.getBoundingClientRect().bottom))].sort((a,b)=>a-b)")
+    complete_rows=[end for end in row_ends if end+4<=box['y']+box['height']]
+    if complete_rows:box['height']=complete_rows[min(2,len(complete_rows))-1]+4-box['y']
+    page.wait_for_function("""bottom=>[...document.querySelectorAll('#pokemonGridResults img')]
+      .filter(i=>i.getBoundingClientRect().top<bottom).every(i=>i.complete && i.naturalWidth>0)""",
+      arg=box['y']+box['height'],timeout=30000)
     results='data:image/png;base64,'+base64.b64encode(page.screenshot(clip=box,animations='disabled')).decode()
     art=context.new_page();art.set_viewport_size({'width':1440,'height':810})
     art.set_content('''<!doctype html><html><head><style>
@@ -150,8 +161,8 @@ def capture_filtering_picture(page,context):
       .footer{font-size:17px;color:#b8d0df;margin-top:30px}.pill{display:inline-block;border:1px solid #6cc3ff;border-radius:20px;padding:8px 13px;margin:0 7px 10px 0;color:#c9f2ff;font-size:17px}
     </style></head><body><main><div class="eyebrow">POKELATOR PRO / QUICK TOUR</div><h1>Advanced Filtering</h1><div class="layout"><div>
       <p class="quote">“An <em>Attack boost</em> and a <em>physical Fire move</em> with <em>75+ power</em>”</p>
-      <p class="sub">Find Pokémon that meet every requirement, then narrow by type, ability and more</p>
-      <div style="margin-top:28px"><span class="pill">Combine Move Requirements</span><span class="pill">Keep Valid Options</span></div>
+      <p class="sub">Find Pokémon that meet every requirement, then use Grid to compare their moves and base stats</p>
+      <div style="margin-top:28px"><span class="pill">Combine Move Requirements</span><span class="pill">Compare in Grid</span></div>
     </div><div><div class="frame"><div class="label">Two Move Requirements · One Pokémon</div><img src="'''+rules+'''" /></div><div class="frame results"><img src="'''+results+'''" /></div></div></div>
       <div class="footer">The Same Move Filters Work When Editing Your Team</div></main></body></html>''')
     art.screenshot(path=str(OUTPUT/'filtering.png'),type='png',animations='disabled');art.close()

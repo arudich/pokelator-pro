@@ -1,5 +1,5 @@
-/* One distinct move per requirement, in filter order. Marginal usage ranks
-   assignments; no joint-set frequency is claimed or displayed. */
+/* Assign distinct required moves in filter order, then fill missing STAB coverage.
+   Marginal usage ranks equally sized sets. */
 (() => {
   function canAssign(names,tests) {
     if(tests.length>4)return false;
@@ -14,9 +14,9 @@
     };
     return tests.every((_,slot)=>place(slot,new Set()));
   }
-  function assign(names,tests,weight) {
+  function assign(names,tests,weight,coverage=[]) {
     if(tests.length>4)return null;
-    const full=(1<<tests.length)-1,buckets=new Map();
+    const full=(1<<(tests.length+coverage.length))-1,buckets=new Map();
     const earlier=(moves,other)=>{
       for(let index=0;index<moves.length;index++) {
         if(moves[index]===other[index])continue;
@@ -25,25 +25,39 @@
       }
       return false;
     };
-    // At most four names with identical eligibility can be needed.
     for(const name of names.slice().sort((a,b)=>weight(b)-weight(a) || a.localeCompare(b))) {
       const bits=tests.reduce((mask,test,index)=>mask|(test(name) ? 1<<index : 0),0);
-      if(!bits)continue;if(!buckets.has(bits))buckets.set(bits,[]);
-      if(buckets.get(bits).length<4)buckets.get(bits).push({name,bits});
+      const covers=coverage.reduce((mask,test,index)=>mask|(test(name) ? 1<<(tests.length+index) : 0),0);
+      const eligibility=bits|covers;
+      if(!eligibility)continue;
+      if(!buckets.has(eligibility))buckets.set(eligibility,[]);
+      if(buckets.get(eligibility).length<4)buckets.get(eligibility).push({name,bits,covers});
     }
-    const dp=Array(full+1).fill(null);dp[0]={score:0,moves:Array(tests.length)};
-    for(const move of [...buckets.values()].flat())for(let mask=full;mask>=0;mask--) {
-      const row=dp[mask];if(!row)continue;
-      for(let slot=0;slot<tests.length;slot++) {
-        const bit=1<<slot;if(mask&bit || !(move.bits&bit))continue;
-        const next=mask|bit,score=row.score+weight(move.name);
-        const moves=row.moves.slice();moves[slot]=move.name;
-        if(!dp[next] || score>dp[next].score+1e-12 || Math.abs(score-dp[next].score)<=1e-12 && earlier(moves,dp[next].moves))dp[next]={score,moves};
+    let dp=new Map([[0,{score:0,required:Array(tests.length),extra:[]}]]);
+    for(const {name,bits,covers} of [...buckets.values()].flat()) {
+      const next=new Map(dp);
+      for(const [mask,row] of dp) {
+        const covered=mask|covers,score=row.score+weight(name);
+        const record=(key,required,extra)=>{
+          const best=next.get(key);
+          if(!best || extra.length<best.extra.length || extra.length===best.extra.length &&
+            (score>best.score+1e-12 || Math.abs(score-best.score)<=1e-12 && earlier([...required,...extra],[...best.required,...best.extra]))) {
+            next.set(key,{score,required,extra});
+          }
+        };
+        if(covered!==mask && row.extra.length<4-tests.length)record(covered,row.required,[...row.extra,name]);
+        for(let slot=0;slot<tests.length;slot++) {
+          const bit=1<<slot;if(mask&bit || !(bits&bit))continue;
+          const required=row.required.slice();required[slot]=name;
+          record(covered|bit,required,row.extra);
+        }
       }
+      dp=next;
     }
-    return dp[full];
+    const result=dp.get(full);
+    return result ? {score:result.score,moves:[...result.required,...result.extra]} : null;
   }
-  function build(species,filters,usage,{moveMeta,priorityChoices}) {
+  function build(species,filters,usage,{moveMeta,priorityChoices,typeEffectiveness}) {
     const names=[...new Set(species.learnset)].filter(name=>moveMeta(name)),pinned=filters.moves || [];
     if(new Set(pinned).size!==pinned.length || pinned.some(name=>!names.includes(name)))return null;
     const moveUsage=new Map((usage?.moves || []).map(row=>[calc.toID(row.name),row.percent]));
@@ -58,9 +72,12 @@
         const priority=new Set(priorityChoices(species,{...filters,abilities:[ability]}).map(move=>move.name));
         tests.push(name=>priority.has(name));
       }
-      const row=assign(names,tests,weight);if(!row)continue;
+      const targets=filters.stabTargets || [];
+      const stab=targets.length ? new Map(names.map(name=>[name,MoveFilters.stabType(moveMeta(name),context)])) : null;
+      const coverage=targets.map(target=>name=>stab.get(name) && typeEffectiveness(stab.get(name),target)>1);
+      const row=assign(names,tests,weight,coverage);if(!row)continue;
       const score=row.score+Math.log(Math.max(.001,abilityUsage.get(ability) ?? (ability===species.abilities[0] ? 1 : .001)));
-      if(!best || score>best.score)best={score,ability,moveSet:row.moves};
+      if(!best || row.moves.length<best.moveSet.length || row.moves.length===best.moveSet.length && score>best.score)best={score,ability,moveSet:row.moves};
     }
     return best ? {ability:best.ability,moveSet:best.moveSet} : null;
   }

@@ -65,6 +65,12 @@ def write_js(path,variable,data,comment='Generated nightly; sources recorded in 
     path.write_text('// '+comment+'\nwindow.'+variable+' = '+json.dumps(data,ensure_ascii=False,separators=(',',':'))+';\n')
 
 
+def pokedex_numbers(source):
+    numbers={name:int(number) for name,number in re.findall(r'^\t([a-z0-9]+): \{\s*\n\s*num: (\d+),',source,re.M) if int(number)>0}
+    if len(set(numbers.values()))<1000:raise ValueError('Incomplete National Pokédex data')
+    return dict(sorted(numbers.items()))
+
+
 def main():
     config=json.loads((ROOT/'config/refresh.json').read_text())
     checked=datetime.now(timezone.utc).isoformat()
@@ -91,11 +97,13 @@ def main():
         moves['championsOverrides']={'source':config['championsMoveOverrides'],'sha256':hashlib.sha256(champions_raw).hexdigest()}
         move_meta={**moves,'license':'MIT','downloadedAt':checked[:10]};meta_path=work/'move-source.json';meta_path.write_text(json.dumps(move_meta))
         subprocess.run(['node',str(ROOT/'scripts/extract_balance_moves.cjs'),str(move_dir),str(meta_path),str(stage/'data/balance-moves.js'),str(champions_path)],check=True)
-        print('Refreshing ability/item descriptions and sprite references…',flush=True)
+        print('Refreshing Pokédex numbers, ability/item descriptions and sprite references…',flush=True)
         urls={'abilities':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/abilities.ts',
+          'pokedex':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/pokedex.ts',
           'items':'https://play.pokemonshowdown.com/data/items.js','itemText':'https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/text/items.ts',
           'sprites':'https://championsbattledata.com/items/'}
         source_bytes={key:fetch(url) for key,url in urls.items()};sources={key:value.decode() for key,value in source_bytes.items()}
+        write_js(stage/'data/pokedex-numbers.js','POKEDEX_NUMBERS',pokedex_numbers(sources['pokedex']),'National Pokédex numbers from Pokémon Showdown (MIT; vendor/SHOWDOWN-LICENSE).')
         abilities=build_abilities(sources['abilities']);write_js(stage/'data/ability-effects.js','ABILITY_EFFECTS',abilities,'Descriptions: Pokemon Showdown (MIT; vendor/SHOWDOWN-LICENSE).')
         write_js(stage/'data/item-descriptions.js','ITEM_DESCRIPTIONS',build_descriptions(sources['itemText']),'Descriptions: Pokemon Showdown (MIT; vendor/SHOWDOWN-LICENSE).')
         hints=build_items(sources['items'],sources['itemText'],sources['sprites']);write_js(stage/'data/item-hints.js','ITEM_HINTS',hints,'Descriptions: Pokemon Showdown (MIT); sprites: Champions Battle Data.')

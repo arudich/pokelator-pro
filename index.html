@@ -6,7 +6,7 @@
     <title>Pokelator Pro</title>
     <link rel="icon" type="image/png" sizes="64x64" href="assets/branding/favicon.png?v=20261121-math-icon" />
     <link rel="apple-touch-icon" sizes="180x180" href="assets/branding/apple-touch-icon.png?v=20261121-math-icon" />
-    <link rel="stylesheet" href="styles.css?v=20261124-tier-selection" />
+    <link rel="stylesheet" href="styles.css?v=20261128-dark-item-hovers" />
   </head>
   <body>
     <div class="app-shell">
@@ -109,20 +109,20 @@
             <label><input id="builderAttackTrial" type="checkbox" /> Try removing</label>
             <input id="builderAttackReduction" type="number" min="0" max="32" step="1" value="1" aria-label="Attack stat points to remove" />
             <span>Attack investment</span>
-            <button id="builderAttackLock" type="button" class="mini-button" title="Save this reduction to our Pokémon">Lock In</button>
+            <button id="builderAttackLock" type="button" class="mini-button">Lock In</button>
           </div>
           <div id="builderSpecialAttackTrialRow" class="builder-move-trial investment-trial" hidden>
             <label><input id="builderSpecialAttackTrial" type="checkbox" /> Try removing</label>
             <input id="builderSpecialAttackReduction" type="number" min="0" max="32" step="1" value="1" aria-label="Special Attack stat points to remove" />
             <span>Special Attack investment</span>
-            <button id="builderSpecialAttackLock" type="button" class="mini-button" title="Save this reduction to our Pokémon">Lock In</button>
+            <button id="builderSpecialAttackLock" type="button" class="mini-button">Lock In</button>
           </div>
           <div id="teamOffenseTrials" class="team-offense-trials" aria-label="Team move suggestions" hidden></div>
           <div id="builderDefenseTrialRow" class="builder-move-trial investment-trial" hidden>
             <label><input id="builderDefenseTrial" type="checkbox" disabled /><span id="builderDefenseTrialText"></span></label>
             <input id="builderDefensePoints" type="number" min="0" max="66" step="1" aria-label="Stat points to invest in defense" />
             <span id="builderDefenseTrialSuffix">stat points into defense</span><small id="builderDefenseTrialSpread"></small>
-            <button id="builderDefenseLock" type="button" class="mini-button" disabled title="Save the suggested defensive spread to our Pokémon">Lock In</button>
+            <button id="builderDefenseLock" type="button" class="mini-button" disabled>Lock In</button>
           </div>
           <details id="builderDefenseAssumptions" class="builder-assumptions" hidden>
             <summary>Strongest available attacks, weighted by estimated sets</summary>
@@ -167,14 +167,15 @@
 
         <section class="panel battle-panel">
           <div class="active-card-row">
-            <div class="active-card">
-              <div class="section-label our-active-heading">Our Active<span class="base-stat-caption">Base stats</span><div id="ourActiveBaseStats"></div></div>
+            <div class="active-card our-active-card">
+              <div class="section-label">Our Active</div>
               <div id="ourActiveSummary" class="active-summary"></div>
             </div>
 
             <div class="active-card opponent-card">
-              <div class="section-label opponent-active-heading" aria-label="Opponent Active">Op. Active<span class="base-stat-caption">Base stats</span><div id="opponentActiveBaseStats"></div></div>
+              <div class="section-label" aria-label="Opponent Active">Op. Active <span id="opponentStatKey" class="stat-range-key">0–32 SP per stat</span></div>
               <div id="opponentActiveSummary" class="active-summary"></div>
+              <div id="opponentActiveStats" class="active-stats"></div>
             </div>
           </div>
 
@@ -233,8 +234,6 @@
             <div id="searchResults" class="search-results" aria-live="polite"></div>
           </div>
 
-          <p id="rosterStatus" class="status-note"></p>
-          <p class="status-note">Hover for item details. Click to activate one item; a bright border marks the active item.</p>
           <div class="opponent-list-wrap">
             <div id="opponentList" class="opponent-list"></div>
             <button id="toggleOpponentsButton" class="mini-button" hidden>Show all</button>
@@ -254,30 +253,32 @@
     <script src="vendor/smogon-data.min.js"></script>
     <script src="vendor/smogon-calc.min.js"></script>
     <script src="data/champions-roster.js?v=20261121-team-editing"></script>
+    <script src="data/pokedex-numbers.js?v=20261128-dex-sort"></script>
     <script src="components/pokemon-forms.js?v=20261123-stance"></script>
     <script src="data/item-hints.js"></script>
     <script src="data/item-descriptions.js?v=20261121-team-editing"></script>
     <script src="data/ability-effects.js?v=20261118-mega-toggle"></script>
     <script src="data/item-sprites.js?v=20261118-mega-toggle"></script>
-    <script src="team-files.js?v=20261121-team-editing"></script>
+    <script src="team-files.js?v=20261128-held-stones-card-drag"></script>
     <script src="data/move-types.js?v=20261120-champions-types"></script>
     <script src="data/balance-moves.js?v=20261123-categories"></script>
     <script src="components/move-summary.js?v=20261121-move-archetypes"></script>
     <script src="components/reference-sets.js?v=20261124-tier-selection"></script>
     <script src="components/priority-moves.js?v=20261123-distinct-moves"></script>
-    <script src="components/move-filters.js?v=20261123-move-filters"></script>
-    <script src="components/satisfying-moves.js?v=20261123-distinct-moves"></script>
-    <script src="components/pokemon-filters.js?v=20261123-distinct-moves"></script>
+    <script src="components/move-filters.js?v=20261128-grid-stab"></script>
+    <script src="components/satisfying-moves.js?v=20261128-grid-stab"></script>
+    <script src="components/pokemon-filters.js?v=20261128-dex-sort"></script>
     <script src="multi-hit.js?v=20261123-battle-assume-hits"></script>
-    <script src="battle.js?v=20261123-categories"></script>
+    <script src="battle.js?v=20261128-raw-stats"></script>
     <script src="offense.js?v=20261123-priority"></script>
     <script src="defense.js?v=20261121-full-attacks"></script>
     <script src="balance.js?v=20261121-full-attacks"></script>
     <script src="data/meta-usage.js?v=20261118-mega-toggle"></script>
     <script src="analytics.js?v=20261120-health-reports"></script>
     <script src="components/opponent-voice.js?v=20261124-space-tap-hold"></script>
-    <script src="app.js?v=20261124-tier-selection"></script>
-    <script src="components/tutorial.js?v=20261123-advanced-filtering"></script>
-    <script src="components/quick-tooltips.js?v=20261123-fast-hover"></script>
+    <div id="pokemonGridResults" class="search-results usage-choice-popup pokemon-grid-popup" aria-label="Pokémon results grid" popover="manual"></div>
+    <script src="app.js?v=20261128-dark-item-hovers"></script>
+    <script src="components/tutorial.js?v=20261128-dark-item-hovers"></script>
+    <script src="components/quick-tooltips.js?v=20261128-half-second-hover"></script>
   </body>
 </html>

@@ -28,22 +28,22 @@ class UniformListTests(unittest.TestCase):
               return Math.max(...gaps)-Math.min(...gaps)<1;
             }"""))
 
-    def test_uniform_opponents_and_known_team_items_and_base_stats(self):
+    def test_uniform_opponents_and_known_team_items_and_raw_stats(self):
         self.load()
         self.evaluate("['Sylveon','Bellibolt'].forEach(addOpponentFromSearch)")
         self.assertEqual(self.page.locator('.opponent-row.expanded').count(),0)
         self.assertEqual(self.page.locator('.opponent-row.compact').count(),4)
-        self.assertTrue(self.evaluate("Array.from(document.querySelectorAll('.opponent-row')).every(row=>row.querySelectorAll('[data-base-stat]').length===6 && row.querySelector('[data-opponent-action=delete]'))"))
+        self.assertTrue(self.evaluate("Array.from(document.querySelectorAll('.opponent-row')).every(row=>row.querySelectorAll('[data-range-stat]').length===6 && row.querySelector('[data-opponent-action=delete]'))"))
         self.page.locator('.opponent-row').last.locator('.pokemon-name').click()
         self.assertEqual(self.page.locator('.opponent-row.expanded').count(),0)
-        self.assertEqual(self.page.locator('.team-row .known-item,.team-row [data-mega-side="our"]').count(),3)
+        self.assertEqual(self.page.locator('.team-row .known-item,.team-row [data-mega-side="our"][aria-pressed="true"]').count(),3)
         self.assertTrue(self.evaluate("Array.from(document.querySelectorAll('.known-item')).every(item=>item.tagName==='SPAN' && !item.hasAttribute('aria-pressed') && getComputedStyle(item).borderTopColor==='rgba(0, 0, 0, 0)')"))
-        self.assertTrue(self.evaluate("Array.from(document.querySelectorAll('.team-row')).every(row=>row.querySelectorAll('[data-base-stat]').length===6)"))
+        self.assertTrue(self.evaluate("Array.from(document.querySelectorAll('.team-row')).every(row=>row.querySelectorAll('[data-raw-stat], [data-stat-total]').length===6)"))
         self.assertEqual(self.page.locator('.expanded-team .known-item img').get_attribute('alt'),'Focus Sash')
         for width in [1440,390]:
             self.page.set_viewport_size({'width':width,'height':900})
             self.assertTrue(self.evaluate("""() => {
               const plus=document.querySelector('[data-nature-mode=plus]').getBoundingClientRect(),minus=document.querySelector('[data-nature-mode=minus]').getBoundingClientRect();
-              const base=document.querySelector('.selected-base-stats').getBoundingClientRect();
-              return Math.abs(plus.top-minus.top)<1 && base.top>=Math.max(plus.bottom,minus.bottom) && document.documentElement.scrollWidth<=innerWidth;
+              const editor=document.querySelector('.set-editor').getBoundingClientRect();
+              return Math.abs(plus.top-minus.top)<1 && editor.top>=Math.max(plus.bottom,minus.bottom) && document.documentElement.scrollWidth<=innerWidth;
             }"""))

@@ -240,7 +240,7 @@
       const kind = tier.kind === 'investment' ? (tier.points < 16 ? 'low-investment' : 'high-investment') : tier.kind;
       let outspeedPoints=null,outspeedNaturePoints=null;
       // Items, abilities and stages can let a slower species beat a faster one.
-      // Calculate the requirement for every opponent, regardless of base Speed.
+      // Calculate the requirement for every opponent, regardless of default Speed.
       {
         const ceiling=speed(species,{item:'',ability,speedStage,investment:{spe:32},nature:{plus:'spe',minus:'spa'}},field);
         const at=(points,boosted=false)=>speed(selected,{...entry,nature:boosted ? {plus:'spe',minus:'spa'} : null,
@@ -261,10 +261,10 @@
       }
       const speedEstimate=!['always-faster','always-slower'].includes(kind)
         ? speedUsageChance(species,{item:'',ability,speedStage},ourSpeed,species.usage?.[options.format],field) : null;
-      groups.find(group => group.kind === kind).members.push({species,tier,ability,ourSpeed,outspeedPoints,outspeedNaturePoints,speedEstimate,weather:field.weather || '',terrain:field.terrain || '',baseSpeed:species.stats.spe-20,
+      groups.find(group => group.kind === kind).members.push({species,tier,ability,ourSpeed,outspeedPoints,outspeedNaturePoints,speedEstimate,weather:field.weather || '',terrain:field.terrain || '',defaultSpeed:species.stats.spe,
         tie:species.stats.spe === selected.stats.spe});
     }
-    return {target,baseSpeed:selected.stats.spe-20,groups};
+    return {target,defaultSpeed:selected.stats.spe,groups};
   }
   function fieldScenarios(species,ability,{weather='',terrain=''} = {}) {
     const setters={Drought:['weather','Sun'],Drizzle:['weather','Rain'],'Sand Stream':['weather','Sand'],

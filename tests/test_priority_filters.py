@@ -50,6 +50,10 @@ class PriorityFilterTests(unittest.TestCase):
         self.assertFalse(result['empty'])
         self.assertIn('avg HP',result['text'])
         self.assertNotIn('Ranking…',result['text'])
+        picker=self.page.locator('#searchResults')
+        self.assertEqual(picker.locator('.picker-source-copy').inner_text(),'Priority Strength · Doubles')
+        picker.get_by_role('button',name='Grid',exact=True).click()
+        self.assertEqual(self.page.locator('#pokemonGridResults .picker-source-copy span').inner_text(),'Priority Strength · Doubles')
         self.assertFalse(self.errors)
 
     def test_priority_panel_and_existing_constraints(self):

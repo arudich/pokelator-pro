@@ -35,7 +35,7 @@ class TeamEditingTests(unittest.TestCase):
 
     def test_investment_totals_select_all_clear_and_undo(self):
         self.fixture()
-        self.assertEqual(self.page.locator('[data-stat-total="spe"]').inner_text(),'253')
+        self.assertEqual(self.page.locator('[data-stat-total="spe"]').inner_text(),'169')
         attack=self.page.locator('input[data-stat="atk"]')
         attack.focus();attack.press('1');attack.press('Enter')
         self.assertEqual(self.evaluate('state.ourTeam[0].investment.atk'),1)
@@ -45,7 +45,7 @@ class TeamEditingTests(unittest.TestCase):
         self.page.locator('[data-clear-investments]').click()
         self.assertEqual(self.evaluate('getTotalInvestment(state.ourTeam[0])'),0)
         self.assertTrue(self.page.locator('[data-clear-investments]').is_disabled())
-        self.assertEqual(self.page.locator('[data-stat-total="spe"]').inner_text(),'201')
+        self.assertEqual(self.page.locator('[data-stat-total="spe"]').inner_text(),'134')
         self.assertEqual(self.evaluate('JSON.stringify([state.ourTeam[0].nature,state.ourTeam[0].item,state.ourTeam[0].moveSet])'),preserved)
         self.page.keyboard.press('Control+z')
         self.assertEqual(self.evaluate('state.ourTeam[0].investment'),before)
@@ -100,6 +100,7 @@ class TeamEditingTests(unittest.TestCase):
         self.assertTrue(result['stats']);self.assertTrue(result['usage'])
         self.page.locator('.set-editor summary').click()
         species=self.page.locator('[data-set-field="name"]');species.fill('Vivillon Ocean')
+        self.assertNotIn('shared',self.page.locator('#searchResults .search-item').first.inner_text())
         self.page.locator('.search-item strong',has_text='Vivillon Ocean Pattern').first.click()
         self.assertEqual(self.evaluate('state.ourTeam[0].name'),'Vivillon Ocean Pattern')
         self.assertEqual(self.evaluate('state.ourTeam[0].ability'),'Compound Eyes')
@@ -121,10 +122,11 @@ class TeamEditingTests(unittest.TestCase):
         self.assertIn('Iron Ball',icon.get_attribute('title'))
         self.assertNotIn('—',self.page.locator('#builderSpeedTiers').inner_text())
         self.assertTrue(self.evaluate("""() => {
-          const label=document.querySelector('.stat-investment-label'),output=label.querySelector('output');
-          return getComputedStyle(label).color===getComputedStyle(document.querySelector('.pokemon-name')).color
-            && getComputedStyle(output).color===getComputedStyle(document.querySelector('.points-readout')).color
-            && getComputedStyle(label).fontSize===getComputedStyle(output).fontSize;
+          return [...document.querySelectorAll('.stat-investment-label')].every(label=>{
+            const name=label.querySelector('strong'),output=label.querySelector('output');
+            return Number(getComputedStyle(name).fontWeight)>Number(getComputedStyle(output).fontWeight)
+              && name.getBoundingClientRect().top===output.getBoundingClientRect().top;
+          });
         }"""))
 
     def test_garbodor_and_all_new_defaults_spend_full_budget_without_editing_saved_builds(self):

@@ -4,8 +4,8 @@
   const seenKey='pokelator-pro-tutorial-seen-v1';
   const slides=[
     {title:'Battle Answers & Better Teams',image:'overview',alt:'Battle calculations beside team-building damage tiers, with callouts for fast battle queries, comparing builds, and saving teams.',caption:'Get battle answers in about 3 seconds with preloaded meta data, then find your next teammate with Advanced Filtering.'},
-    {title:'Advanced Filtering',image:'filtering',alt:'An Attack boost and a physical Fire move with 75 or more power: two compact move requirements above actual matching Pokémon results.',caption:'Find Pokémon that meet several move requirements, then combine them with type, resistance and ability filters.'},
-    {title:'Fast Matchup Answers',image:'battle',alt:'Actual Battle View with highlighted voice input and opponent selection, damage ranges, weather, terrain, abilities, items, stat stages and Speed comparisons, plus a real item tooltip labeled Hover When Confused!.',caption:'Add opponents by voice or search, then test battle conditions and modifiers. Hover When Confused!'},
+    {title:'Advanced Filtering',image:'filtering',alt:'Two move requirements, an Attack boost and a physical Fire move with at least 75 power, above a grid showing matching Pokémon, their base stats and the moves that qualify.',caption:'Combine move, type and ability filters, then open Grid to compare matches and their qualifying moves.'},
+    {title:'Fast Matchup Answers',image:'battle',alt:'Battle View with voice input, your active Pokémon’s stats, opponent stat ranges, damage, battle conditions and Speed comparisons, plus an open item tooltip.',caption:'Add opponents by voice or search, compare damage and Speed, and hover items or opponent stat ranges for details.'},
     {title:'Smarter Stat Investments',image:'builder',alt:'Speed, Offense, Defense and Balance panels showing investment thresholds, move previews, defensive spread suggestions and one-on-one matchups.',caption:'Compare Speed, Offense, Team Offense, Defense and Balance, then lock in stronger moves and stat spreads.'},
     {title:'Your Matchup Shortlists',image:'highlights',alt:'Highlighted opponent borders, Pokémon search, the highlighted-only filter and named highlight sets in Team Builder.',caption:'Highlight Pokémon individually or by tier, focus calculations on them, and save named sets to revisit.'}
   ];
@@ -24,7 +24,7 @@
   function render() {
     const slide=slides[current];
     title.textContent=slide.title;caption.textContent=slide.caption;
-    picture.src=`assets/tutorial/${slide.image}.png?v=20261124-tier-selection-release`;picture.alt=slide.alt;
+    picture.src=`assets/tutorial/${slide.image}.png?v=20261128-dark-item-hovers`;picture.alt=slide.alt;
     previous.disabled=current===0;next.hidden=current===slides.length-1;done.hidden=current!==slides.length-1;
     dialog.querySelector('#tutorialProgress').textContent=`${current+1} / ${slides.length}`;
     dots.querySelectorAll('button').forEach((button,index)=>button.setAttribute('aria-current',String(index===current)));

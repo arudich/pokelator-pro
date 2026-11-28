@@ -29,6 +29,16 @@ const cosmeticPokemon=(rosterSnapshot.cosmeticForms || []).flatMap(form=>{
   return base ? [{...base,...form,calcId:base.calcId || base.id,cosmeticBaseId:base.id}] : [];
 });
 const pokemonCatalog=[...pokerData,...cosmeticPokemon];
+function pokedexNumber(species) {
+  let id=species.cosmeticBaseId || species.calcId || species.id;
+  while(id) {
+    const number=window.POKEDEX_NUMBERS?.[calc.toID(id)];
+    if(Number.isInteger(number)) return number;
+    const suffix=id.lastIndexOf('-');
+    if(suffix<0) break;
+    id=id.slice(0,suffix);
+  }
+}
 const builderReferences=new ReferenceSets(pokemonCatalog.map(species=>species.id));
 const ordinaryForms=new Map();
 const megaFormChoices=new Map();
@@ -39,6 +49,9 @@ function availableMegaForms(species) {
   const base=megaBaseSpecies(species);if(!base)return [];
   if(!megaFormChoices.has(base.id))megaFormChoices.set(base.id,pokerData.filter(p=>p.isMega&&megaBaseSpecies(p)?.id===base.id));
   return megaFormChoices.get(base.id);
+}
+function megaFormForStone(species, stone) {
+  return stone ? availableMegaForms(species).find(form=>Battle.requiredMegaItem(form)===stone) : undefined;
 }
 const natureOptions = Battle.natureOptions;
 const itemOptions = [...Battle.generation.items].map(item => item.name);
@@ -76,48 +89,138 @@ function battleSpecies(entry,side='opponent') {
     const weather=['Air Lock','Cloud Nine'].includes(otherAbility)?'':state.weather;
     return Battle.forecastSpecies(base,ability,weather);
   }
-  if(species?.selectedMegaFromBase)return species;
-  if(side==='opponent'&&species&&!species.isMega){
-    const prefs=getPreferences(species,side),mega=availableMegaForms(species).find(p=>p.id===prefs.megaFormId&&Battle.requiredMegaItem(p)===prefs.itemChoice);
-    if(mega)return {...mega,id:species.id,calcId:mega.id,megaStoneName:Battle.requiredMegaItem(mega),selectedMegaFromBase:true};
+  if(!species || species.originalName || species.selectedMegaFromBase)return species;
+  if(!species.isMega){
+    const formId=side==='opponent' ? getPreferences(species,side).megaFormId : '';
+    const mega=side==='our' ? megaFormForStone(species,entry.item)
+      : formId && availableMegaForms(species).find(form=>form.id===formId);
+    if(mega && (side!=='our' || getPreferences(entry,side).megaActive)) {
+      return {...mega,id:species.id,calcId:mega.id,megaStoneName:Battle.requiredMegaItem(mega),selectedMegaFromBase:true};
+    }
   }
   if(PokemonForms.isAegislash(species)) {
     const canonical=getPokemonByName('Aegislash');
     return getPreferences(canonical,side).bladeActive ? canonical : PokemonForms.shield(rosterSnapshot,canonical);
   }
-  if(!species?.isMega || getPreferences(species,side).megaActive) return species;
-  if(ordinaryForms.has(species.id)) return ordinaryForms.get(species.id);
-  const engine=Battle.generation.species.get(calc.toID(species.id));
-  const base=getPokemonByName(engine.baseSpecies);
-  if(!base) return species;
-  const form={...base,id:species.id,calcId:base.id,originalName:species.name,megaStoneName:Battle.requiredMegaItem(species)};
-  ordinaryForms.set(species.id,form);return form;
+  if(!species.isMega || getPreferences(species,side).megaActive) return species;
+  if(!ordinaryForms.has(species.id)){
+    const base=megaBaseSpecies(species);
+    ordinaryForms.set(species.id,{...base,id:species.id,calcId:base.id,originalName:species.name});
+  }
+  return ordinaryForms.get(species.id);
 }
-function ordinaryAbility(species,entry,side) {
-  const choice=getPreferences(species,side).baseAbilityChoice;
+function ordinaryAbility(species,entry) {
+  const choice=getPreferences(species,'our').baseAbilityChoice;
   if(choice!=='auto') return species.abilities.includes(choice) ? choice : '';
   if(entry.ability!==undefined && (entry.ability==='' || entry.ability==='No Ability' || species.abilities.includes(entry.ability))) return entry.ability;
   const rows=(getUsage(species)?.abilities || []).filter(row=>species.abilities.includes(row.name)).sort((a,b)=>b.percent-a.percent);
-  return side==='our' ? rows[0]?.name || species.abilities[0]
-    : species.abilities.length===1 ? species.abilities[0] : rows[0]?.percent>=ABILITY_USAGE_THRESHOLD ? rows[0].name : '';
+  return rows[0]?.name || species.abilities[0];
 }
-function battleEntry(entry,side='our') {
-  const species=battleSpecies(entry,side);
-  return species?.megaStoneName ? {...entry,ability:ordinaryAbility(species,entry,side),item:species.megaStoneName} : entry;
+function battleEntry(entry,species=battleSpecies(entry,'our')) {
+  if(species?.selectedMegaFromBase) return {...entry,ability:species.abilities[0],item:Battle.requiredMegaItem(species)};
+  if(species?.originalName) return {...entry,ability:ordinaryAbility(species,entry),item:Battle.requiredMegaItem(getPokemonByName(species.originalName))};
+  return entry;
 }
 function getPokemonImage(name) {
   const species = /^Castform (Sunny|Rainy|Snowy) Form$/.test(name)?rosterSnapshot.pokemon.find(p=>p.name===name)
     :name==='Aegislash Shield Forme' ? rosterSnapshot.pokemon.find(p=>p.id==='Aegislash') : getPokemonByName(name);
   return species ? new URL(species.image, 'https://championsbattledata.com/').href : '';
 }
-function baseStatsMarkup(entry) {
-  const species=entry.stats ? entry : getPokemonByName(entry.name);
-  const labels={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};
-  const values=statOrder.map(stat=>[stat,stat==='hp' && species.stats.hp===1 ? 1 : species.stats[stat]-(stat==='hp' ? 75 : 20)]);
+const compactStatLabels={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};
+function baseStatValue(species,stat) {
+  return stat==='hp' && species.stats.hp===1 ? 1 : species.stats[stat]-(stat==='hp' ? 75 : 20);
+}
+const baseStatColorScales=Object.fromEntries(statOrder.map(stat=>{
+  // Count each playable form once and exclude cosmetic variants.
+  const values=pokerData.map(species=>baseStatValue(species,stat)).sort((a,b)=>a-b);
+  const percentile=fraction=>{
+    const index=(values.length-1)*fraction,low=Math.floor(index),high=Math.ceil(index);
+    return values[low]+(values[high]-values[low])*(index-low);
+  };
+  return [stat,[
+    [Math.min(40,percentile(.05)),'#dc4d5a'],
+    [percentile(.45),'#ebcd69'],
+    [percentile(.80),'#7aca75'],
+    [percentile(.95),'#279d59']
+  ]];
+}));
+function baseStatColor(stat,value) {
+  const stops=baseStatColorScales[stat];
+  if(value<=stops[0][0]) return stops[0][1];
+  for(let index=1;index<stops.length;index++) {
+    const [high,to]=stops[index];
+    if(value>high) continue;
+    const [low,from]=stops[index-1];
+    const weight=(high-value)/(high-low)*100;
+    return `color-mix(in oklab, ${from} ${weight.toFixed(1)}%, ${to})`;
+  }
+  return stops.at(-1)[1];
+}
+function baseStatsMarkup(species) {
+  const labels=compactStatLabels;
+  const values=statOrder.map(stat=>[stat,baseStatValue(species,stat)]);
   const description=`${species.name} base stats: ${values.map(([stat,value])=>`${labels[stat]} ${value}`).join(' · ')}. Before investment, nature and stat stages.`;
-  return `<div class="base-stat-strip" role="group" aria-label="${escapeHtml(description)}" title="${escapeHtml(description)}">
-    ${values.map(([stat,value])=>`<span class="base-stat base-stat-${stat}" data-base-stat="${stat}" data-base-value="${value}" style="--stat-fill:${Math.min(100,value/255*100).toFixed(1)}%"><span class="base-stat-label">${labels[stat]}</span><strong>${value}</strong><i aria-hidden="true"></i></span>`).join('')}
+  return `<div class="base-stat-strip" role="group" aria-label="${escapeHtml(description)}" title="Base stats before investment, nature and stat stages.">
+    ${values.map(([stat,value])=>`<span class="base-stat" data-base-stat="${stat}" data-base-value="${value}" style="--stat-fill:${Math.min(100,value/255*100).toFixed(1)}%;--stat-color:${baseStatColor(stat,value)}"><span class="base-stat-label">${labels[stat]}</span><strong>${value}</strong><i aria-hidden="true"></i></span>`).join('')}
   </div>`;
+}
+
+function ourStatsMarkup(entry,species) {
+  const description=`${species.name} level 50 stats with this build’s investment and nature, before battle modifiers.`;
+  return `<dl class="raw-stat-strip" aria-label="${escapeHtml(description)}" title="${escapeHtml(description)}">
+    ${statOrder.map(stat=>`<div><dt>${compactStatLabels[stat]}</dt><dd data-raw-stat="${stat}">${Battle.effectiveStat(species,entry,stat)}</dd></div>`).join('')}
+  </dl>`;
+}
+
+function opponentStatsMarkup(species,legendId) {
+  return `<div class="opponent-stat-ranges" role="group" aria-label="${escapeHtml(species.name)} level 50 stat ranges" ${legendId ? `tabindex="0" aria-describedby="${legendId}"` : ''}>
+    ${legendId ? `<div id="${legendId}" class="range-legend" role="tooltip">
+      <span class="range-lowered">− Nature</span>
+      <span class="range-neutral">Neutral · 0–32 SP</span>
+      <span class="range-boosted">+ Nature</span>
+    </div>` : ''}
+    ${statOrder.map(stat=>{
+      const label=compactStatLabels[stat],investment={[stat]:MAX_STAT_POINTS};
+      const neutralMin=Battle.effectiveStat(species,{},stat);
+      const neutralMax=Battle.effectiveStat(species,{investment},stat);
+      const point=(kind,value)=>`<span class="opponent-range-point" data-point="${kind}">${value}<i class="opponent-range-marker" aria-hidden="true"></i></span>`;
+      const neutral=point('neutral-min',neutralMin);
+      let scale,details;
+      if(stat==='hp') {
+        details=neutralMin===neutralMax ? `Fixed at ${neutralMin}` : `${neutralMin} at 0 SP, ${neutralMax} at ${MAX_STAT_POINTS} SP`;
+        scale=neutralMin===neutralMax ? `<span class="opponent-range-fixed">${neutral}</span>`
+          : `<span class="opponent-range-segment range-neutral">${neutral}${point('neutral-max',neutralMax)}</span>`;
+      } else {
+        const other=stat==='atk' ? 'spa' : 'atk';
+        const min=Battle.effectiveStat(species,{nature:{plus:other,minus:stat}},stat);
+        const max=Battle.effectiveStat(species,{nature:{plus:stat,minus:other},investment},stat);
+        details=`${min} at 0 SP with a lowering nature, ${neutralMin}–${neutralMax} at 0–${MAX_STAT_POINTS} SP with a neutral nature, ${max} at ${MAX_STAT_POINTS} SP with a boosting nature`;
+        scale=`<span class="opponent-range-segment range-lowered" style="--range-size:${neutralMin-min}">${point('min',min)}</span>
+          <span class="opponent-range-segment range-neutral" style="--range-size:${neutralMax-neutralMin}">${neutral}${point('neutral-max',neutralMax)}</span>
+          <span class="opponent-range-segment range-boosted" style="--range-size:${max-neutralMax}">${point('max',max)}</span>`;
+      }
+      const description=`${label}. ${details}.`;
+      return `<div class="opponent-stat" data-range-stat="${stat}" role="img" aria-label="${description}">
+        <span class="opponent-stat-label">${label}</span><span class="opponent-range-scale">${scale}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function megaStatComparisonMarkup(entry,species) {
+  const saved=savedSpecies(entry);
+  const forms=availableMegaForms(saved);
+  const mega=species.isMega ? species : saved.isMega ? saved : megaFormForStone(saved,entry.item) || (forms.length===1 ? forms[0] : null);
+  if(!mega) return '';
+  const base=megaBaseSpecies(saved);
+  const label=`Mega change · ${base.name} → ${mega.name}`;
+  return `<div class="mega-stat-comparison"><span title="${escapeHtml(label)}">Mega change</span>
+    <dl class="raw-stat-strip" aria-label="${escapeHtml(label)}">${statOrder.map(stat=>{
+      const before=Battle.effectiveStat(base,entry,stat),after=Battle.effectiveStat(mega,entry,stat);
+      const change=after-before;
+      const value=change ? `${change<0 ? '−' : '+'}${Math.abs(change)}` : '0';
+      return `<div title="${compactStatLabels[stat]} ${before} → ${after}"><dt>${compactStatLabels[stat]}</dt><dd class="${change<0 ? 'stat-nature-lowered' : change>0 ? 'stat-nature-boosted' : ''}" data-mega-stat="${stat}">${value}</dd></div>`;
+    }).join('')}</dl></div>`;
 }
 
 const state = {
@@ -405,14 +508,21 @@ function natureChoice(raw, field, legacyField) {
   return typeof raw?.[legacyField] === 'boolean' ? raw[legacyField] : 'auto';
 }
 function sanitizePreferences(raw = {}) {
-  return {megaFormId:typeof raw?.megaFormId==='string'?raw.megaFormId:'',bladeActive:raw?.bladeActive!==false,megaActive:raw?.megaActive!==false,baseAbilityChoice:typeof raw?.baseAbilityChoice==='string' ? raw.baseAbilityChoice : 'auto',offenseStage:Number.isInteger(raw?.offenseStage) ? clamp(raw.offenseStage,-6,6) : 0,
+  const megaFormId=typeof raw?.megaFormId==='string' ? raw.megaFormId : '';
+  const itemChoice=raw?.scarfHighlighted===true ? 'Choice Scarf' : typeof raw?.itemChoice==='string' ? raw.itemChoice : '';
+  const megaAbilityChoices=Object.fromEntries(Object.entries(raw?.megaAbilityChoices || {}).filter(([,choice])=>typeof choice==='string'));
+  if(megaFormId && typeof raw?.megaAbilityChoice==='string' && !Object.hasOwn(megaAbilityChoices,megaFormId)) {
+    megaAbilityChoices[megaFormId]=raw.megaAbilityChoice;
+  }
+  return {megaFormId,bladeActive:raw?.bladeActive!==false,megaActive:raw?.megaActive!==false,baseAbilityChoice:typeof raw?.baseAbilityChoice==='string' ? raw.baseAbilityChoice : 'auto',offenseStage:Number.isInteger(raw?.offenseStage) ? clamp(raw.offenseStage,-6,6) : 0,
     speedStage:Number.isInteger(raw?.speedStage) ? clamp(raw.speedStage,-2,2) : 0,
     builderOpponentOffenseStage:Number.isInteger(raw?.builderOpponentOffenseStage) ? clamp(raw.builderOpponentOffenseStage,-2,2) : 0,
     builderOpponentSpeedStage:Number.isInteger(raw?.builderOpponentSpeedStage) ? clamp(raw.builderOpponentSpeedStage,-2,2) : 0,
     defenseStage:Number.isInteger(raw?.defenseStage) ? clamp(raw.defenseStage,-6,6) : 0,
     defenseNatureChoice: natureChoice(raw, 'defenseNatureChoice', 'boostDefenseNature'),
     offenseNatureChoice: natureChoice(raw, 'offenseNatureChoice', 'boostOffenseNature'),
-    itemChoice: raw?.scarfHighlighted===true ? 'Choice Scarf' : typeof raw?.itemChoice === 'string' ? raw.itemChoice : '',
+    itemChoice: megaFormId && Battle.generation.items.get(calc.toID(itemChoice))?.megaStone ? '' : itemChoice,
+    megaAbilityChoices,
     abilityChoice: typeof raw?.abilityChoice === 'string' ? raw.abilityChoice : raw?.abilityAssumptionDisabled === true ? '' : 'auto'};
 }
 function loadPreferences() {
@@ -507,7 +617,7 @@ function natureBoostForMove(opponent, role, stat) {
 }
 function natureFlagState(opponent, role) {
   const ours = state.ourTeam[state.activeOurIndex];
-  const moveNames = role === 'defense' ? ours?.moveSet || [] : getPokemonByName(opponent?.name)?.learnset || [];
+  const moveNames = role === 'defense' ? ours?.moveSet || [] : battleSpecies(opponent,'opponent')?.learnset || [];
   const relevant = [...new Set(moveNames.map(Battle.moveMeta).filter(move => move && move.category !== 'Status')
     .map(move => role === 'defense' ? move.defensiveStat : move.offensiveStat))];
   const stats = relevant.length ? relevant : role === 'defense' ? ['def', 'spd'] : ['atk', 'spa'];
@@ -541,9 +651,15 @@ function opponentAbilityOptions(opponent) {
     });
   return options.sort((a,b) => Number(b.automatic)-Number(a.automatic));
 }
+function opponentAbilityField(species) {
+  return species?.originalName ? 'baseAbilityChoice' : 'abilityChoice';
+}
+function opponentAbilityChoice(species) {
+  const prefs=getPreferences(species,'opponent');
+  return species?.selectedMegaFromBase ? prefs.megaAbilityChoices[species.calcId] ?? 'auto' : prefs[opponentAbilityField(species)];
+}
 function appliedOpponentAbility(opponent) {
-  const prefs=getPreferences(opponent,'opponent');
-  const choice=battleSpecies(opponent,'opponent')?.megaStoneName ? prefs.baseAbilityChoice : prefs.abilityChoice;
+  const choice=opponentAbilityChoice(battleSpecies(opponent,'opponent'));
   if (choice === 'auto') return getOpponentAbilityAssumption(opponent)?.name || '';
   return opponentAbilityOptions(opponent).some(option => option.name === choice) ? choice : '';
 }
@@ -571,7 +687,7 @@ function itemHintMetadata(name) {
     description:'Speed ×1.5; the holder is locked into one move. Reference only: no Choice Scarf modifier is applied to calculations.'}
     : window.ITEM_HINTS[calc.toID(name)];
 }
-function getItemHints(species) {
+function getItemHints(species, prefs=getPreferences(species,'opponent')) {
   // Parent-species usage cannot establish an item frequency for an evolved Mega form.
   if (species.isMega) return [];
   const usage = getUsage(species);
@@ -583,7 +699,7 @@ function getItemHints(species) {
       description:`Mega Evolve into ${mega.name}. Click again to return to ${species.name}.`});
   }
   // A manual selection stays visible across formats even if it is no longer common.
-  const selected = getPreferences(species,'opponent').itemChoice;
+  const selected = prefs.itemChoice;
   if (selected && itemHintMetadata(selected) && !hints.some(item => item.name === selected)) {
     const reference = usage?.items?.find(item => item.name === selected);
     hints.push({...itemHintMetadata(selected), percent: reference?.percent ?? null,
@@ -592,29 +708,29 @@ function getItemHints(species) {
   return hints;
 }
 function appliedOpponentItem(opponent) {
-  const species = opponent && savedSpecies(opponent);
+  const species = battleSpecies(opponent,'opponent');
   if (!species) return '';
-  if(species.isMega)return Battle.requiredMegaItem(species);
+  const stone=Battle.requiredMegaItem(species);
+  if(stone) return stone;
   const selected = getPreferences(opponent, 'opponent').itemChoice;
-  if(availableMegaForms(species).some(mega=>Battle.requiredMegaItem(mega)===selected))return selected;
   const item = window.ITEM_HINTS[calc.toID(selected)];
   return item && Battle.generation.items.get(calc.toID(item.name)) ? item.name : '';
 }
 function buildItemHints(entry) {
-  const species = getPokemonByName(entry.name);
-  if(species?.isMega) return `<div class="item-hints">${megaStoneMarkup(entry,'opponent')}</div>`;
-  const hints = getItemHints(species);
-  const stance=stanceMarkup(entry,'opponent');
+  const species=savedSpecies(entry),effective=battleSpecies(entry,'opponent'),prefs=getPreferences(entry,'opponent');
+  if(species.isMega && effective.isMega) return `<div class="item-hints">${megaStoneMarkup(entry,'opponent',effective)}</div>`;
+  const hints=getItemHints(megaBaseSpecies(species),prefs).filter(item=>
+    effective.isMega ? item.megaFormId===effective.calcId : !species.isMega || !item.megaFormId);
+  const stance=species.isMega ? megaStoneMarkup(entry,'opponent',effective) : stanceMarkup(entry,'opponent');
   if (!hints.length) return stance ? `<div class="item-hints">${stance}</div>` : '';
-  const active = getPreferences(entry,'opponent').itemChoice;
   return `<div class="item-hints" aria-label="Opponent item choices">${stance}${hints.map(item => {
-    const enabled = item.name === active;
+    const enabled = item.megaFormId ? effective.isMega : item.name === prefs.itemChoice;
     const frequency = item.percent === null ? 'Usage not reported' : `${item.percent}% ${state.format} usage`;
     const description = item.megaFormId ? `${item.name}. ${item.description} ${enabled?'Mega form active.':'Mega form inactive.'}` : `${item.name} · ${frequency} (${item.reference}). ${item.description} ${item.referenceOnly ? (enabled ? 'Highlighted for reference. Click to clear.' : 'Click to highlight for reference.') : enabled ? 'Active for damage calculations. Click to deactivate.' : 'Not applied to damage. Click to activate.'}`;
     return `<button class="item-hint" type="button" data-opponent-item="${escapeHtml(item.name)}" aria-pressed="${enabled}"
       aria-label="${escapeHtml(description)}">
       <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy" />
-      <span role="tooltip" class="item-tooltip" popover="manual">${escapeHtml(description)}</span></button>`;
+      ${itemTooltipMarkup(description)}</button>`;
   }).join('')}</div>`;
 }
 
@@ -674,10 +790,18 @@ function updateNature(entry, value, mode = null) {
 
 function updateItem(entry, value) {
   if (!entry) return;
-  const species = getPokemonByName(entry.name);
+  const species = savedSpecies(entry),effective=battleSpecies(entry,'our');
   const item=canonicalItem(value);
-  if(item===null) {renderTeam();return;}
-  entry.item = species.isMega ? Battle.requiredMegaItem(species) : item;
+  if(item===null || effective.isMega) {renderTeam();return;}
+  const mega=megaFormForStone(species,item);
+  if(Battle.generation.items.get(calc.toID(item))?.megaStone && !mega) {renderTeam();return;}
+  if(item===entry.item) {renderTeam();return;}
+  if(species.isMega) {
+    const base=megaBaseSpecies(species);
+    Object.assign(entry,{name:base.name,id:base.id,types:base.types,form:base.form,ability:ordinaryAbility(effective,entry)});
+  }
+  entry.item=item;
+  if(mega) {getPreferences(entry,'our').megaActive=true;savePreferences();}
   saveTeamToStorage();
   render();
 }
@@ -706,8 +830,14 @@ function sanitizeTeamEntry(rawEntry) {
     nature.plus = Battle.natureStats.includes(rawEntry.nature.plus) ? rawEntry.nature.plus : null;
     nature.minus = Battle.natureStats.includes(rawEntry.nature.minus) ? rawEntry.nature.minus : null;
   }
+  let item=canonicalItem(rawEntry.item) ?? '';
+  if(pokemon.isMega) item=Battle.requiredMegaItem(pokemon);
+  else if(!item && rawEntry.megaFormId) {
+    const legacyForm=availableMegaForms(pokemon).find(form=>form.id===rawEntry.megaFormId);
+    item=Battle.requiredMegaItem(legacyForm);
+  } else if(Battle.generation.items.get(calc.toID(item))?.megaStone && !megaFormForStone(pokemon,item)) item='';
   return {name: pokemon.name, nickname:typeof rawEntry.nickname==='string' ? rawEntry.nickname.trim().slice(0,40) : '', id: pokemon.id, types: pokemon.types, form: pokemon.form,
-    item: pokemon.isMega ? Battle.requiredMegaItem(pokemon) : typeof rawEntry.item === 'string' ? canonicalItem(rawEntry.item) ?? '' : '',
+    item,
     ability: pokemon.abilities.includes(rawEntry.ability) ? rawEntry.ability : pokemon.abilities[0],
     nature, moveSet: moveSet.length ? moveSet : pokemon.moves.slice(0, 4), investment,
     damageMultiplier: 1};
@@ -950,7 +1080,7 @@ function addTeamPokemon(name,savedBuild=null,satisfyingSet=null) {
     status.hidden = false;
     return false;
   }
-  if(!savedBuild && teamPokemonFilters?.hasMoveRequirements()) {
+  if(!savedBuild && teamPokemonFilters?.requiresMoves) {
     satisfyingSet=satisfyingSet || teamPokemonFilters.satisfyingSet(species);
     if(!satisfyingSet){status.textContent='Choose a Pokémon that matches the move filters.';status.hidden=false;return false;}
   }
@@ -982,21 +1112,125 @@ function removeTeamPokemon(index) {
 }
 
 function moveTeamPokemon(index,step) {
-  document.activeElement?.blur?.();
   const destination=index+step;
-  if(!Number.isInteger(index) || ![-1,1].includes(step) || index<0 || index>=state.ourTeam.length || destination<0 || destination>=state.ourTeam.length) return;
+  if(![-1,1].includes(step) || !reorderTeamPokemon(index,destination)) return;
+  document.querySelector(`[data-move-team-index="${destination}"][data-team-step="${step}"]`)?.focus();
+}
+function reorderTeamPokemon(index,destination) {
+  if(index===destination || ![index,destination].every(slot=>Number.isInteger(slot) && slot>=0 && slot<state.ourTeam.length)) return false;
+  document.activeElement?.blur?.();
   const selected=state.ourTeam[state.activeOurIndex],member=state.ourTeam.splice(index,1)[0];
   state.ourTeam.splice(destination,0,member);
   state.activeOurIndex=state.ourTeam.indexOf(selected);
   if(!state.teamOffenseCustomized) resetTeamOffenseSelection();
   saveTeamToStorage();render();
-  document.querySelector(`[data-move-team-index="${destination}"][data-team-step="${step}"]`)?.focus();
+  return true;
 }
 function teamOrderControls(entry,index) {
-  return [-1,1].map(step=>`<button type="button" class="control-btn team-order-button" data-move-team-index="${index}" data-team-step="${step}"
+  const handle=index!==state.activeOurIndex ? ` class="column-tag team-order-handle" data-team-drag title="Drag to reorder ${escapeHtml(pokemonDisplayName(entry))}"` : ' class="column-tag"';
+  return `<span${handle}>${index+1}</span>`+[-1,1].map(step=>`<button type="button" class="control-btn team-order-button" data-move-team-index="${index}" data-team-step="${step}"
     ${index+step<0 || index+step>=state.ourTeam.length ? 'disabled' : ''}
     title="Move ${escapeHtml(entry.name)} ${step<0 ? 'earlier' : 'later'} in default order"
     aria-label="Move ${escapeHtml(entry.name)} ${step<0 ? 'earlier' : 'later'} in team order">${step<0 ? '↑' : '↓'}</button>`).join('');
+}
+
+const teamCardControls='input, select, textarea, label, summary, button, a, [contenteditable]';
+function bindTeamReorder(list) {
+  const panel=list.closest('.our-team-panel');
+  let drag=null,scrollFrame=0,suppressClick=false;
+  const finish=()=>{
+    const current=drag;
+    if(!current) return;
+    drag=null;
+    cancelAnimationFrame(scrollFrame);
+    current.row.classList.remove('team-drag-source');
+    current.target?.removeAttribute('data-team-drop');
+    if(current.surface.hasPointerCapture(current.pointer)) current.surface.releasePointerCapture(current.pointer);
+  };
+  const updateTarget=()=>{
+    const hit=document.elementFromPoint(drag.x,drag.y);
+    let target=hit?.closest('.team-row');
+    if(hit===list) {
+      target=[...list.children].find((row,index,rows)=>{
+        const bottom=row.getBoundingClientRect().bottom;
+        const nextTop=rows[index+1]?.getBoundingClientRect().top ?? bottom;
+        return drag.y<=(bottom+nextTop)/2;
+      });
+    }
+    if(target?.parentElement!==list || target===drag.row) target=null;
+    if(target===drag.target) return;
+    drag.target?.removeAttribute('data-team-drop');
+    drag.target=target;
+    // The active card stays pinned above the other cards, so use the numbered slots.
+    if(target) target.dataset.teamDrop=Number(target.dataset.teamIndex)<drag.index ? 'before' : 'after';
+  };
+  const autoscroll=()=>{
+    if(!drag.row.isConnected) {finish();return;}
+    const {left,right,top,bottom}=panel.getBoundingClientRect();
+    if(drag.x>=left && drag.x<=right) {
+      const edge=36;
+      const above=Math.max(0,top)+edge-drag.y,below=drag.y-Math.min(innerHeight,bottom)+edge;
+      const distance=clamp(Math.max(0,below)-Math.max(0,above),-edge,edge);
+      if(distance) {
+        const last=panel.scrollTop,step=Math.sign(distance)*Math.ceil(Math.abs(distance)/3);
+        panel.scrollTop+=step;
+        if(panel.scrollTop===last && (drag.y<edge || drag.y>innerHeight-edge)) window.scrollBy(0,step);
+        updateTarget();
+      }
+    }
+    scrollFrame=requestAnimationFrame(autoscroll);
+  };
+  list.addEventListener('pointerdown',event=>{
+    if(event.button!==0 || !event.isPrimary || drag?.row.isConnected) return;
+    suppressClick=false;
+    let surface=event.target,row=surface.closest('.compact-team');
+    if(!row || surface.closest(teamCardControls)) return;
+    if(event.pointerType==='touch' && !surface.closest('[data-team-drag]')) return;
+    finish();
+    event.preventDefault();
+    const index=row.dataset.teamIndex;
+    document.activeElement?.blur?.();
+    if(!surface.isConnected) {
+      // Committing an editor can replace the card under the pointer.
+      surface=document.elementFromPoint(event.clientX,event.clientY);
+      row=surface?.closest('.compact-team');
+      if(row?.dataset.teamIndex!==index || surface.closest(teamCardControls)) return;
+    }
+    drag={row,surface,pointer:event.pointerId,index:Number(index),x:event.clientX,y:event.clientY,started:false,target:null};
+    surface.setPointerCapture(event.pointerId);
+  });
+  list.addEventListener('pointermove',event=>{
+    if(drag?.pointer!==event.pointerId) return;
+    if(!drag.started) {
+      if(Math.hypot(event.clientX-drag.x,event.clientY-drag.y)<5) return;
+      drag.started=true;
+      suppressClick=true;
+      drag.row.classList.add('team-drag-source');
+      scrollFrame=requestAnimationFrame(autoscroll);
+    }
+    drag.x=event.clientX;drag.y=event.clientY;
+    updateTarget();
+  });
+  list.addEventListener('pointerup',event=>{
+    if(drag?.pointer!==event.pointerId) return;
+    if(drag.started) {
+      drag.x=event.clientX;drag.y=event.clientY;
+      updateTarget();
+    }
+    const index=drag.index,destination=Number(drag.target?.dataset.teamIndex);
+    finish();
+    reorderTeamPokemon(index,destination);
+  });
+  for(const eventName of ['pointercancel','lostpointercapture']) {
+    list.addEventListener(eventName,event=>{if(drag?.pointer===event.pointerId) finish();});
+  }
+  list.addEventListener('dragstart',event=>{if(!event.target.closest(teamCardControls)) event.preventDefault();});
+  list.addEventListener('click',event=>{
+    if(!suppressClick || event.detail===0) return;
+    suppressClick=false;
+    event.preventDefault();event.stopImmediatePropagation();
+  },true);
+  document.addEventListener('keydown',event=>{if(event.key==='Escape' && drag) finish();});
 }
 
 function pokemonUsageReference(species) {
@@ -1031,9 +1265,9 @@ function priorityRanking(filters) {
   const worker=new Worker('priority-worker.js?v=20261123-priority');
   priorityJob={key,worker,progress:'Ranking priority attacks…'};
   const refresh=()=>{
-    const picker=activeUsagePicker;
-    if(picker && [teamPokemonFilters?.input].includes(picker.input)) {
-      picker.items=picker.choices(picker.query);picker.cursor=Math.min(picker.cursor,Math.max(0,picker.items.length-1));updateUsagePicker();
+    if(!filters.enabled || filters.sort!=='priority') return;
+    for(const picker of [activeUsagePicker,gridUsagePicker]) {
+      if(picker?.pokemonFilters===filters) refreshUsagePicker(picker);
     }
   };
   worker.onmessage=({data})=>{
@@ -1064,30 +1298,51 @@ function buildSearchResults(query,includeAll=false,filters=null) {
       || (getUsage(a)?.rank ?? Infinity)-(getUsage(b)?.rank ?? Infinity) || a.name.localeCompare(b.name));
 }
 function buildTeamSearchResults(query) {
-  const regular=buildSearchResults(query,false,teamPokemonFilters),matches=new Set(regular.map(species=>species.id));
+  const regular=buildSearchResults(query,true,teamPokemonFilters),matches=new Map(regular.map(species=>[species.id,species]));
   if(!matches.size) return regular;
-  const saved=state.teamLibrary.flatMap(team=>(team.savedPokemon || team.pokemon).filter(entry=>matches.has(entry.id) && (!teamPokemonFilters.hasMoveRequirements() || teamPokemonFilters.matchesBuild(regular.find(species=>species.id===entry.id),entry))).map(entry=>({
-    ...regular.find(species=>species.id===entry.id),savedBuild:structuredClone(entry),sourceTeamId:team.id,sourceTeamName:team.name
-  }))).sort((a,b)=>(b.sourceTeamId===state.activeTeamId)-(a.sourceTeamId===state.activeTeamId)
-    || a.sourceTeamName.localeCompare(b.sourceTeamName) || a.name.localeCompare(b.name));
+  const saved=state.teamLibrary.flatMap(team=>(team.savedPokemon || team.pokemon).flatMap(entry=>{
+    const species=matches.get(entry.id);
+    if(!species) return [];
+    const satisfyingSet=teamPokemonFilters.requiresMoves ? teamPokemonFilters.satisfyingBuild(species,entry) : null;
+    return !teamPokemonFilters.requiresMoves || satisfyingSet
+      ? [{...species,satisfyingSet,savedBuild:structuredClone(entry),sourceTeamId:team.id,sourceTeamName:team.name}] : [];
+  })).sort((a,b)=>(b.sourceTeamId===state.activeTeamId)-(a.sourceTeamId===state.activeTeamId)
+    || a.sourceTeamName.localeCompare(b.sourceTeamName)
+    || (a.pickerSort==='dex' ? (a.pickerSortValue ?? Infinity)-(b.pickerSortValue ?? Infinity) : 0)
+    || a.name.localeCompare(b.name));
   return [...regular,...saved];
 }
-function pokemonChoiceMarkup(species) {
+function pokemonChoiceRanking(species) {
+  if(species.pickerSort==='dex') return species.pickerSortValue===undefined ? 'Dex number unavailable' : `#${String(species.pickerSortValue).padStart(4,'0')}`;
   const sortValue=species.pickerSort==='priority' ? (Number.isFinite(species.pickerSortValue) ? `${species.pickerSortValue.toFixed(1)}% avg HP` : species.priorityPending ? 'Ranking…' : 'Unavailable') : species.pickerSort && species.pickerSort!=='usage' ? `${statLabels[species.pickerSort]} ${species.pickerSortValue}` : '';
+  if(species.savedBuild) return species.pickerSort==='priority' ? 'Saved build' : sortValue || 'Saved build';
+  if(sortValue) return sortValue;
+  const usage=pokemonUsageReference(species);
+  if(!usage) return 'Usage unavailable';
+  return `${species.pickerSort==='usage' && usage.rank ? '#'+usage.rank+' · ' : ''}${usage.percent.toFixed(2)}%`;
+}
+function satisfyingMovesMarkup(moves) {
+  return moves?.length ? `<div class="search-item-sub satisfying-moves">${moves.map(name=>`<span>${escapeHtml(name)}</span>`).join(' · ')}</div>` : '';
+}
+function pokemonChoiceMarkup(species) {
+  const ranking=escapeHtml(pokemonChoiceRanking(species));
+  const portrait=`<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" loading="lazy" />`;
   if(species.savedBuild) {
     const build=species.savedBuild;
-    return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" />
-      <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${species.pickerSort==='priority' ? 'Saved build' : sortValue || 'Saved build'}</small></div>
+    return `${portrait}<div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small>${ranking}</small></div>
       <div class="saved-build-team">${escapeHtml(species.sourceTeamName)}</div>
       <div class="search-item-sub">${escapeHtml(build.nature.name)}${build.item ? ` · ${escapeHtml(build.item)}` : ''} · ${escapeHtml(build.ability)}</div>
       <div class="search-item-sub">${statOrder.filter(stat=>build.investment[stat]).map(stat=>`${statLabels[stat]} ${build.investment[stat]}`).join(' · ') || 'No stat investment'}</div>
       <div class="search-item-sub">${build.moveSet.map(escapeHtml).join(' · ')}</div></div>`;
   }
-  const usage=pokemonUsageReference(species);
-  const shared=usage && calc.toID(usage.name)!==calc.toID(species.id);
-  return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" />
-    <div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small ${species.pickerSort==='priority' ? 'data-quick-tooltip="Mean damage of the best qualifying priority move against typical Top N builds; capped at full HP for each opponent. Conditions assumed satisfied. Weather, terrain and Meta Mode weights apply."' : ''}>${sortValue || (usage ? `${species.pickerSort==='usage' && usage.rank ? '#'+usage.rank+' · ' : ''}${usage.percent.toFixed(2)}%${shared ? ' shared' : ''}` : 'Usage unavailable')}</small></div>
-    <div class="search-item-sub">${species.types.join(' / ')}${species.cosmeticBaseId ? ' · Cosmetic form · shared stats and usage' : ''}</div>${baseStatsMarkup(species)}${species.satisfyingSet ? `<div class="search-item-sub satisfying-moves">${species.satisfyingSet.moveSet.map(name=>`<span>${escapeHtml(name)}</span>`).join(' · ')}</div>` : ''}</div>`;
+  return `${portrait}<div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(species.name)}</strong><small ${species.pickerSort==='priority' ? 'data-quick-tooltip="Average damage as a percentage of target HP, capped at 100% per opponent. Conditions are assumed satisfied. Weather, terrain and Meta Mode weights apply."' : ''}>${ranking}</small></div>
+    <div class="search-item-sub">${species.types.join(' / ')}${species.cosmeticBaseId ? ' · Cosmetic form' : ''}</div>${baseStatsMarkup(species)}${satisfyingMovesMarkup(species.satisfyingSet?.moveSet)}</div>`;
+}
+function pokemonGridChoiceMarkup(species,showStats) {
+  const subtitle=species.savedBuild ? species.sourceTeamName : pokemonChoiceRanking(species);
+  return `<img class="search-item-image" src="${getPokemonImage(species.name)}" alt="" loading="lazy" />
+    <div class="choice-copy"><strong>${escapeHtml(species.name)}</strong><small>${escapeHtml(subtitle)}</small></div>
+    ${showStats ? baseStatsMarkup(species) : ''}${satisfyingMovesMarkup(species.satisfyingSet?.moveSet)}`;
 }
 function buildMoveChoices(species,query='') {
   const clean=query.trim().toLowerCase();
@@ -1112,14 +1367,17 @@ function moveChoiceMarkup(move) {
 }
 function buildItemChoices(species,query='') {
   const clean=query.trim().toLowerCase();
-  const usage=new Map((getUsage(species)?.items || []).map(row=>[calc.toID(row.name),row.percent]));
-  return [{name:'No Item',value:'',percent:null,description:'No held item.'},...itemOptions.map(name=>{
+  const usage=new Map((getUsage(megaBaseSpecies(species))?.items || []).map(row=>[calc.toID(row.name),row.percent]));
+  const megaForms=availableMegaForms(species);
+  const validStones=new Map(megaForms.map(form=>[Battle.requiredMegaItem(form),form]));
+  return [{name:'No Item',value:'',percent:null,description:'No held item.'},...itemOptions.flatMap(name=>{
     const item=Battle.generation.items.get(calc.toID(name));
-    const mega=item.megaStone && Object.values(item.megaStone);
-    const description=window.ITEM_DESCRIPTIONS?.[calc.toID(name)] || window.ITEM_HINTS[calc.toID(name)]?.description
-      || (mega?.length ? `Required to Mega Evolve ${Object.keys(item.megaStone).join(' / ')} into ${mega.join(' / ')}.` : 'Held item; its supported effects apply to calculations.');
-    return {name,value:name,percent:usage.get(calc.toID(name)) ?? null,description,image:window.ITEM_SPRITES[name]};
-  }).sort((a,b)=>(b.percent ?? -1)-(a.percent ?? -1) || a.name.localeCompare(b.name))]
+    const mega=validStones.get(name);
+    if(item.megaStone && !mega) return [];
+    const description=mega ? `Mega Evolve into ${mega.name}.`
+      : window.ITEM_DESCRIPTIONS?.[calc.toID(name)] || window.ITEM_HINTS[calc.toID(name)]?.description || 'Held item; its supported effects apply to calculations.';
+    return [{name,value:name,percent:usage.get(calc.toID(name)) ?? null,description,image:window.ITEM_SPRITES[name],mega:!!mega}];
+  }).sort((a,b)=>Number(b.mega)-Number(a.mega) || (b.percent ?? -1)-(a.percent ?? -1) || a.name.localeCompare(b.name))]
     .filter(item=>!clean || item.name.toLowerCase().includes(clean) || item.description.toLowerCase().includes(clean));
 }
 function itemChoiceMarkup(item) {
@@ -1137,25 +1395,87 @@ function abilityChoiceMarkup(ability) {
   return `<div class="choice-copy"><div class="choice-heading"><strong>${escapeHtml(ability.name)}</strong><small>${ability.percent===null ? 'Usage unavailable' : `${ability.percent}%`}</small></div>
     <div class="search-item-sub">${escapeHtml(ability.description)}</div></div>`;
 }
-let activeUsagePicker=null;
-function closeUsagePicker() {
-  if(!activeUsagePicker) return;
-  const {input,popup}=activeUsagePicker;
-  if(popup.matches(':popover-open')) popup.hidePopover();
-  popup.innerHTML='';input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');activeUsagePicker=null;
+let activeUsagePicker=null,gridUsagePicker=null;
+function usagePickerFor(input) {
+  if(gridUsagePicker?.input===input) return gridUsagePicker;
+  return activeUsagePicker?.input===input ? activeUsagePicker : null;
 }
-function bindUsagePicker(input,{choices,markup,choose,kind='pokemon',hint='',moveFilterOptions={}}) {
+function closeUsagePicker({commitDraft=false,picker=activeUsagePicker}={}) {
+  if(!picker) return;
+  const {input,popup,deferredChange}=picker;
+  const wasGrid=picker===gridUsagePicker;
+  if(picker===activeUsagePicker) activeUsagePicker=null;
+  if(wasGrid) gridUsagePicker=null;
+  if(popup.matches(':popover-open')) popup.hidePopover();
+  popup.replaceChildren();input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');
+  if(wasGrid) {
+    picker.pokemonFilters.setGridButton(null);
+    picker.pokemonFilters.syncPanelLayer();
+  }
+  if(commitDraft && deferredChange && input.isConnected) input.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function restoreGridPickerInput(picker) {
+  if(picker!==gridUsagePicker || picker.input.isConnected) return;
+  const index=state.ourTeam.indexOf(picker.member);
+  if(index>=0) {state.activeOurIndex=index;render();}
+}
+function changeUsagePickerLayout(picker,layout) {
+  const inGrid=picker===gridUsagePicker,wantsGrid=layout!=='list';
+  const fromToolbar=picker.popup.contains(document.activeElement);
+  if(inGrid!==wantsGrid) {
+    if(inGrid) restoreGridPickerInput(picker);
+    closeUsagePicker({picker});
+    if(wantsGrid) {
+      closeUsagePicker({picker:gridUsagePicker});
+      picker.popup=document.getElementById('pokemonGridResults');
+      gridUsagePicker=picker;
+    } else {
+      closeUsagePicker({commitDraft:true});
+      picker.popup=document.getElementById('searchResults');
+      activeUsagePicker=picker;
+    }
+  }
+  picker.layout=layout;picker.popup.scrollTop=0;
+  updateUsagePicker(picker);
+  if(wantsGrid && !inGrid) picker.pokemonFilters.syncPanelLayer();
+  if(!wantsGrid) {
+    const editor=picker.input.closest('details');
+    if(editor) editor.open=true;
+    picker.input.focus();positionUsagePicker(picker);
+  }
+  else if(!inGrid && fromToolbar) picker.popup.querySelector('[data-picker-control="stats"]').focus({preventScroll:true});
+}
+function resetUsagePickerQuery(picker,query) {
+  picker.query=query;
+  picker.items=picker.choices(query);
+  picker.cursor=Math.max(0,picker.items.findIndex(item=>item.name.toLowerCase()===query.trim().toLowerCase()));
+  picker.popup.scrollTop=0;
+  updateUsagePicker(picker);
+}
+function refreshUsagePicker(picker) {
+  picker.items=picker.choices(picker.query);
+  picker.cursor=Math.min(picker.cursor,Math.max(0,picker.items.length-1));
+  updateUsagePicker(picker);
+}
+function usageChoiceId(picker,index) {
+  return `${picker===gridUsagePicker ? 'pokemon-grid-choice' : 'usage-choice'}-${index}`;
+}
+function bindUsagePicker(input,{choices,markup,choose,kind='pokemon',hint='',moveFilterOptions={},pokemonFilters=null,member=null}) {
   input.removeAttribute('list');input.autocomplete='off';input.setAttribute('role','combobox');
-  input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-expanded','false');input.setAttribute('aria-controls','searchResults');
+  input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-expanded','false');input.setAttribute('aria-controls',pokemonFilters ? 'pokemon-picker-options' : 'searchResults');
+  if(member && gridUsagePicker?.member===member) {
+    Object.assign(gridUsagePicker,{input,choices,markup,choose,hint});
+    input.value=gridUsagePicker.query;
+  }
   let moveFilters=null;
   const unfilteredChoices=choices;
   if(kind==='move')choices=query=>unfilteredChoices(query).filter(move=>moveFilters.accept(move));
   const open=(query)=>{
+    if(gridUsagePicker?.input===input) {resetUsagePickerQuery(gridUsagePicker,query);return;}
     closeUsagePicker();
-    const popup=document.getElementById('searchResults');popup.className='search-results usage-choice-popup';popup.setAttribute('popover','manual');popup.setAttribute('role','listbox');
-    const items=choices(query),exact=items.findIndex(item=>item.name.toLowerCase()===query.trim().toLowerCase());
-    activeUsagePicker={input,popup,items,cursor:Math.max(0,exact),query,choices,markup,choose,kind,hint};
-    updateUsagePicker();
+    const popup=document.getElementById('searchResults');
+    activeUsagePicker={input,popup,choices,markup,choose,kind,hint,pokemonFilters,member,layout:'list'};
+    resetUsagePickerQuery(activeUsagePicker,query);
   };
   if(kind==='move') {
     moveFilters=new MoveFilters.Picker({input,choices:()=>unfilteredChoices(''),
@@ -1164,55 +1484,155 @@ function bindUsagePicker(input,{choices,markup,choose,kind='pokemon',hint='',mov
       onChange:show=>{if(show)open('');else if(activeUsagePicker?.input===input)open(activeUsagePicker.query);}});
     moveFilters.mount();input.moveFilters=moveFilters;
   }
-  input.addEventListener('focus',()=>open(kind==='move' || kind==='ability' || kind==='item' ? '' : input.value));
+  input.addEventListener('focus',()=>{
+    if(!usagePickerFor(input))open(kind==='move' || kind==='ability' || kind==='item' ? '' : input.value);
+  });
   if(kind==='move')input.addEventListener('click',()=>{if(activeUsagePicker?.input!==input)open('');});
+  if(pokemonFilters)input.addEventListener('click',()=>{if(!usagePickerFor(input))open(input.value);});
   input.addEventListener('input',()=>open(input.value));
-  input.addEventListener('blur',()=>{if(activeUsagePicker?.input===input) closeUsagePicker();});
+  input.addEventListener('blur',event=>{
+    if(activeUsagePicker?.input===input && !activeUsagePicker.popup.contains(event.relatedTarget)) closeUsagePicker({commitDraft:true});
+  });
   input.addEventListener('keydown',event=>{
+    const picker=usagePickerFor(input);
+    if(event.key==='Tab' && !event.shiftKey && picker) {
+      const control=picker.popup.querySelector('[data-picker-control]');
+      if(control) {
+        event.preventDefault();
+        picker.focusingPickerControl=true;
+        control.focus();
+        picker.focusingPickerControl=false;
+        return;
+      }
+    }
     if(event.key==='Escape') {
-      if(kind==='pokemon') {input.value='';if(input.id==='pokemonSearchInput') state.searchQuery='';}
-      closeUsagePicker();event.preventDefault();event.stopImmediatePropagation();return;
+      if(picker && picker===gridUsagePicker) changeUsagePickerLayout(picker,'list');
+      else {
+        if(kind==='pokemon') {
+          input.value=picker?.deferredChange ? input.defaultValue : '';
+          if(input.id==='pokemonSearchInput') state.searchQuery='';
+        }
+        if(picker) closeUsagePicker({picker});
+      }
+      event.preventDefault();event.stopImmediatePropagation();return;
     }
     if(event.key==='ArrowDown' || event.key==='ArrowUp') {
       event.preventDefault();event.stopImmediatePropagation();
-      if(activeUsagePicker?.input!==input) {open(input.value);return;}
-      const picker=activeUsagePicker;
-      if(picker.items.length) picker.cursor=(picker.cursor+(event.key==='ArrowDown' ? 1 : -1)+picker.items.length)%picker.items.length;
-      updateUsagePicker();document.getElementById(`usage-choice-${picker.cursor}`)?.scrollIntoView({block:'nearest'});
-    } else if(event.key==='Enter' && activeUsagePicker?.input===input && activeUsagePicker.items.length) {
+      if(!picker) {open(input.value);return;}
+      const count=picker.items.length;
+      if(!count) return;
+      const previous=document.getElementById(usageChoiceId(picker,picker.cursor));
+      previous.classList.remove('active');previous.setAttribute('aria-selected','false');
+      picker.cursor=(picker.cursor+(event.key==='ArrowDown' ? 1 : -1)+count)%count;
+      if(input.id==='pokemonSearchInput')state.searchCursor=picker.cursor;
+      const next=document.getElementById(usageChoiceId(picker,picker.cursor));
+      next.classList.add('active');next.setAttribute('aria-selected','true');
+      input.setAttribute('aria-activedescendant',next.id);
+      next.scrollIntoView({block:'nearest'});
+    } else if(event.key==='Enter' && picker?.items.length) {
       event.preventDefault();event.stopImmediatePropagation();
-      const picker=activeUsagePicker,item=picker.items[picker.cursor];closeUsagePicker();choose(item);
+      const item=picker.items[picker.cursor];closeUsagePicker({picker});choose(item);
     }
   });
 }
-function updateUsagePicker() {
-  const picker=activeUsagePicker;if(!picker) return;
-  const {input,popup,items,cursor,kind}=picker;
+function updateUsagePicker(picker=activeUsagePicker) {
+  if(!picker) return;
+  const {input,popup,items,cursor,kind,pokemonFilters}=picker;
+  const canGrid=pokemonFilters?.active && pokemonFilters.enabled;
+  const grid=picker===gridUsagePicker;
+  const listId=grid ? 'pokemon-grid-options' : 'pokemon-picker-options';
+  if(pokemonFilters) popup.removeAttribute('role');
+  else popup.setAttribute('role','listbox');
+  input.setAttribute('aria-controls',pokemonFilters ? listId : popup.id);
   if(input.id==='pokemonSearchInput') {state.searchQuery=picker.query;state.searchResults=items;state.searchCursor=cursor;}
   const snapshot=window.META_USAGE?.formats[state.format];
-  const priorityFilter=input===teamPokemonFilters?.input ? teamPokemonFilters : null;
-  const rankingHint=priorityFilter?.sort==='priority' ? `${priorityJob?.progress || 'Priority Strength · best attack · typical builds'} · Top ${state.builderTopN} · ${state.format}` : '';
-  popup.innerHTML=`<div class="choice-source">${escapeHtml(rankingHint || picker.hint || `${state.format} · ${snapshot?.month || ''} Showdown usage`)}</div>`
-    +(items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="usage-choice-${index}" data-choice-index="${index}" class="${kind==='pokemon' ? 'search-item' : kind==='ability' ? 'ability-choice' : kind==='item' ? 'item-choice' : 'move-choice'} usage-choice ${index===cursor ? 'active' : ''}">${picker.markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>');
+  const rankingHint=pokemonFilters?.enabled && pokemonFilters.sort==='priority' ? `${priorityJob?.progress || 'Priority Strength'} · ${state.format}` : '';
+  const focusedControl=popup.contains(document.activeElement) ? document.activeElement.dataset.pickerControl : undefined;
+  const filterToggle=pokemonFilters?.active ? `<button type="button" class="mini-button" data-picker-filter-toggle data-picker-control="filters" aria-label="Apply Pokémon filters" aria-pressed="${pokemonFilters.enabled}">Filters ${pokemonFilters.enabled ? 'on' : 'off'}</button>` : '';
+  const layoutButton=(layout,label,pressed='')=>`<button type="button" class="mini-button" data-picker-control="${layout}" ${pressed!=='' ? `aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const layoutControls=grid ? `<button type="button" class="mini-button" data-picker-control="edit-filters" aria-controls="${pokemonFilters.panel.id}">Edit filters</button>
+    ${layoutButton('stats','Base stats',picker.layout==='stats')}<button type="button" class="mini-button picker-grid-close" data-picker-control="list" aria-label="Close">×</button>`
+    : canGrid ? layoutButton('compact','Grid') : '';
+  const count=grid ? `<strong>${items.filter(item=>!item.savedBuild).length} matching Pokémon</strong>` : '';
+  const source=rankingHint || picker.hint || `${state.format} · ${snapshot?.month || ''} Showdown usage`;
+  const markup=grid ? item=>pokemonGridChoiceMarkup(item,picker.layout==='stats') : picker.markup;
+  const optionClass=kind==='pokemon' ? 'search-item' : kind==='ability' ? 'ability-choice' : kind==='item' ? 'item-choice' : 'move-choice';
+  const choices=items.length ? items.map((item,index)=>`${item.savedBuild && !items[index-1]?.savedBuild ? '<div class="choice-source saved-build-divider">Saved builds · per team</div>' : ''}<div role="option" aria-selected="${index===cursor}" id="${usageChoiceId(picker,index)}" data-choice-index="${index}" class="${optionClass} usage-choice ${index===cursor ? 'active' : ''}">${markup(item)}</div>`).join('') : '<div class="empty-state">No matching choices.</div>';
+  const summary=[];
+  if(grid && picker.member) summary.push(`Editing ${pokemonDisplayName(picker.member)}`);
+  if(grid && canGrid) {
+    summary.push(...pokemonFilters.moves);
+    if(pokemonFilters.stabTargets.length) summary.push(`STAB into ${pokemonFilters.stabTargets.join(', ')}`);
+  }
+  summary.push(source);
+  popup.innerHTML=`<div class="choice-source"><div class="picker-source-copy">${count}<span>${escapeHtml(summary.join(' · '))}</span></div>${filterToggle || layoutControls ? `<div class="picker-controls">${filterToggle}${layoutControls}</div>` : ''}</div>`
+    +(pokemonFilters ? `<div id="${listId}" data-results-layout="${picker.layout}" role="listbox" aria-label="Pokémon results">${choices}</div>` : choices);
   if(kind==='move' && input.moveFilters && !input.moveFilters.onRequirement)popup.querySelector('.choice-source').append(input.moveFilters.button);
+  const controls=[...popup.querySelectorAll('[data-picker-control]')];
+  for(const control of controls) {
+    control.addEventListener('pointerdown',event=>event.preventDefault());
+    control.addEventListener('click',()=>{
+      const action=control.dataset.pickerControl;
+      if(action==='filters') {
+        pokemonFilters.setEnabled(!pokemonFilters.enabled);
+        resetUsagePickerQuery(picker,picker.query);
+      } else if(action==='edit-filters') pokemonFilters.toggle(control);
+      else changeUsagePickerLayout(picker,action==='stats' && picker.layout==='stats' ? 'compact' : action);
+    });
+    control.addEventListener('keydown',event=>{
+      if(event.key==='Tab') {
+        const adjacent=controls[controls.indexOf(control)+(event.shiftKey ? -1 : 1)];
+        if(adjacent || event.shiftKey) {
+          event.preventDefault();
+          if(!adjacent) restoreGridPickerInput(picker);
+          (adjacent || picker.input).focus();
+        }
+      } else if(event.key==='Escape') {
+        event.preventDefault();
+        if(grid) changeUsagePickerLayout(picker,'list');
+        else {
+          input.focus();if(picker.deferredChange) input.value=input.defaultValue;
+          closeUsagePicker({picker});
+        }
+      }
+    });
+    control.addEventListener('blur',()=>queueMicrotask(()=>{
+      if(activeUsagePicker===picker && document.activeElement!==input && !popup.contains(document.activeElement)) closeUsagePicker({commitDraft:true});
+    }));
+  }
   for(const row of popup.querySelectorAll('[data-choice-index]')) {
     row.addEventListener('pointerdown',event=>event.preventDefault());
-    row.addEventListener('click',()=>{const item=items[Number(row.dataset.choiceIndex)];closeUsagePicker();picker.choose(item);});
+    row.addEventListener('click',()=>{
+      const item=items[Number(row.dataset.choiceIndex)];
+      restoreGridPickerInput(picker);
+      closeUsagePicker({picker});picker.choose(item);
+    });
   }
   input.setAttribute('aria-expanded','true');
-  if(items.length) input.setAttribute('aria-activedescendant',`usage-choice-${cursor}`);
+  if(items.length) input.setAttribute('aria-activedescendant',usageChoiceId(picker,cursor));
+  else input.removeAttribute('aria-activedescendant');
   if(!popup.matches(':popover-open')) popup.showPopover();
-  positionUsagePicker();
+  positionUsagePicker(picker);
+  if(grid) pokemonFilters.setGridButton(popup.querySelector('[data-picker-control="edit-filters"]'));
+  if(focusedControl) {
+    const target=controls.find(control=>control.dataset.pickerControl===focusedControl) || controls[1] || controls[0] || input;
+    target.focus({preventScroll:true});
+  }
 }
-function positionUsagePicker() {
-  if(!activeUsagePicker)return;
-  const {input,popup}=activeUsagePicker;
+function positionUsagePicker(picker=activeUsagePicker) {
+  if(!picker)return;
+  const {input,popup}=picker;
+  const grid=picker===gridUsagePicker;
   const box=input.getBoundingClientRect();
-  const width=Math.min(Math.max(box.width,340),innerWidth-16);
-  popup.style.width=`${width}px`;popup.style.left=`${clamp(box.left,8,Math.max(8,innerWidth-width-8))}px`;
+  const width=Math.min(grid ? 1280 : Math.max(box.width,340),innerWidth-16);
+  popup.style.width=`${width}px`;
+  popup.style.left=`${grid ? (innerWidth-width)/2 : clamp(box.left,8,Math.max(8,innerWidth-width-8))}px`;
+  if(grid && (!box.height || box.bottom<=0 || box.top>=innerHeight)) {
+    popup.style.top='8px';popup.style.maxHeight=`${innerHeight-16}px`;return;
+  }
   const below=innerHeight-box.bottom-8,above=box.top-8;
-  const down=below>=Math.min(280,above);
-  popup.style.maxHeight=`${Math.max(70,Math.min(380,down ? below : above))}px`;
+  const down=below>=(grid ? above : Math.min(280,above));
+  popup.style.maxHeight=`${Math.max(70,Math.min(grid ? innerHeight : 380,(down ? below : above)-4))}px`;
   popup.style.top=down ? `${box.bottom+4}px` : `${Math.max(8,box.top-popup.getBoundingClientRect().height-4)}px`;
 }
 
@@ -1243,6 +1663,8 @@ function commitTeamInvestment(entry, stat, rawValue) {
     row.querySelector(`input[data-stat="${stat}"]`).value = next[stat];
     row.querySelector('.points-readout strong').textContent = getTotalInvestment(entry);
     updateStatInvestmentLabels(row,entry);
+    const comparison=row.querySelector('.mega-stat-comparison');
+    if(comparison) comparison.outerHTML=megaStatComparisonMarkup(entry,battleSpecies(entry,'our'));
     row.querySelector('[data-clear-investments]').disabled=!getTotalInvestment(entry);
   }
   renderActiveSummary();
@@ -1261,7 +1683,6 @@ function commitStatInput(event) {
 
 let teamSetEditorExpanded=false;
 function buildSetEditor(entry, index, side) {
-  const species = getPokemonByName(entry.name);
   const activeAbility=side==='our' ? battleEntry(entry).ability : entry.ability;
   const attr = `data-set-side="${side}" data-set-index="${index}"`;
   return `<details class="set-editor"${side==='our' && teamSetEditorExpanded ? ' open' : ''}><summary>Edit ${side === 'our' ? 'Pokémon & moves' : 'opponent set'}</summary>
@@ -1274,12 +1695,14 @@ function buildSetEditor(entry, index, side) {
 }
 function bindSetEditors(container) {
   container.querySelectorAll('[data-set-field]').forEach(input => {
-    const species=getPokemonByName((input.dataset.setSide==='our' ? state.ourTeam : state.opponentList)[Number(input.dataset.setIndex)].name);
+    const entry=(input.dataset.setSide==='our' ? state.ourTeam : state.opponentList)[Number(input.dataset.setIndex)];
+    const species=savedSpecies(entry);
     if(input.dataset.setField==='name' || input.dataset.setField==='ability' || input.dataset.setField.startsWith('move-')) {
       const isMove=input.dataset.setField.startsWith('move-');
       const isAbility=input.dataset.setField==='ability';
-      const abilitySpecies=input.dataset.setSide==='our' ? battleSpecies(species,'our') : species;
-      bindUsagePicker(input,{moveFilterOptions:{species:{...abilitySpecies,ability:input.dataset.setSide==='our' ? battleEntry(state.ourTeam[Number(input.dataset.setIndex)]).ability : undefined}},kind:isMove ? 'move' : isAbility ? 'ability' : 'pokemon',choices:query=>isMove ? buildMoveChoices(species,query) : isAbility ? buildAbilityChoices(abilitySpecies,query) : input.dataset.setSide==='our' ? buildTeamSearchResults(query) : buildSearchResults(query),
+      const teamName=input.dataset.setSide==='our' && !isMove && !isAbility;
+      const abilitySpecies=input.dataset.setSide==='our' ? battleSpecies(entry,'our') : species;
+      bindUsagePicker(input,{pokemonFilters:teamName ? teamPokemonFilters : null,member:teamName ? entry : null,moveFilterOptions:{species:{...abilitySpecies,ability:input.dataset.setSide==='our' ? battleEntry(state.ourTeam[Number(input.dataset.setIndex)]).ability : undefined}},kind:isMove ? 'move' : isAbility ? 'ability' : 'pokemon',choices:query=>isMove ? buildMoveChoices(species,query) : isAbility ? buildAbilityChoices(abilitySpecies,query) : input.dataset.setSide==='our' ? buildTeamSearchResults(query) : buildSearchResults(query),
         markup:isMove ? moveChoiceMarkup : isAbility ? abilityChoiceMarkup : pokemonChoiceMarkup,
         hint:isMove || isAbility ? `${state.format} ${isAbility ? 'ability' : 'move'} usage · ${getUsage(isAbility ? abilitySpecies : species)?.name || species.name} · Champions Battle Data` : '',
         choose:item=>{
@@ -1307,16 +1730,24 @@ function bindSetEditors(container) {
         input.value=choice;
       }
       if (field === 'name') {
+        const picker=usagePickerFor(input);
+        if(picker && (picker===gridUsagePicker || picker.focusingPickerControl)) {
+          picker.deferredChange=true;
+          return;
+        }
         const species = getPokemonByName(input.value);
         if (!species) { input.value = entry.name; return; }
         const previous=getPokemonByName(entry.name);
         const cosmeticChange=(previous.cosmeticBaseId || previous.id)===(species.cosmeticBaseId || species.id);
         team[index] = sanitizeTeamEntry({...entry, name: species.name, ability:input.satisfyingSet?.ability || (cosmeticChange ? entry.ability : species.abilities[0]),
-          item: getPokemonByName(entry.name).isMega && !species.isMega ? '' : entry.item,
+          item: previous.isMega && !species.isMega ? '' : entry.item,
           moveSet:input.satisfyingSet?.moveSet || (cosmeticChange ? entry.moveSet : species.moves), damageMultiplier: 1});
         if(side==='our' && state.teamOffenseExcluded.has(entry)) state.teamOffenseExcluded.add(team[index]);
-      } else if(field==='ability' && side==='our' && battleSpecies(entry,'our').megaStoneName) {
-        getPreferences(entry,'our').baseAbilityChoice=input.value;savePreferences();
+      } else if(field==='ability' && side==='our') {
+        const species=battleSpecies(entry,'our');
+        if(species.originalName) {
+          getPreferences(entry,'our').baseAbilityChoice=input.value;savePreferences();
+        } else if(!species.selectedMegaFromBase) entry.ability=input.value;
       } else if (field.startsWith('move-')) {
         const move = Battle.moveMeta(input.value);
         if (!move) { input.value = entry.moveSet[Number(field.slice(5))] || ''; return; }
@@ -1339,6 +1770,7 @@ function bindSetEditors(container) {
 }
 
 function renderTeam() {
+  hideItemTooltip();
   const container = document.getElementById('ourTeamList');
   const editor=container.querySelector('.set-editor');
   if(editor) teamSetEditorExpanded=editor.open;
@@ -1363,21 +1795,26 @@ function renderTeam() {
     .map((entry, index) => {
       const actualIndex = state.ourTeam.indexOf(entry);
       const isSelected = index === 0;
+      const species=battleSpecies(entry,'our'),display=listDisplayEntry(entry,species);
       if (!isSelected) {
         return `<div class="team-row compact-team" data-team-index="${actualIndex}">
-          <img class="team-avatar" src="${getPokemonImage(entry.name)}" alt="${entry.name}" />
-          <div class="compact-row-copy">${pokemonListHeading(entry,actualIndex,false,true)}
-            <div class="opponent-card-details">${baseStatsMarkup(entry)}</div></div>
+          ${pokemonListPortrait(display,species)}
+          <div class="compact-row-copy">${pokemonListHeading(entry,display,actualIndex,false,true,species)}
+            ${ourStatsMarkup(entry,species)}</div>
         </div>`;
       }
 
       const total = getTotalInvestment(entry);
-      const megaItem = Battle.requiredMegaItem(getPokemonByName(entry.name));
+      const megaItem = species.isMega ? Battle.requiredMegaItem(species) : '';
       const plusValue = entry.nature?.plus || '';
       const minusValue = entry.nature?.minus || '';
       const statFields = statOrder.map((stat) => `
         <div class="input-block">
-          <label class="stat-investment-label" for="team-${actualIndex}-${stat}">${statLabels[stat]}: <output data-stat-total="${stat}" title="${stat==='spe' ? 'Actual Speed after investment, nature, held item and active weather/terrain abilities; before temporary stages' : `Actual ${statLabels[stat]} after investment and nature, before temporary stages or item and ability modifiers`}">${getEffectiveStat(entry,stat)}</output><span class="stat-investment-breakdown" title="Base + invested points + nature change; any extra term is from item or field effects" data-stat-breakdown="${stat}">${statInvestmentBreakdown(entry,stat)}</span></label>
+          <label class="stat-investment-label" for="team-${actualIndex}-${stat}">
+            <strong>${statLabels[stat]}</strong>
+            <output data-stat-total="${stat}" title="Level 50 stat with investment and nature, before battle modifiers">${Battle.effectiveStat(species,entry,stat)}</output>
+            <span class="stat-investment-breakdown" data-stat-breakdown="${stat}" title="Default stat + invested points ± nature change">${statInvestmentBreakdown(entry,species,stat)}</span>
+          </label>
           <input
             id="team-${actualIndex}-${stat}"
             type="text"
@@ -1397,19 +1834,19 @@ function renderTeam() {
 
       return `
         <div class="team-row expanded-team" data-team-index="${actualIndex}">
-          <img class="team-avatar" src="${getPokemonImage(entry.name)}" alt="${entry.name}" />
+          ${pokemonListPortrait(display,species)}
           <div class="team-main">
             <div class="team-top-row">
               <div>
-                <div class="pokemon-name" title="${escapeHtml(entry.name)}">${escapeHtml(pokemonDisplayName(entry))}</div>
-                <div class="pokemon-type">${entry.types.join(' / ')}</div>
+                <div class="pokemon-name">${escapeHtml(pokemonDisplayName(display))}</div>
+                <div class="pokemon-type">${listDisplayTypes(entry,display)}</div>
               </div>
-              <div class="team-member-actions">${knownItemMarkup(entry)}<span class="column-tag">${actualIndex + 1}</span>
+              <div class="team-member-actions">${knownItemMarkup(entry,species)}
                 ${teamOrderControls(entry,actualIndex)}
                 <button type="button" class="control-btn delete" data-remove-team-index="${actualIndex}"
                   aria-label="Remove ${escapeHtml(entry.name)} from team">×</button></div>
             </div>
-            <div class="investment-heading"><span>Stat Investments <small class="stat-breakdown-key" title="Breakdowns show uninvested stat + invested points + nature change. Any final extra term is from item or field effects.">Base + Invested + Nature</small></span><button type="button" class="mini-button clear-investments" data-clear-investments="${actualIndex}" ${!total ? 'disabled' : ''} title="Clear all six investments; keep the nature, item, ability and moves">Clear Investments</button></div>
+            <div class="investment-heading"><span>Stat Investments</span><button type="button" class="mini-button clear-investments" data-clear-investments="${actualIndex}" ${!total ? 'disabled' : ''} title="Clear all six investments; keep the nature, item, ability and moves">Clear Investments</button></div>
             <div class="stat-grid">${statFields}</div>
             <div class="team-bottom-row">
               <div class="input-block">
@@ -1429,7 +1866,7 @@ function renderTeam() {
                 <label>Item</label>
                 <input
                   class="searchable-input"
-                  value="${escapeHtml(entry.item)}"
+                  value="${escapeHtml(battleEntry(entry,species).item)}"
                   data-team-index="${actualIndex}"
                   data-field="item"
                 />
@@ -1453,7 +1890,7 @@ function renderTeam() {
                     </label>
                   </div>
                 </div>
-            <div class="selected-base-stats"><span>Base stats</span>${baseStatsMarkup(entry)}</div>
+            ${megaStatComparisonMarkup(entry,species)}
             ${buildSetEditor(entry, actualIndex, 'our')}
             <div class="points-readout">Invested: <strong>${total}</strong> / ${MAX_TEAM_POINTS}</div>
           </div>
@@ -1466,7 +1903,7 @@ function renderTeam() {
     row.classList.toggle('coverage-selected',state.view === 'builder' && state.builderPanel === 'team-offense'
       && !state.teamOffenseExcluded.has(state.ourTeam[Number(row.dataset.teamIndex)]));
     row.addEventListener('click', (event) => {
-      const interactive = event.target.closest('input, select, label, details, summary, button');
+      const interactive = event.target.closest(`${teamCardControls}, [data-team-drag]`);
       if (interactive) return;
       const teamIndex = Number.parseInt(row.getAttribute('data-team-index'), 10);
       if (!Number.isNaN(teamIndex) && teamIndex!==state.activeOurIndex) {
@@ -1523,7 +1960,7 @@ function renderTeam() {
 
   container.querySelectorAll('input[data-field="item"]').forEach(input=>{
     const entry=state.ourTeam[Number(input.dataset.teamIndex)];
-    bindUsagePicker(input,{kind:'item',choices:query=>buildItemChoices(battleSpecies(entry,'our'),query),markup:itemChoiceMarkup,
+    bindUsagePicker(input,{kind:'item',choices:query=>buildItemChoices(savedSpecies(entry),query),markup:itemChoiceMarkup,
       hint:`${state.format} item usage · ${getUsage(getPokemonByName(entry.name))?.name || entry.name}`,
       choose:item=>updateItem(entry,item.value)});
   });
@@ -1561,7 +1998,11 @@ function addOpponentsByName(names) {
     const previous=existing.get(megaBaseSpecies(species).id);
     if(!species.isMega)return previous||sanitizeOpponentEntry({name:species.name});
     const entry=previous?.id===species.id?previous:sanitizeOpponentEntry({name:species.name});
-    state.preferences[`opponent:${species.id}`]=sanitizePreferences({...getPreferences(previous||entry,'opponent'),megaActive:true,megaFormId:'',itemChoice:''});
+    const prefs=getPreferences(previous||entry,'opponent');
+    const fromBase=previous && !savedSpecies(previous).isMega;
+    state.preferences[`opponent:${species.id}`]=sanitizePreferences({...prefs,megaActive:true,megaFormId:'',
+      abilityChoice:fromBase ? prefs.megaAbilityChoices[species.id] : prefs.abilityChoice,
+      baseAbilityChoice:fromBase ? prefs.abilityChoice : prefs.baseAbilityChoice});
     return entry;
   });
   const seen=new Set(added.map(family));
@@ -1582,30 +2023,51 @@ function resetBattle() {
   savePreferences();saveTeamToStorage();render();
 }
 
-function knownItemMarkup(entry) {
-  if(savedSpecies(entry)?.isMega) return megaStoneMarkup(entry,'our');
+function knownItemMarkup(entry,species) {
+  const saved=savedSpecies(entry);
+  const mega=saved.isMega ? saved : megaFormForStone(saved,entry.item);
+  if(mega) return megaStoneMarkup(entry,'our',species,mega);
   const stance=stanceMarkup(entry,'our');
-  if(!entry.item) return stance;
-  const image=window.ITEM_SPRITES?.[entry.item],hint=window.ITEM_HINTS[calc.toID(entry.item)] || {description:window.ITEM_DESCRIPTIONS?.[calc.toID(entry.item)]};
-  const label=`${entry.item}${hint?.description ? `. ${hint.description}` : ''}`;
-  return `${stance}<span class="item-hint known-item" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(entry.item)}" />` : `<small>${escapeHtml(entry.item)}</small>`}</span>`;
+  return `${stance}${heldItemMarkup(entry.item)}`;
+}
+function itemTooltipMarkup(label) {
+  return `<span role="tooltip" class="item-tooltip" popover="manual">${escapeHtml(label)}</span>`;
+}
+function heldItemMarkup(item) {
+  if(!item) return '';
+  const image=window.ITEM_SPRITES?.[item],hint=window.ITEM_HINTS[calc.toID(item)] || {description:window.ITEM_DESCRIPTIONS?.[calc.toID(item)]};
+  const label=`${item}${hint?.description ? `. ${hint.description}` : ''}`;
+  const tooltip=image || hint?.description ? itemTooltipMarkup(label) : '';
+  return `<span class="item-hint known-item" aria-label="${escapeHtml(label)}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(item)}" />` : `<small>${escapeHtml(item)}</small>`}${tooltip}</span>`;
 }
 function stanceMarkup(entry,side) {
   const species=savedSpecies(entry);if(!PokemonForms.isAegislash(species))return '';
   const active=getPreferences(species,side).bladeActive;
   const label=`${active?'Blade':'Shield'} Forme active. Click to use ${active?'Shield':'Blade'} Forme.`;
-  return `<button type="button" class="item-hint mega-stone stance-toggle" data-stance-side="${side}" aria-pressed="${active}" aria-label="${label}"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 2 8 7v8h8V7zM5 16h14M12 16v6M9 22h6" fill="none" stroke="currentColor" stroke-width="2"/></svg><span role="tooltip" class="item-tooltip" popover="manual">${label}</span></button>`;
+  const image=getPokemonImage('Aegislash Blade Forme');
+  return `<button type="button" class="item-hint mega-stone stance-toggle" data-stance-side="${side}" aria-pressed="${active}" aria-label="${label}"><img src="${escapeHtml(image)}" alt="" />${itemTooltipMarkup(label)}</button>`;
 }
-function megaStoneMarkup(entry,side) {
-  const species=savedSpecies(entry),stone=Battle.requiredMegaItem(species),active=getPreferences(species,side).megaActive;
-  const image=window.ITEM_SPRITES[stone],effective=battleSpecies(species,side);
-  const label=`${stone}\n${active ? species.name : effective.name} active. Click to ${active ? 'use the ordinary form' : 'Mega Evolve'}. The stone remains held.`;
-  return `<button type="button" class="item-hint mega-stone" data-mega-side="${side}" data-mega-id="${species.id}" aria-pressed="${active}" aria-label="${escapeHtml(label)}">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(stone)}" />` : escapeHtml(stone)}<span role="tooltip" class="item-tooltip" popover="manual">${escapeHtml(label)}</span></button>`;
+function megaStoneMarkup(entry,side,effective,readyForm=savedSpecies(entry)) {
+  const saved=savedSpecies(entry),form=effective.isMega ? effective : readyForm;
+  const stone=Battle.requiredMegaItem(form),image=window.ITEM_SPRITES[stone],active=effective.isMega;
+  const label=`${stone}. ${active ? `Return to ${megaBaseSpecies(saved).name}.` : `Mega Evolve into ${form.name}.`}`;
+  return `<button type="button" class="item-hint mega-stone" data-mega-side="${side}" aria-pressed="${active}" aria-label="${escapeHtml(label)}">${image ? `<img src="${escapeHtml(image)}" alt="" />` : escapeHtml(stone)}${itemTooltipMarkup(label)}</button>`;
 }
-function pokemonListHeading(entry,index,remove=false,ours=false) {
+function listDisplayEntry(entry,species) {
+  return species.isMega || species.originalName ? {...entry,name:species.name,types:species.types} : entry;
+}
+function pokemonListPortrait(display,species) {
+  const name=species.stanceForm ? `Aegislash ${species.stanceForm} Forme` : display.name;
+  return `<img class="team-avatar" src="${escapeHtml(getPokemonImage(name))}" alt="${escapeHtml(name)}" />`;
+}
+function listDisplayTypes(entry,display) {
+  const form=entry.nickname && display.name!==entry.name ? `${escapeHtml(display.name)} · ` : '';
+  return `${form}${display.types.join(' / ')}`;
+}
+function pokemonListHeading(entry,display,index,remove=false,ours=false,species) {
   return `<div class="opponent-name-block"><div class="opponent-name-line">
-    <div class="pokemon-identity"><div class="pokemon-name" title="${escapeHtml(entry.name)}">${escapeHtml(pokemonDisplayName(entry))}</div><div class="pokemon-type">${entry.types.join(' / ')}</div></div>
-    ${ours ? knownItemMarkup(entry) : buildItemHints(entry)}<span class="column-tag">${index+1}</span>${ours ? teamOrderControls(entry,index) : ''}
+    <div class="pokemon-identity"><div class="pokemon-name">${escapeHtml(pokemonDisplayName(display))}</div><div class="pokemon-type">${listDisplayTypes(entry,display)}</div></div>
+    ${ours ? knownItemMarkup(entry,species)+teamOrderControls(display,index) : `${buildItemHints(entry)}<span class="column-tag">${index+1}</span>`}
     ${ours ? `<button type="button" class="control-btn delete" data-remove-team-index="${index}" title="Remove ${escapeHtml(pokemonDisplayName(entry))}" aria-label="Remove ${escapeHtml(pokemonDisplayName(entry))} from team">×</button>` : ''}
     ${remove ? `<button type="button" class="control-btn" data-opponent-action="up" data-opponent-index="${index}" ${index===0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(entry.name)} earlier">↑</button><button type="button" class="control-btn" data-opponent-action="down" data-opponent-index="${index}" ${index===state.opponentList.length-1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(entry.name)} later">↓</button><button type="button" class="control-btn delete" data-opponent-action="delete" data-opponent-index="${index}" title="Remove ${escapeHtml(entry.name)}" aria-label="Remove ${escapeHtml(entry.name)} from opposition">✕</button>` : ''}
     </div></div>`;
@@ -1635,12 +2097,13 @@ function renderOpponentList() {
 
   const visible = state.opponentsExpanded ? ordered : ordered.slice(0, 6);
   container.innerHTML = visible
-    .map((entry, index) => {
+    .map(entry => {
       const actualIndex = state.opponentList.indexOf(entry);
+      const species=battleSpecies(entry,'opponent'),display=listDisplayEntry(entry,species);
       return `<div class="opponent-row compact${actualIndex === state.activeOpponentIndex ? ' item-color-selected' : ''}" data-opponent-index="${actualIndex}">
-        <img class="team-avatar" src="${getPokemonImage(entry.name)}" alt="${entry.name}" />
-        <div class="compact-row-copy">${pokemonListHeading(entry,actualIndex,true)}
-          <div class="opponent-card-details">${baseStatsMarkup(entry)}</div></div>
+        ${pokemonListPortrait(display,species)}
+        <div class="compact-row-copy">${pokemonListHeading(entry,display,actualIndex,true)}</div>
+        ${opponentStatsMarkup(species,`opponent-range-key-${actualIndex}`)}
       </div>`;
     })
     .join('');
@@ -1687,34 +2150,36 @@ function renderOpponentList() {
   });
 }
 
-function buildActiveSummaryMarkup(entry) {
+function buildActiveSummaryMarkup(entry,species) {
   if (!entry) {
     return '<div class="empty-state">No selection</div>';
   }
 
-  const side=entry.kind==='opponent' ? 'opponent' : 'our',species=battleSpecies(entry,side);
-  entry={...battleEntry(entry,side),name:species.name,types:species.types};
+  const side=entry.kind==='opponent' ? 'opponent' : 'our';
+  const display={...(side==='our' ? battleEntry(entry,species) : entry),name:species.name,types:species.types};
   const opponentItem = side==='opponent' ? appliedOpponentItem(entry) : '';
-  return `
-    <img src="${getPokemonImage(entry.name)}" alt="${entry.name}" />
+  const portrait=`<img src="${getPokemonImage(display.name)}" alt="${display.name}" />`;
+  const identity=`
     <div class="summary-meta">
-      <div class="summary-name" title="${escapeHtml(entry.name)}">${escapeHtml(pokemonDisplayName(entry))}</div>
-      <div class="summary-types">${entry.types.join(' / ')}</div>
-      <div class="summary-item">${entry.kind === 'opponent' ? (opponentItem ? `${escapeHtml(opponentItem)} selected` : 'No assumed moves, investment or item') : `${escapeHtml(entry.item)} • ${escapeHtml(entry.nature.name)}`}</div>
+      <div class="summary-name">${escapeHtml(pokemonDisplayName(display))}</div>
+      <div class="summary-types">${listDisplayTypes(entry,display)}</div>
+      <div class="summary-item">${side==='opponent' ? escapeHtml(opponentItem || 'No assumed moves, investment or item') : [display.item,entry.nature.name].filter(Boolean).map(escapeHtml).join(' · ')}</div>
     </div>
   `;
+  return side==='opponent' ? portrait+identity
+    : `<div class="our-active-portrait">${portrait}</div>
+        <div class="our-active-details">${identity}<div id="ourActiveStats" class="active-stats">${ourStatsMarkup(entry,species)}</div></div>`;
 }
 
 function renderActiveSummary() {
   const ourEntry = state.ourTeam[state.activeOurIndex] || state.ourTeam[0];
   const opponentEntry = state.opponentList[state.activeOpponentIndex] || state.opponentList[0];
 
-  document.getElementById('ourActiveSummary').innerHTML = buildActiveSummaryMarkup(ourEntry);
-  document.getElementById('ourActiveBaseStats').innerHTML=ourEntry ? baseStatsMarkup(battleSpecies(ourEntry,'our')) : '';
-  document.querySelector('.our-active-heading .base-stat-caption').hidden=!ourEntry;
-  document.getElementById('opponentActiveSummary').innerHTML = buildActiveSummaryMarkup(opponentEntry);
-  document.getElementById('opponentActiveBaseStats').innerHTML=opponentEntry ? baseStatsMarkup(battleSpecies(opponentEntry,'opponent')) : '';
-  document.querySelector('.opponent-active-heading .base-stat-caption').hidden=!opponentEntry;
+  const ours=battleSpecies(ourEntry,'our'),opponent=battleSpecies(opponentEntry,'opponent');
+  document.getElementById('ourActiveSummary').innerHTML=buildActiveSummaryMarkup(ourEntry,ours);
+  document.getElementById('opponentActiveSummary').innerHTML=buildActiveSummaryMarkup(opponentEntry,opponent);
+  document.getElementById('opponentActiveStats').innerHTML=opponent ? opponentStatsMarkup(opponent,'opponent-active-range-key') : '';
+  document.getElementById('opponentStatKey').hidden=!opponent;
 }
 
 function speedEstimateText(estimate) {
@@ -1749,7 +2214,7 @@ function renderSpeedSummary() {
   const species = battleSpecies(opponentEntry,'opponent');
   const ability=appliedOpponentAbility(opponentEntry);
   const field=Battle.speedField(state,battleEntry(ourEntry).ability,ability);
-  const targetSpeed = Battle.speed(getPokemonByName(ourEntry.name),{...battleEntry(ourEntry),speedStage:getPreferences(ourEntry,'our').speedStage},field);
+  const targetSpeed = Battle.speed(battleSpecies(ourEntry,'our'),{...battleEntry(ourEntry),speedStage:getPreferences(ourEntry,'our').speedStage},field);
   // These are independent opponent scenarios; our exact build remains fixed.
   const scenarios = [
     {label: 'Normal', item: ''},
@@ -1757,7 +2222,7 @@ function renderSpeedSummary() {
     {label: 'Tailwind', item: '', tailwind: true}
   ];
   container.innerHTML = scenarios.map(scenario => {
-    if ((species.isMega || species.megaStoneName) && scenario.item === 'Choice Scarf') {
+    if (species.isMega && scenario.item === 'Choice Scarf') {
       return '<div class="speed-scenario"><dt>Choice Scarf</dt><dd class="speed-unavailable">Unavailable · Mega Stone required</dd></div>';
     }
     const tier = Battle.speedTier(species, {...opponentEntry,speedStage:getPreferences(opponentEntry,'opponent').speedStage,ability,item: scenario.item}, targetSpeed,
@@ -1784,7 +2249,7 @@ function cancelOffenseThresholdSearch() {
 }
 function annotateOffenseThresholds(ours,stats,rows) {
   if(!stats.length) {cancelOffenseThresholdSearch();offenseThresholdTrial={key:'',worker:null,finished:false,thresholds:null};return rows;}
-  const job={species:defenseSpecies(getPokemonByName(ours.name),'our'),ours:battleEntry(ours),stats,
+  const job={species:defenseSpecies(ours,'our'),ours:battleEntry(ours),stats,
     options:{format:state.format,attackerAlliesFainted:state.alliesFainted,attackerStages:statStages(ours,'our')},
     targets:builderOffenseProfiles(ours).map(profile=>({id:profile.scenarioId,species:defenseSpecies(profile.species),
       spreads:getUsage(profile.species)?.spreads || [],
@@ -1823,7 +2288,7 @@ function statDistributionWeights(roster) {
   if(!state.metaMode) return new Map(roster.map(species=>[species.id,1]));
   const data=window.META_USAGE?.formats[state.format]?.species || {},resolved=new Map(),counts=new Map();
   for(const species of roster) {
-    const exact=calc.toID(species.id),reference=calc.toID(getUsage(species)?.name || '');
+    const exact=calc.toID(species.selectedMegaFromBase ? species.calcId : species.id),reference=calc.toID(getUsage(species)?.name || '');
     // Showdown groups these cosmetic forms under a shared usage entry.
     const shared={mausholdfour:'maushold',toxtricitylowkey:'toxtricity'}[exact]
       || (exact.startsWith('vivillon') ? 'vivillon' : null);
@@ -1840,8 +2305,9 @@ function statDistributionWeights(roster) {
 }
 function builderOffenseProfiles(ours) {
   const species = battleSpecies(ours,'our');
+  const combatant=battleEntry(ours,species);
   const attackerStages=statStages(ours,'our');
-  const signature = JSON.stringify([{...ours,moveSet:[]},state.format,state.weather,state.terrain,state.alliesFainted,attackerStages,species.calcId || species.id]);
+  const signature = JSON.stringify([{...combatant,moveSet:[]},state.format,state.weather,state.terrain,state.alliesFainted,attackerStages,species.calcId || species.id]);
   offenseSignature = signature;
   if (!offenseCache.has(signature)) {
     if (offenseCache.size >= 12) offenseCache.delete(offenseCache.keys().next().value);
@@ -1860,7 +2326,7 @@ function builderOffenseProfiles(ours) {
     if (!cached || cached.key !== key) { cached = {key,moves:new Map()}; memberCache.set(condition.scenarioId,cached); }
     return {...condition,species:defender,reference:usage?.name || defender.name,rank:usage?.rank,key,
       evaluate(name) {
-        if (!cached.moves.has(name)) cached.moves.set(name,Offense.analyze(species,{...ours,moveSet:[name]},defender,usage?.spreads || [],{
+        if (!cached.moves.has(name)) cached.moves.set(name,Offense.analyze(species,{...combatant,moveSet:[name]},defender,usage?.spreads || [],{
           format:state.format,weather:condition.weather,terrain:condition.terrain,attackerStages,defenderStages,
           attackerAlliesFainted:state.alliesFainted,
           defenderAbility:ability,defenderItem:item,
@@ -2138,8 +2604,8 @@ function defenseSpecies(species,side='opponent') {
   return {id:species.id,name:species.name,isMega:species.isMega,stats:species.stats,types:species.types,calcId:species.calcId,megaStoneName:species.megaStoneName};
 }
 function renderBuilderDefense(selected) {
-  const roster=builderRoster(getPokemonByName(selected.name),false),weights=statDistributionWeights(roster);
-  const job={species:defenseSpecies(getPokemonByName(selected.name),'our'),ours:battleEntry(selected),
+  const roster=builderRoster(battleSpecies(selected,'our'),false),weights=statDistributionWeights(roster);
+  const job={species:defenseSpecies(selected,'our'),ours:battleEntry(selected),
     options:{format:state.format,weather:state.weather,terrain:state.terrain,attackerAlliesFainted:state.opponentsFainted},
     targets:roster.flatMap(species=>Battle.fieldScenarios(species,appliedOpponentAbility(species),state).map(condition=>{
       const usage=getUsage(species),prefs=getPreferences(species,'opponent');
@@ -2309,12 +2775,12 @@ function renderBalanceResults() {
   document.getElementById('builderOffenseTiers').setAttribute('aria-label','Estimated 1v1 matchup outcomes');
 }
 function renderBuilderBalance(selected) {
-  const roster=builderRoster(getPokemonByName(selected.name),false),weights=statDistributionWeights(roster);
-  const job={species:defenseSpecies(getPokemonByName(selected.name),'our'),ours:battleEntry(selected),
+  const roster=builderRoster(battleSpecies(selected,'our'),false),weights=statDistributionWeights(roster);
+  const job={species:defenseSpecies(selected,'our'),ours:battleEntry(selected),
     targets:roster.flatMap(species=>Battle.fieldScenarios(species,appliedOpponentAbility(species),state).map(condition=>{
-      const usage=getUsage(species) || {},prefs=getPreferences(species,'opponent');
+      const usage=getUsage(species) || {};
       const abilities=species.abilities.length===1 ? [{name:species.abilities[0],percent:100}]
-        : (species.megaStoneName ? prefs.baseAbilityChoice : prefs.abilityChoice)!=='auto' || condition.scenario?.active ? [{name:condition.ability,percent:100}]
+        : opponentAbilityChoice(species)!=='auto' || condition.scenario?.active ? [{name:condition.ability,percent:100}]
         : (usage.abilities || []).filter(row=>species.abilities.includes(row.name));
       return {species:defenseSpecies(species),usage:{name:usage.name,rank:usage.rank,moves:usage.moves || [],spreads:usage.spreads || [],natures:usage.natures || [],items:usage.items || []},
         ability:condition.ability,abilities,scenarioId:condition.scenarioId,scenario:condition.scenario,weight:condition.weight*(weights.get(species.id) ?? 1),
@@ -2456,7 +2922,9 @@ function renderTeamBuilder() {
     summary.innerHTML = `<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>ATK ${getEffectiveStat(selected,'atk')} · SPA ${getEffectiveStat(selected,'spa')}</span>`;
     renderBuilderOffense(selected);return;
   }
-  const data = Battle.builderSpeedGroups(builderRoster(species),species,{...battleEntry(selected),speedStage:getPreferences(selected,'our').speedStage},{...state,opponentAbility:appliedOpponentAbility,opponentSpeedStage:getPreferences(selected,'our').builderOpponentSpeedStage});
+  const combatant=battleEntry(selected,species);
+  const data = Battle.builderSpeedGroups(builderRoster(species),species,{...combatant,speedStage:getPreferences(selected,'our').speedStage},{...state,opponentAbility:appliedOpponentAbility,opponentSpeedStage:getPreferences(selected,'our').builderOpponentSpeedStage});
+  const ourItem=combatant.item;
   summary.innerHTML = `<strong>${escapeHtml(selected.nickname || battleSpecies(selected,'our').name)}</strong><span>Speed <b>${data.target}</b> · ${selected.investment.spe} SP · ${escapeHtml(selected.nature.name)}</span>`;
   summary.append(document.getElementById('builderStages'));
   const icon = member => {
@@ -2466,8 +2934,8 @@ function renderTeamBuilder() {
       ? `<span class="speed-chance-badge" title="${escapeHtml(speedEstimateDescription(member.speedEstimate))}">${speedEstimateText(member.speedEstimate)}</span>` : '';
     if(showEstimate) description+=`\n${speedEstimateDescription(member.speedEstimate)}`;
     description+=`\n${speedMatchupDescription(member.tier)}`;
-    description+=`\n${member.tie ? 'Same base Speed: ' : 'Base Speed: '}${member.baseSpeed}`;
-    const conditions=[member.weather,member.terrain,member.ability,selected.item ? `Our item: ${selected.item}` : ''].filter(Boolean);
+    description+=`\nDefault Speed (0 SP, neutral): ${member.defaultSpeed}`;
+    const conditions=[member.weather,member.terrain,member.ability,ourItem ? `Our item: ${ourItem}` : ''].filter(Boolean);
     if(conditions.length) description+=`\n${conditions.join(' · ')}`;
     const investmentEligible=!(member.tier.kind==='always-slower' && member.outspeedPoints===0);
     const showBadge=investmentEligible && member.outspeedPoints!==null;
@@ -2481,11 +2949,11 @@ function renderTeamBuilder() {
       <img src="${getPokemonImage(member.species.name)}" alt="${escapeHtml(description)}" loading="lazy" />${badge}${chanceBadge}</span>`;
   };
   const cloud = members => members.length ? `<div class="tier-icon-cloud">${members.map(icon).join('')}</div>` : '';
-  const tie = members => `<section id="builderSpeedTie" class="builder-speed-tie" aria-label="Speed Tie, matching base Speed"><h3>Speed Tie <small>Base ${data.baseSpeed}</small>${tierSelectionControls()}</h3>${cloud(members)}</section>`;
+  const tie = members => `<section id="builderSpeedTie" class="builder-speed-tie" aria-label="Matching default Speed"><h3>Same Default Speed <small>${data.defaultSpeed}</small>${tierSelectionControls()}</h3>${cloud(members)}</section>`;
   list.innerHTML = data.groups.filter(group => group.members.length).map(group => {
     const ties = group.members.filter(member => member.tie);
-    const body = ties.length ? cloud(group.members.filter(member => member.baseSpeed > data.baseSpeed)) + tie(ties)
-      + cloud(group.members.filter(member => member.baseSpeed < data.baseSpeed)) : cloud(group.members);
+    const body = ties.length ? cloud(group.members.filter(member => member.defaultSpeed > data.defaultSpeed)) + tie(ties)
+      + cloud(group.members.filter(member => member.defaultSpeed < data.defaultSpeed)) : cloud(group.members);
     return `<section class="builder-tier-group" data-speed-group="${group.kind}"><h3>${group.label}${tierSelectionControls()}</h3>${body}</section>`;
   }).join('');
   const key = `${state.activeTeamId}:${state.activeOurIndex}:${species.id}:${data.target}:${state.format}:${state.builderTopN}`;
@@ -2506,24 +2974,42 @@ function render() {
   renderDamageRanges();
   renderSearchResults();
   renderTeamBuilder();
+  if(gridUsagePicker) {
+    if(gridUsagePicker.input.isConnected || state.ourTeam.includes(gridUsagePicker.member)) refreshUsagePicker(gridUsagePicker);
+    else closeUsagePicker({picker:gridUsagePicker});
+  }
 }
 
-let activeItemTooltip=null;
+let itemTooltipTarget=null;
+let itemTooltipTimer;
 function hideItemTooltip() {
-  if(activeItemTooltip?.matches(':popover-open')) activeItemTooltip.hidePopover();
-  activeItemTooltip=null;
+  clearTimeout(itemTooltipTimer);
+  itemTooltipTarget?.querySelector('.item-tooltip:popover-open')?.hidePopover();
+  itemTooltipTarget=null;
 }
-function showItemTooltip(button) {
-  const tooltip=button.querySelector('.item-tooltip');
-  if(!tooltip) return;
-  hideItemTooltip();activeItemTooltip=tooltip;
-  tooltip.style.left='0px';tooltip.style.top='0px';tooltip.showPopover();
-  const anchor=button.getBoundingClientRect(),box=tooltip.getBoundingClientRect();
+function positionItemTooltip(target,tooltip) {
+  const anchor=target.getBoundingClientRect(),box=tooltip.getBoundingClientRect();
   tooltip.style.left=`${Math.max(8,Math.min(anchor.left,innerWidth-box.width-8))}px`;
   const top=anchor.bottom+6+box.height<=innerHeight-8 ? anchor.bottom+6 : anchor.top-box.height-6;
   tooltip.style.top=`${Math.max(8,Math.min(top,innerHeight-box.height-8))}px`;
 }
+function scheduleItemTooltip(target) {
+  if(itemTooltipTarget===target) return;
+  const tooltip=target.querySelector('.item-tooltip');
+  if(!tooltip) return;
+  hideItemTooltip();
+  itemTooltipTarget=target;
+  itemTooltipTimer=setTimeout(()=>{
+    if(!target.isConnected) {
+      hideItemTooltip();
+      return;
+    }
+    tooltip.showPopover();
+    positionItemTooltip(target,tooltip);
+  },500);
+}
 function bindStaticControls() {
+  bindTeamReorder(document.getElementById('ourTeamList'));
   const iconSize=document.getElementById('builderIconSize');
   const applyIconSize=value=>{
     const size=clamp(Number(value) || 94.5,54,160);
@@ -2568,27 +3054,39 @@ function bindStaticControls() {
     const stance=event.target.closest('[data-stance-side]');
     if(stance){const prefs=getPreferences(getPokemonByName('Aegislash'),stance.dataset.stanceSide);prefs.bladeActive=!prefs.bladeActive;savePreferences();render();return;}
     const button=event.target.closest('[data-mega-side]');if(!button) return;
-    const species=getPokemonByName(button.dataset.megaId),prefs=getPreferences(species,button.dataset.megaSide);
-    prefs.megaActive=!prefs.megaActive;savePreferences();render();
+    const side=button.dataset.megaSide;
+    const index=Number(button.closest(side==='our' ? '.team-row' : '.opponent-row').dataset[side==='our' ? 'teamIndex' : 'opponentIndex']);
+    const entry=(side==='our' ? state.ourTeam : state.opponentList)[index];
+    const prefs=getPreferences(entry,side);
+    prefs.megaActive=!prefs.megaActive;
+    savePreferences();
+    render();
+    const row=document.querySelector(side==='our' ? `.team-row[data-team-index="${index}"]` : `.opponent-row[data-opponent-index="${index}"]`);
+    (row?.querySelector('[data-mega-side]') || row?.querySelector('[data-field="item"]'))?.focus({preventScroll:true});
   });
   document.addEventListener('pointerover',event=>{
-    const button=event.target.closest('button.item-hint');
-    if(button && !button.contains(event.relatedTarget)) showItemTooltip(button);
+    const target=event.target.closest('.item-hint');
+    if(event.pointerType!=='touch' && target && !target.contains(event.relatedTarget)) scheduleItemTooltip(target);
   });
   document.addEventListener('pointerout',event=>{
-    const button=event.target.closest('button.item-hint');
-    if(button && !button.contains(event.relatedTarget)) hideItemTooltip();
+    const target=event.target.closest('.item-hint');
+    if(target && target===itemTooltipTarget && !target.contains(event.relatedTarget)) hideItemTooltip();
   });
   document.addEventListener('focusin',event=>{
-    if(event.target.matches('button.item-hint:focus-visible')) showItemTooltip(event.target);
+    if(event.target.matches('.item-hint:focus-visible')) scheduleItemTooltip(event.target);
   });
-  document.addEventListener('focusout',event=>{if(event.target.matches('button.item-hint')) hideItemTooltip();});
+  document.addEventListener('focusout',event=>{if(event.target===itemTooltipTarget) hideItemTooltip();});
+  document.addEventListener('pointerdown',hideItemTooltip);
   document.addEventListener('keydown',event=>{if(event.key==='Escape') hideItemTooltip();});
   window.addEventListener('resize',hideItemTooltip);
   document.addEventListener('scroll',()=>{
-    const button=activeItemTooltip?.closest('button');
-    if(button && (button.matches(':hover') || button.matches(':focus-visible'))) showItemTooltip(button);
-    else hideItemTooltip();
+    const target=itemTooltipTarget;
+    if(!target?.matches(':hover, :focus-visible')) {
+      hideItemTooltip();
+      return;
+    }
+    const tooltip=target.querySelector('.item-tooltip:popover-open');
+    if(tooltip) positionItemTooltip(target,tooltip);
   },true);
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-field-option]');
@@ -2737,10 +3235,12 @@ function bindStaticControls() {
     const index = Number(button.closest('[data-opponent-index]').dataset.opponentIndex);
     const opponent = state.opponentList[index];
     const name = button.dataset.opponentItem;
-    if (!getItemHints(getPokemonByName(opponent.name)).some(item => item.name === name)) return;
+    const species=savedSpecies(opponent);
     const prefs=getPreferences(opponent,'opponent');
-    prefs.itemChoice = prefs.itemChoice === name ? '' : name;
-    prefs.megaFormId=prefs.itemChoice?getItemHints(getPokemonByName(opponent.name)).find(item=>item.name===prefs.itemChoice)?.megaFormId||'':'';
+    const option=getItemHints(megaBaseSpecies(species),prefs).find(item=>item.name===name);
+    if(!option) return;
+    if(option.megaFormId) prefs.megaFormId=prefs.megaFormId===option.megaFormId ? '' : option.megaFormId;
+    else prefs.itemChoice=prefs.itemChoice===name ? '' : name;
     savePreferences();
     renderOpponentList();
     renderActiveSummary();renderDamageRanges();renderSpeedSummary();renderTeamBuilder();
@@ -2756,8 +3256,10 @@ function bindStaticControls() {
     if (!button) return;
     const name = button.dataset.assumedAbility;
     const opponent = state.opponentList[state.activeOpponentIndex];
-    const field=battleSpecies(opponent,'opponent').megaStoneName ? 'baseAbilityChoice' : 'abilityChoice';
-    getOpponentPreferences()[field] = appliedOpponentAbility(opponent) === name ? '' : name;
+    const species=battleSpecies(opponent,'opponent'),prefs=getOpponentPreferences();
+    const choice=appliedOpponentAbility(opponent) === name ? '' : name;
+    if(species.selectedMegaFromBase) prefs.megaAbilityChoices[species.calcId]=choice;
+    else prefs[opponentAbilityField(species)]=choice;
     savePreferences();
     renderActiveSummary();renderDamageRanges();
     renderSpeedSummary();renderTeamBuilder();
@@ -2778,19 +3280,36 @@ function bindStaticControls() {
       renderDamageRanges();
     });
   });
-  const createFilters=input=>new PokemonFilters({catalog:pokemonCatalog,generation:Battle.generation,usage:pokemonUsageReference,
+  const createFilters=input=>new PokemonFilters({catalog:pokemonCatalog,generation:Battle.generation,usage:pokemonUsageReference,dexNumber:pokedexNumber,
     moveMeta:Battle.moveMeta,priorityChoices,priorityRanking,usageData:getUsage,bindPicker:bindUsagePicker,moveMarkup:moveChoiceMarkup,abilityMarkup:abilityChoiceMarkup,
-    onApply:()=>{input.value='';}});
+    shouldFloat:()=>Boolean(gridUsagePicker),
+    onDismiss:()=>{if(gridUsagePicker) refreshUsagePicker(gridUsagePicker);},
+    onApply:()=>{
+      if(gridUsagePicker) {
+        const picker=gridUsagePicker;
+        resetUsagePickerQuery(picker,picker.query);
+        return picker.input.getClientRects().length ? picker.input : picker.popup.querySelector('[data-picker-control="edit-filters"]');
+      }
+      input.value='';
+    }});
   teamPokemonFilters=createFilters(document.getElementById('teamPokemonInput'));
   teamPokemonFilters.mount(document.getElementById('teamPokemonInput'));
   bindUsagePicker(document.getElementById('pokemonSearchInput'),{choices:query=>buildSearchResults(query),markup:pokemonChoiceMarkup,choose:item=>addOpponentFromSearch(item.name)});
-  bindUsagePicker(document.getElementById('teamPokemonInput'),{choices:buildTeamSearchResults,markup:pokemonChoiceMarkup,choose:item=>addTeamPokemon(item.name,item.savedBuild,item.satisfyingSet)});
+  bindUsagePicker(document.getElementById('teamPokemonInput'),{pokemonFilters:teamPokemonFilters,choices:buildTeamSearchResults,markup:pokemonChoiceMarkup,choose:item=>addTeamPokemon(item.name,item.savedBuild,item.satisfyingSet)});
   opponentVoice=new OpponentVoice.Controller({button:document.getElementById('opponentVoiceButton'),status:document.getElementById('opponentVoiceStatus'),catalog:pokemonCatalog,rank:species=>pokemonUsageReference(species)?.percent || 0,add:addOpponentsByName,active:()=>state.view==='battle'});
   document.addEventListener('pointerdown',event=>{
-    if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target) && event.target!==activeUsagePicker.input) closeUsagePicker();
+    if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target) && event.target!==activeUsagePicker.input) closeUsagePicker({commitDraft:true});
   });
-  window.addEventListener('resize',closeUsagePicker);
-  document.addEventListener('scroll',event=>{if(activeUsagePicker && !activeUsagePicker.popup.contains(event.target)){const box=activeUsagePicker.input.getBoundingClientRect();if(box.bottom>0 && box.top<innerHeight)positionUsagePicker();else closeUsagePicker();}},true);
+  window.addEventListener('resize',()=>{closeUsagePicker();positionUsagePicker(gridUsagePicker);teamPokemonFilters.positionPanel();});
+  document.addEventListener('scroll',event=>{
+    if(event.target.closest?.('.usage-choice-popup')) return;
+    if(activeUsagePicker) {
+      const box=activeUsagePicker.input.getBoundingClientRect();
+      if(box.bottom>0 && box.top<innerHeight)positionUsagePicker();else closeUsagePicker();
+    }
+    positionUsagePicker(gridUsagePicker);
+    teamPokemonFilters.positionPanel();
+  },true);
 
   const clearButton = document.getElementById('clearOpponentsButton');
   document.getElementById('resetBattleButton').addEventListener('click',resetBattle);
@@ -2961,10 +3480,9 @@ function setupItemHighlightEditor() {
 function initializeApp() {
   // Both views share this picker; keep it outside the hidden Battle sidebar.
   const choicePopup=document.getElementById('searchResults');
-  choicePopup.setAttribute('popover','manual');
+  choicePopup.classList.add('usage-choice-popup');choicePopup.setAttribute('popover','manual');
   document.body.append(choicePopup);
   document.getElementById('speciesList').innerHTML = pokerData.map(p => `<option value="${escapeHtml(p.name)}"></option>`).join('');
-  document.getElementById('rosterStatus').textContent = `${pokerData.length} species/forms · roster snapshot ${rosterSnapshot.generatedAt.slice(0, 10)}`;
   repairTeamState();
   initializeTeamLibrary();
 
@@ -2989,19 +3507,17 @@ function getEffectiveStat(entry, stat) {
   entry=battleEntry(entry);
   return stat === 'spe' ? Battle.speed(species, entry,state) : Battle.effectiveStat(species, entry, stat);
 }
-function statInvestmentBreakdown(entry,stat) {
-  const invested=Number(entry.investment?.[stat] || 0);
-  const species=battleSpecies(entry,'our'),combatant=battleEntry(entry);
+function statInvestmentBreakdown(entry,species,stat) {
   const base=species.stats[stat];
-  const nature=Battle.effectiveStat(species,combatant,stat)-base-invested;
+  const invested=base===1 && stat==='hp' ? 0 : Number(entry.investment[stat] || 0);
+  const nature=Battle.effectiveStat(species,entry,stat)-base-invested;
   if(!invested && !nature) return '';
-  const modifiers=getEffectiveStat(entry,stat)-base-invested-nature;
-  const delta=value=>`${value<0 ? '−' : '+'} ${Math.abs(value)}`;
-  return `(${base}${invested ? ` + ${invested}` : ''}${nature ? ` ${delta(nature)}` : ''}${modifiers ? ` ${delta(modifiers)}` : ''})`;
+  return `(${base}${invested ? ` + ${invested}` : ''}${nature ? ` ${nature<0 ? '−' : '+'} ${Math.abs(nature)}` : ''})`;
 }
 function updateStatInvestmentLabels(container,entry) {
-  for(const output of container.querySelectorAll('[data-stat-total]')) output.textContent=getEffectiveStat(entry,output.dataset.statTotal);
-  for(const breakdown of container.querySelectorAll('[data-stat-breakdown]')) breakdown.textContent=statInvestmentBreakdown(entry,breakdown.dataset.statBreakdown);
+  const species=battleSpecies(entry,'our');
+  for(const output of container.querySelectorAll('[data-stat-total]')) output.textContent=Battle.effectiveStat(species,entry,output.dataset.statTotal);
+  for(const breakdown of container.querySelectorAll('[data-stat-breakdown]')) breakdown.textContent=statInvestmentBreakdown(entry,species,breakdown.dataset.statBreakdown);
 }
 function getDefenseInvestmentLevels() {
   return [0, 35, 64].map(points => ({points, label: `${points} SP: optimal HP / relevant defense`}));
@@ -3207,7 +3723,10 @@ function renderDamageRanges() {
 
 Battle.resolveCombatant=(species,entry)=>{
   const side=Array.isArray(entry.moveSet) ? 'our' : 'opponent';
-  const effective=battleSpecies(species,side);
-  return effective?.megaStoneName || PokemonForms.isAegislash(species) || PokemonForms.isCastform(species) ? {species:effective,entry:battleEntry({...entry,id:species.id,name:species.name},side)} : {species,entry};
+  const effective=battleSpecies({...species,item:entry.item,ability:entry.ability},side);
+  if(effective.originalName || effective.selectedMegaFromBase || PokemonForms.isAegislash(species) || PokemonForms.isCastform(species)) {
+    return {species:effective,entry:side==='our' ? battleEntry(entry,effective) : entry};
+  }
+  return {species,entry};
 };
 initializeApp();

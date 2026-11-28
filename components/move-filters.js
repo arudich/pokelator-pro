@@ -28,6 +28,16 @@
     const healing=Boolean(e.heal || e.drain || ['Rest','Wish','Strength Sap','Morning Sun','Synthesis','Moonlight','Shore Up','Floral Healing','Purify','Jungle Healing','Lunar Blessing','Swallow'].includes(move.name));
     const result={effect:e,selfBoost,targetBoost,status,healing};cache.set(move.name,result);return result;
   }
+  function stabType(move,species) {
+    if(!move || move.category==='Status' || !species)return null;
+    const {effect}=traits(move);
+    const abilities=species.ability ? [species.ability] : species.abilities || [];
+    const converters={Aerilate:'Flying',Pixilate:'Fairy',Refrigerate:'Ice',Galvanize:'Electric'};
+    let type=move.type;
+    if(type==='Normal')type=abilities.map(a=>converters[a]).find(t=>species.types.includes(t)) || type;
+    if(effect.flags?.sound && abilities.includes('Liquid Voice'))type='Water';
+    return species.types.includes(type) || abilities.some(a=>a==='Protean' || a==='Libero') ? type : null;
+  }
   function matches(move,q={},species=null) {
     if(!move)return false;
     const {effect:e,selfBoost,targetBoost,status,healing}=traits(move);
@@ -35,15 +45,7 @@
     if(q.type && move.type!==q.type)return false;
     const power=Number(move.power || 0);
     if(q.minPower!==undefined && power<q.minPower || q.maxPower!==undefined && power>q.maxPower)return false;
-    if(q.stab) {
-      if(move.category==='Status' || !species)return false;
-      let type=move.type;
-      const ability=species.ability,abilities=ability ? [ability] : species.abilities || [];
-      const converters={Aerilate:'Flying',Pixilate:'Fairy',Refrigerate:'Ice',Galvanize:'Electric'};
-      if(type==='Normal')type=abilities.map(a=>converters[a]).find(t=>species.types.includes(t)) || type;
-      if(e.flags?.sound && abilities.includes('Liquid Voice'))type='Water';
-      if(!species.types.includes(type) && !abilities.some(a=>a==='Protean' || a==='Libero'))return false;
-    }
+    if(q.stab && !stabType(move,species))return false;
     const multi=Boolean(move.multihit || e.multihit);
     if(q.multihit==='yes' && !multi || q.multihit==='no' && multi)return false;
     let priority=e.priority || 0;
@@ -146,5 +148,5 @@
       if(this.panel.matches(':popover-open'))this.position();
     }
   }
-  window.MoveFilters={matches,traits,describe,Picker};
+  window.MoveFilters={matches,stabType,traits,describe,Picker};
 })();

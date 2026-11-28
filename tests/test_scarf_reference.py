@@ -1,3 +1,4 @@
+import datetime
 import unittest
 import test_app as app_tests
 
@@ -51,7 +52,7 @@ class ScarfReferenceTests(unittest.TestCase):
             self.assertIsNone(item.get_attribute('title'))
             item.hover()
             tooltip=self.page.locator('.item-tooltip:popover-open')
-            self.assertTrue(tooltip.is_visible())
+            tooltip.wait_for(state='visible')
             box=tooltip.bounding_box()
             self.assertGreaterEqual(box['x'],0)
             self.assertLessEqual(box['x']+box['width'],width)
@@ -60,3 +61,44 @@ class ScarfReferenceTests(unittest.TestCase):
             item.click()
             self.page.mouse.move(5,5)
             self.assertEqual(self.page.locator('.item-tooltip:popover-open').count(),0)
+
+    def test_known_items_and_form_controls_share_the_half_second_tooltip(self):
+        self.load(frozen_usage=True)
+        self.evaluate("""() => {
+          state.ourTeam=[
+            sanitizeTeamEntry({name:'Aerodactyl',item:'Focus Sash'}),
+            sanitizeTeamEntry({name:'Aegislash',item:'Life Orb'}),
+            sanitizeTeamEntry({name:'Mega Medicham'})
+          ];
+          state.opponentList=[sanitizeOpponentEntry({name:'Kingambit'})];
+          state.activeOurIndex=state.activeOpponentIndex=0;render();
+        }""")
+        self.page.clock.install()
+        self.page.clock.pause_at(datetime.datetime.now(datetime.timezone.utc))
+        active_tooltip=self.page.locator('.item-tooltip:popover-open')
+        controls=[
+            ('#opponentList [data-opponent-item="Life Orb"]','Life Orb'),
+            ('#ourTeamList .known-item','Focus Sash'),
+            ('#ourTeamList .stance-toggle','Blade Forme'),
+            ('#ourTeamList [data-mega-side="our"]','Medichamite'),
+        ]
+        opponent_style=None
+        for selector,label in controls:
+            with self.subTest(control=label):
+                target=self.page.locator(selector).first
+                self.assertIsNone(target.get_attribute('title'))
+                target.dispatch_event('pointerover',{'pointerType':'mouse'})
+                self.page.clock.run_for(499)
+                self.assertEqual(active_tooltip.count(),0)
+                self.page.clock.run_for(1)
+                self.assertIn(label,active_tooltip.inner_text())
+                style=active_tooltip.evaluate("""tooltip => {
+                  const {backgroundColor,border,color}=getComputedStyle(tooltip);
+                  return {backgroundColor,border,color};
+                }""")
+                if opponent_style is None:
+                    opponent_style=style
+                self.assertEqual(style,opponent_style)
+                self.assertIn('solid',style['border'])
+                target.dispatch_event('pointerout',{'pointerType':'mouse'})
+                self.assertEqual(active_tooltip.count(),0)

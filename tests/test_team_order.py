@@ -43,6 +43,45 @@ class TeamOrderTests(unittest.TestCase):
         self.page.set_viewport_size({'width':390,'height':844})
         self.assertTrue(self.evaluate('document.documentElement.scrollWidth<=innerWidth'))
 
+    def test_drag_inserts_at_the_target_slot_and_keeps_the_selected_pokemon(self):
+        self.load()
+        original=self.evaluate('state.ourTeam.map(p=>p.name)')
+        selected=original[0]
+
+        def drag_to(source, destination, surface='.team-avatar', drop=True, allowed=True):
+            source_handle=self.page.locator(f'.team-row[data-team-index="{source}"] {surface}')
+            target=self.page.locator(f'.team-row[data-team-index="{destination}"]')
+            start=source_handle.bounding_box()
+            end=target.locator('.column-tag').bounding_box()
+            self.page.mouse.move(start['x']+start['width']/2,start['y']+start['height']/2)
+            self.page.mouse.down()
+            self.page.mouse.move(end['x']+end['width']/2,end['y']+end['height']/2,steps=12)
+            marker='before' if destination<source else 'after'
+            self.assertEqual(target.get_attribute('data-team-drop'),marker if allowed else None)
+            if not drop:
+                self.page.keyboard.press('Escape')
+            self.page.mouse.up()
+            self.assertEqual(self.page.locator('[data-team-drop], .team-drag-source').count(),0)
+
+        drag_to(2,0,drop=False)
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),original)
+        drag_to(2,0)
+        expected=[original[2],original[0],original[1]]
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),expected)
+        self.assertEqual(self.evaluate('state.ourTeam[state.activeOurIndex].name'),selected)
+        self.assertEqual(self.page.locator('.expanded-team').get_attribute('data-team-index'),'1')
+
+        self.assertEqual(self.page.locator('.expanded-team [data-team-drag]').count(),0)
+        drag_to(1,2,surface='.pokemon-name',allowed=False)
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),expected)
+        drag_to(2,1,surface='.pokemon-name')
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),[original[2],original[1],original[0]])
+        self.assertEqual(self.evaluate('state.ourTeam[state.activeOurIndex].name'),selected)
+        self.page.keyboard.press('Control+z')
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),expected)
+        self.page.reload()
+        self.assertEqual(self.evaluate('state.ourTeam.map(p=>p.name)'),expected)
+
     def test_team_offense_defaults_to_first_two_and_respects_manual_choices(self):
         self.load()
         self.evaluate("""() => {

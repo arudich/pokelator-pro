@@ -1,28 +1,26 @@
 /* Pokémon-picker constraints; type resistance uses the net defensive typing. */
 (() => {
-  const stats={hp:'HP',atk:'Attack',def:'Defense',spa:'Sp. Atk',spd:'Sp. Def',spe:'Speed'};
+  const sortLabels={usage:'Usage Ranking',dex:'Pokédex Number',priority:'Priority Strength',hp:'HP',atk:'Attack',def:'Defense',spa:'Sp. Atk',spd:'Sp. Def',spe:'Speed'};
   class PokemonFilters {
-    constructor({catalog,generation,usage,moveMeta,bindPicker,moveMarkup,abilityMarkup,onApply,priorityChoices=()=>[],priorityRanking=()=>null,usageData=()=>null}) {
-      Object.assign(this,{catalog,generation,usage,moveMeta,bindPicker,moveMarkup,abilityMarkup,onApply,priorityChoices,priorityRanking,usageData});
-      this.stabTypeCache=new WeakMap();this.moveQueryCache=new Map();this.moveMetaCache=new Map();this.satisfyingCache=new WeakMap();
+    constructor({catalog,generation,usage,dexNumber,moveMeta,bindPicker,moveMarkup,abilityMarkup,onApply,onDismiss=()=>{},shouldFloat=()=>false,priorityChoices=()=>[],priorityRanking=()=>null,usageData=()=>null}) {
+      Object.assign(this,{catalog,generation,usage,dexNumber,moveMeta,bindPicker,moveMarkup,abilityMarkup,onApply,onDismiss,shouldFloat,priorityChoices,priorityRanking,usageData});
+      this.moveQueryCache=new Map();this.moveMetaCache=new Map();this.satisfyingCache=new WeakMap();
+      this.moveOptions={moveMeta:name=>this.meta(name),priorityChoices,
+        typeEffectiveness:(type,target)=>this.generation.types.get(type.toLowerCase())?.effectiveness[target] ?? 1};
       this.reset();
     }
-    reset() {this.moves=[];this.moveQueries=[];this.abilities=[];this.types=[];this.resists=[];this.stabTargets=[];this.priorityRequired=false;this.priorityConditional=true;this.priorityUsage=0;this.priorityCategory='';this.priorityType='';this.sort='usage';this.showAll=false;this.openSections=new Set();this.lastSection=null;}
+    reset() {this.moves=[];this.moveQueries=[];this.abilities=[];this.types=[];this.resists=[];this.stabTargets=[];this.priorityRequired=false;this.priorityConditional=true;this.priorityUsage=0;this.priorityCategory='';this.priorityType='';this.sort='usage';this.enabled=true;this.showAll=false;this.openSections=new Set();this.lastSection=null;}
     get active() {return this.moves.length+this.moveQueries.length+this.abilities.length+this.types.length+this.resists.length+this.stabTargets.length>0 || this.priorityRequired || this.sort!=='usage';}
-    base(species,stat) {return species.stats[stat]-(stat==='hp' ? species.stats.hp===1 ? 0 : 75 : 20);}
-    stabTypes(species) {
-      if(!this.stabTypeCache.has(species)) {
-        const types=new Set(species.types);
-        if(species.abilities.some(name=>name==='Protean' || name==='Libero')) {
-          for(const name of species.learnset) {
-            const move=this.moveMeta(name);
-            if(move && move.category!=='Status') types.add(move.type);
-          }
-        }
-        this.stabTypeCache.set(species,[...types]);
-      }
-      return this.stabTypeCache.get(species);
+    get requiresMoves() { return this.enabled && this.hasMoveRequirements(); }
+    setEnabled(enabled) {
+      this.enabled=enabled;
+      this.updateButton();
     }
+    updateButton() {
+      this.button.textContent=this.active && this.enabled ? 'Filters •' : 'Filters';
+      this.button.title=this.active && !this.enabled ? 'Pokémon filters are off' : '';
+    }
+    base(species,stat) {return species.stats[stat]-(stat==='hp' ? species.stats.hp===1 ? 0 : 75 : 20);}
     queryMatches(species,queries,abilities=species.abilities || []) {
       if(!queries.length)return true;
       const key=JSON.stringify([species.id || species.name,queries,abilities]);
@@ -35,29 +33,26 @@
       const abilities=species.abilities.filter(a=>!this.abilities.length || this.abilities.includes(a));
       return abilities.some(ability=>{
         const context={...species,ability};if(!MoveFilters.matches(move,q,context))return false;
-        const tests=[...this.moves.map(required=>name=>name===required),...this.moveQueries.map(query=>name=>MoveFilters.matches(this.meta(name),query,context)),name=>name===move.name];
-        if(this.priorityRequired || this.sort==='priority') {
-          const names=new Set(this.priorityChoices(species,{...this,abilities:[ability]}).map(m=>m.name));tests.push(name=>names.has(name));
-        }
-        return SatisfyingMoves.canAssign(species.learnset.filter(name=>this.meta(name)),tests);
+        return Boolean(this.satisfyingSet(species,{...this,moves:[...this.moves,move.name],abilities:[ability]}));
       });
     }
-    hasMoveRequirements(filters=this) {return Boolean(filters.moves.length || filters.moveQueries?.length || filters.priorityRequired || filters.sort==='priority');}
+    hasMoveRequirements(filters=this) {return Boolean(filters.moves.length || filters.moveQueries?.length || filters.stabTargets?.length || filters.priorityRequired || filters.sort==='priority');}
     satisfyingSet(species,filters=this) {
       if(!this.hasMoveRequirements(filters))return null;
-      const usage=this.usageData(species),owner=usage || species;
-      if(!this.satisfyingCache.has(owner))this.satisfyingCache.set(owner,new Map());
-      const cache=this.satisfyingCache.get(owner),key=JSON.stringify([species.id || species.name,filters.moves,filters.moveQueries,filters.abilities,filters.priorityRequired,filters.sort==='priority',filters.priorityConditional,filters.priorityUsage,filters.priorityCategory,filters.priorityType]);
-      if(!cache.has(key)) {
+      const usage=this.usageData(species);
+      if(!this.satisfyingCache.has(species))this.satisfyingCache.set(species,new Map());
+      const cache=this.satisfyingCache.get(species),key=JSON.stringify([filters.moves,filters.moveQueries,filters.stabTargets,filters.abilities,filters.priorityRequired,filters.sort==='priority',filters.priorityConditional,filters.priorityUsage,filters.priorityCategory,filters.priorityType]);
+      if(!cache.has(key) || cache.get(key).usage!==usage) {
         if(cache.size>=64)cache.delete(cache.keys().next().value);
-        cache.set(key,SatisfyingMoves.build(species,filters,usage,{moveMeta:name=>this.meta(name),priorityChoices:this.priorityChoices}));
+        cache.set(key,{usage,set:SatisfyingMoves.build(species,filters,usage,this.moveOptions)});
       }
-      return cache.get(key);
+      return cache.get(key).set;
+    }
+    satisfyingBuild(species,entry) {
+      return SatisfyingMoves.build({...species,abilities:[entry.ability],learnset:entry.moveSet || []},this,this.usageData(species),this.moveOptions);
     }
     matchesBuild(species,entry) {
-      if(this.abilities.length && !this.abilities.includes(entry.ability))return false;
-      const options={moveMeta:name=>this.meta(name),priorityChoices:this.priorityChoices};
-      return Boolean(SatisfyingMoves.build({...species,abilities:[entry.ability],learnset:entry.moveSet || []},this,this.usageData(species),options));
+      return Boolean(this.satisfyingBuild(species,entry));
     }
 
     matches(species,filters=this) {
@@ -67,25 +62,32 @@
         && filters.types.every(type=>species.types.includes(type))
         && filters.resists.every(type=>species.types.reduce((factor,defense)=>factor*(this.generation.types.get(type.toLowerCase())?.effectiveness[defense] ?? 1),1)<1)
         && (!(filters.priorityRequired || filters.sort==='priority') || this.priorityChoices(species,filters).length>0)
-        && filters.stabTargets.every(target=>this.stabTypes(species).some(type=>(this.generation.types.get(type.toLowerCase())?.effectiveness[target] ?? 1)>1))
         && (!this.hasMoveRequirements(filters) || Boolean(this.satisfyingSet(species,filters)));
     }
     canChange(key,values) {
       const filters={...this,[key]:values};
       const addingStabType=key==='stabTargets' && values.some(type=>!this.stabTargets.includes(type));
       return this.catalog.some(species=>this.matches(species,filters)
-        && (!addingStabType || values.every(target=>species.types.some(type=>(this.generation.types.get(type.toLowerCase())?.effectiveness[target] ?? 1)>1))));
+        && (!addingStabType || values.every(target=>species.types.some(type=>this.moveOptions.typeEffectiveness(type,target)>1))));
     }
     change(key,values) {
       if(((key==='moves' || key==='moveQueries') && values.length+(key==='moves' ? this.moveQueries.length : this.moves.length)>4) || (key==='types' && values.length>2) || !this.canChange(key,values)) return false;
       this[key]=values;return true;
     }
     apply(rows) {
-      const ranking=this.sort==='priority' ? this.priorityRanking(this) : null;
-      return rows.filter(species=>this.matches(species)).sort((a,b)=>
-        (this.sort==='priority' ? (ranking?.get(b.id)?.score ?? -1)-(ranking?.get(a.id)?.score ?? -1) : this.sort==='usage' ? (this.usage(a)?.rank ?? Infinity)-(this.usage(b)?.rank ?? Infinity) : this.base(b,this.sort)-this.base(a,this.sort))
-        || (a.usage?.rank ?? Infinity)-(b.usage?.rank ?? Infinity) || a.name.localeCompare(b.name))
-        .map(species=>({...species,satisfyingSet:this.satisfyingSet(species),pickerSort:this.sort,priorityBest:ranking?.get(species.id),priorityPending:this.sort==='priority' && !ranking,priorityOptions:this.priorityRequired || this.sort==='priority' ? this.priorityChoices(species,this) : null,pickerSortValue:this.sort==='usage' ? this.usage(species)?.rank : this.sort==='priority' ? ranking?.get(species.id)?.score : this.base(species,this.sort)}));
+      const sort=this.enabled ? this.sort : 'usage';
+      const ranking=sort==='priority' ? this.priorityRanking(this) : null;
+      const showPriority=this.enabled && (this.priorityRequired || sort==='priority');
+      const matches=this.enabled ? rows.filter(species=>this.matches(species)) : [...rows];
+      const score=sort==='usage' ? species=>this.usage(species)?.rank : sort==='dex' ? this.dexNumber
+        : sort==='priority' ? species=>ranking?.get(species.id)?.score : species=>this.base(species,sort);
+      const ascending=sort==='usage' || sort==='dex';
+      return matches.map(species=>({...species,satisfyingSet:this.requiresMoves ? this.satisfyingSet(species) : null,pickerSort:sort,
+        priorityBest:ranking?.get(species.id),priorityPending:sort==='priority' && !ranking,
+        priorityOptions:showPriority ? this.priorityChoices(species,this) : null,pickerSortValue:score(species)}))
+        .sort((a,b)=>(ascending ? (a.pickerSortValue ?? Infinity)-(b.pickerSortValue ?? Infinity) : (b.pickerSortValue ?? -1)-(a.pickerSortValue ?? -1))
+          || (sort==='dex' ? Number(a.form!=='Base')-Number(b.form!=='Base') : (a.usage?.rank ?? Infinity)-(b.usage?.rank ?? Infinity))
+          || a.name.localeCompare(b.name));
     }
     priorityMarkup(types) {
       const control=(key,value,label)=>{const valid=this.canChange(key,value) && (key==='priorityRequired' || this.catalog.some(s=>this.matches(s,{...this,[key]:value,priorityRequired:true})));return valid ? `<button type="button" class="mini-button" data-priority-key="${key}" data-priority-value='${JSON.stringify(value)}' aria-pressed="${this[key]===value}">${label}</button>` : '';};
@@ -103,8 +105,63 @@
       this.panel=document.createElement('section');this.panel.className='pokemon-filter-panel';this.panel.hidden=true;
       this.panel.id=input.id+'Filters';this.button.setAttribute('aria-controls',this.panel.id);
       input.closest('.search-box').append(this.panel);
-      this.button.addEventListener('click',()=>{this.panel.hidden=!this.panel.hidden;this.button.setAttribute('aria-expanded',String(!this.panel.hidden));if(!this.panel.hidden)this.render();});
+      this.button.addEventListener('click',()=>this.toggle(this.button));
+      new ResizeObserver(()=>this.positionPanel()).observe(this.panel);
       this.render();
+    }
+    setGridButton(button) {
+      if(this.gridButton && this.trigger===this.gridButton) this.trigger=button || this.button;
+      this.gridButton=button;
+      this.updateExpanded();
+      this.positionPanel();
+    }
+    updateExpanded() {
+      const expanded=String(!this.panel.hidden);
+      this.button.setAttribute('aria-expanded',expanded);
+      this.gridButton?.setAttribute('aria-expanded',expanded);
+    }
+    toggle(trigger) {
+      this.trigger=trigger;
+      if(!this.panel.hidden) {this.close(true);return;}
+      this.panel.hidden=false;
+      this.updateExpanded();
+      this.render();
+      this.syncPanelLayer();
+      if(this.panel.matches(':popover-open')) this.panel.querySelector('[data-filter-close]').focus({preventScroll:true});
+    }
+    close(restoreFocus=false) {
+      this.panel.hidden=true;
+      this.updateExpanded();
+      this.syncPanelLayer();
+      if(restoreFocus) {
+        this.onDismiss();
+        (this.trigger?.isConnected ? this.trigger : this.button).focus({preventScroll:true});
+      }
+    }
+    syncPanelLayer() {
+      const floating=!this.panel.hidden && this.shouldFloat();
+      if(floating && !this.panel.hasAttribute('popover')) {
+        this.panel.setAttribute('popover','manual');
+        this.panel.showPopover();
+        this.positionPanel();
+      } else if(!floating && this.panel.hasAttribute('popover')) {
+        this.panel.hidePopover();
+        this.panel.removeAttribute('popover');
+        this.panel.removeAttribute('style');
+      }
+    }
+    positionPanel() {
+      if(!this.panel.matches(':popover-open'))return;
+      const anchor=this.input.parentElement.getBoundingClientRect();
+      const trigger=this.trigger?.getBoundingClientRect();
+      const reference=trigger?.height && trigger.bottom>0 && trigger.top<innerHeight ? trigger : anchor;
+      const width=Math.min(Math.max(anchor.width,240),innerWidth-16);
+      const above=reference.top-16,below=innerHeight-reference.bottom-16;
+      const down=below>=Math.min(330,above);
+      this.panel.style.width=`${width}px`;
+      this.panel.style.left=`${Math.max(8,Math.min(anchor.left,innerWidth-width-8))}px`;
+      this.panel.style.maxHeight=`${Math.max(0,Math.min(550,down ? below : above))}px`;
+      this.panel.style.top=`${Math.max(8,down ? reference.bottom+8 : reference.top-this.panel.offsetHeight-8)}px`;
     }
     render() {
       const typeNames=[...this.generation.types].map(type=>type.name).filter(name=>name!=='???' && name!=='Stellar');
@@ -119,10 +176,9 @@
         +section('resists','Resists Type',selected('resists'),`<small>Resist every selected type; immunities count</small><div class="filter-types">${typeButtons('resists')}</div>`)
         +section('stabTargets','Super-Effective STAB',selected('stabTargets'),`<small title="Protean and Libero appear in results, but each added type must leave a Pokémon covering all selected types with its natural STAB.">Into each selected type · includes Protean / Libero</small><div class="filter-types">${typeButtons('stabTargets')}</div>`)
         +section('priority','Priority',this.priorityRequired || this.sort==='priority' ? 'Damaging attacks' : 'Any',this.priorityMarkup(typeNames))
-        +section('sort','Sort By',this.sort==='usage' ? 'Usage Ranking' : this.sort==='priority' ? 'Priority Strength' : stats[this.sort],`<div class="filter-types">${Object.entries({usage:'Usage Ranking',priority:'Priority Strength',...stats}).filter(([key])=>key!=='priority' || this.canChange('sort','priority')).map(([key,label])=>`<button type="button" class="mini-button" data-filter-sort="${key}" aria-pressed="${this.sort===key}">${label}</button>`).join('')}</div>`)
+        +section('sort','Sort By',sortLabels[this.sort],`<div class="filter-types">${Object.entries(sortLabels).filter(([key])=>key!=='priority' || this.canChange('sort','priority')).map(([key,label])=>`<button type="button" class="mini-button" data-filter-sort="${key}" aria-pressed="${this.sort===key}">${label}</button>`).join('')}</div>`)
         +`<div class="filter-actions"><span>${this.catalog.filter(species=>this.matches(species)).length} matching Pokémon</span><button type="button" class="mini-button" data-filter-reset>Reset</button><button type="button" class="mini-button" data-filter-apply>Show Pokémon</button></div>`;
-      const close=()=>{this.panel.hidden=true;this.button.setAttribute('aria-expanded','false');};
-      this.panel.querySelector('[data-filter-close]').onclick=()=>{close();this.button.focus();};
+      this.panel.querySelector('[data-filter-close]').onclick=()=>this.close(true);
       const visitSection=next=>{
         if(this.lastSection && this.lastSection!==next) {
           const previous=this.lastSection;
@@ -141,7 +197,7 @@
         details.open=open;
         if(open)this.openSections.add(details.dataset.filterSection);else this.openSections.delete(details.dataset.filterSection);
       };
-      this.button.textContent=this.active ? `Filters •` : 'Filters';
+      this.updateButton();
       for(const input of this.panel.querySelectorAll('[data-filter-search]')) {
         const key=input.dataset.filterSearch;
         const viable=this.catalog.filter(species=>this.matches(species,key==='abilities' ? {...this,abilities:[]} : this));
@@ -159,7 +215,10 @@
       this.panel.querySelectorAll('[data-filter-sort]').forEach(button=>button.onclick=()=>{if(this.canChange('sort',button.dataset.filterSort))this.sort=button.dataset.filterSort;this.render();});
       this.panel.querySelectorAll('[data-priority-key]').forEach(button=>button.onclick=()=>{const key=button.dataset.priorityKey,value=JSON.parse(button.dataset.priorityValue);if(this.canChange(key,value)){this[key]=value;if(key==='priorityRequired' && !value && this.sort==='priority')this.sort='usage';if(key!=='priorityRequired')this.priorityRequired=true;}this.render();});
       this.panel.querySelector('[data-filter-reset]').onclick=()=>{this.reset();this.render();};
-      this.panel.querySelector('[data-filter-apply]').onclick=()=>{this.showAll=true;this.onApply();close();this.input.focus();};
+      this.panel.querySelector('[data-filter-apply]').onclick=()=>{
+        this.showAll=true;this.setEnabled(true);this.close();
+        (this.onApply() || this.input).focus();
+      };
     }
   }
   window.PokemonFilters=PokemonFilters;

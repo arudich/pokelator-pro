@@ -28,7 +28,7 @@
       tip.style.top=`${Math.max(8,anchor.bottom+8+box.height<=innerHeight-8 ? anchor.bottom+8 : anchor.top-box.height-8)}px`;
       if(!target.hasAttribute('aria-describedby'))target.setAttribute('aria-describedby','quickTooltip');
     };
-    timer=setTimeout(reveal,immediate ? 0 : 250);
+    timer=setTimeout(reveal,immediate ? 0 : 500);
   }
   document.addEventListener('pointerover',event=>{
     if(event.pointerType==='touch')return;

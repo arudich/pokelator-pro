@@ -3,8 +3,8 @@
 Five screens introduce the app, with one caption per picture:
 
 1. **Overview** — approximately three-second battle queries using preloaded meta data; team-building previews and browser-saved teams.
-2. **Advanced Filtering** — a large language example (“An Attack boost and a physical Fire move with 75+ power”) beside two compact real move requirements and matching Pokémon; the same filters also work in team move pickers.
-3. **Battle** — opponent selection, damage in both directions, weather/terrain, fainted allies, abilities/items, stat stages and Speed scenarios, plus “Hover When Confused!” with a real item tooltip.
+2. **Advanced Filtering** — a language example (“An Attack boost and a physical Fire move with 75+ power”) beside two move requirements and a results grid with base stats and qualifying moves. The same move filters work in team move pickers.
+3. **Battle** — opponent selection, our active Pokémon’s stats, opponent stat ranges, damage in both directions, battle conditions and Speed scenarios, with a real item tooltip.
 4. **Team building** — Speed thresholds, Offense/Team Offense coverage and move previews, Defense spread previews, Balance matchups and optimization, with independent move and stat Lock In buttons.
 5. **References** — highlights shared across views/reloads, searching outside Top N, highlighted-only calculations and named sets.
 

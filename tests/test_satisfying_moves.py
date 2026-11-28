@@ -90,3 +90,19 @@ class SatisfyingMoveTests(unittest.TestCase):
         }""")
         self.assertFalse(result['wrong'])
         self.assertTrue(result['right'])
+
+    def test_stab_can_reuse_a_required_move_but_cannot_add_a_fifth_move(self):
+        self.load()
+        result=self.evaluate("""() => {
+          const f=teamPokemonFilters,spiritomb=getPokemonByName('Spiritomb');
+          f.stabTargets=['Ghost','Psychic'];
+          const reused=f.satisfyingSet(spiritomb,{...f,moves:['Shadow Ball','Trick Room']});
+          f.moves=['Trick Room','Toxic'];
+          const exact={ability:spiritomb.abilities[0],moveSet:['Trick Room','Toxic']};
+          return {reused:reused.moveSet,wrong:f.matchesBuild(spiritomb,exact),right:f.matchesBuild(spiritomb,{...exact,moveSet:[...exact.moveSet,'Shadow Ball']}),
+            tooMany:f.satisfyingSet(spiritomb,{...f,moves:['Trick Room','Toxic','Protect','Will-O-Wisp']})};
+        }""")
+        self.assertEqual(result['reused'],['Shadow Ball','Trick Room'])
+        self.assertFalse(result['wrong'])
+        self.assertTrue(result['right'])
+        self.assertIsNone(result['tooMany'])
